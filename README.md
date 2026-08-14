@@ -122,7 +122,7 @@ Servicios publicados:
 | Servicio | Dirección |
 |---|---|
 | Sistema web | `http://localhost:3000` |
-| API y salud | `http://localhost:8080/salud` (solo en el computador anfitrión) |
+| API | Interna en `http://api:8080`; el frontal la consume mediante `/backend` |
 
 La API recibe la conexión remota mediante una variable de entorno y no almacena la cadena dentro de la imagen. Su comprobación de salud valida también la conectividad con SQL Server, y el frontal espera a que esa comprobación sea correcta antes de iniciar.
 
@@ -134,9 +134,27 @@ Para detener el sistema sin eliminar la base de datos:
 docker compose down
 ```
 
-Los puertos, la empresa de desarrollo, la cadena remota y la aplicación controlada de migraciones pueden configurarse en `.env` antes de levantar los servicios.
+Los puertos, la dirección de publicación del frontal, la empresa de desarrollo, la cadena remota y la aplicación controlada de migraciones pueden configurarse en `.env` antes de levantar los servicios. Al copiar `.env.example`, `TALLERES_WEB_IP_PUBLICACION=0.0.0.0` permite abrir el frontal desde una tablet de la red local.
 
-La API se publica únicamente sobre `127.0.0.1`; desde otros dispositivos se accede a sus funciones mediante el frontal y su proxy interno. Docker no crea, almacena ni elimina la base de datos remota.
+La API no publica un puerto en el anfitrión; desde el navegador se accede a sus funciones mediante el frontal y su proxy interno. Docker no crea, almacena ni elimina la base de datos remota.
+
+## Despliegue en Coolify
+
+Coolify debe desplegar el repositorio como **Docker Compose**, usando `/compose.yaml` como ruta del archivo. No seleccione `src/Talleres.Api/Dockerfile` como recurso independiente: ese Dockerfile solo construye la API, mientras que `compose.yaml` construye y coordina la API y el sistema web en contenedores separados.
+
+Configure estas variables en la sección **Environment Variables** de Coolify:
+
+| Variable | Requerida | Valor recomendado |
+|---|---:|---|
+| `TALLERES_CONNECTION_STRING` | Sí | Cadena secreta de SQL Server remoto |
+| `TALLERES_APLICAR_MIGRACIONES` | No | `false`; habilitarla solo deliberadamente |
+| `TALLERES_EMPRESA_ID` | No | `1` mientras se implementa autenticación |
+| `TALLERES_WEB_IP_PUBLICACION` | No | `127.0.0.1` |
+| `TALLERES_WEB_PORT` | No | `0`, para que Docker asigne un puerto anfitrión libre |
+
+Asigne el dominio público solamente al servicio `web` e indique el puerto interno `3000` en el dominio de Coolify, por ejemplo `https://talleres.example.com:3000`. No asigne un dominio al servicio `api`: no publica ningún puerto del servidor y el frontal reenvía `/backend` de forma privada a `http://api:8080` dentro de la red de Docker.
+
+El archivo `.env` es solo para ejecución local y nunca debe subirse a Git. En Coolify, la cadena de conexión se guarda como variable secreta del recurso.
 
 ## Rutas principales
 

@@ -10,11 +10,11 @@ services:
       ASPNETCORE_HTTP_PORTS: 8080
       BaseDatos__AplicarMigracionesAlIniciar: "${TALLERES_APLICAR_MIGRACIONES:-false}"
       Http__UsarRedireccionHttps: "false"
-      ConnectionStrings__TallerDb: "${TALLERES_CONNECTION_STRING:?Defina TALLERES_CONNECTION_STRING en el archivo .env}"
+      ConnectionStrings__TallerDb: "${TALLERES_CONNECTION_STRING:?Configure TALLERES_CONNECTION_STRING en Coolify o en el archivo .env local}"
       Cors__OrigenesPermitidos__0: "http://localhost:${TALLERES_WEB_PORT:-3000}"
       Cors__OrigenesPermitidos__1: "http://127.0.0.1:${TALLERES_WEB_PORT:-3000}"
-    ports:
-      - "127.0.0.1:${TALLERES_API_PORT:-8080}:8080"
+    expose:
+      - "8080"
     healthcheck:
       test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8080/salud"]
       interval: 5s
@@ -35,8 +35,10 @@ services:
       PORT: 3000
       HOST: 0.0.0.0
       TALLERES_API_INTERNA_URL: http://api:8080
+    expose:
+      - "3000"
     ports:
-      - "${TALLERES_WEB_PORT:-3000}:3000"
+      - "${TALLERES_WEB_IP_PUBLICACION:-127.0.0.1}:${TALLERES_WEB_PORT:-0}:3000"
     depends_on:
       api:
         condition: service_healthy
