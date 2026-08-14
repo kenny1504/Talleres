@@ -1,0 +1,31 @@
+@Talleres_Api_HostAddress = http://localhost:5056
+@EmpresaId = 1
+
+GET {{Talleres_Api_HostAddress}}/salud
+Accept: application/json
+
+###
+
+POST {{Talleres_Api_HostAddress}}/api/clientes
+Content-Type: application/json
+X-Empresa-Id: {{EmpresaId}}
+
+{
+  "nombre": "Ana López",
+  "documentoIdentidad": "001-010190-0001A",
+  "telefono": "8888-0000",
+  "correo": "ana@example.com",
+  "direccion": "Managua"
+}
+
+###
+
+GET {{Talleres_Api_HostAddress}}/api/clientes
+Accept: application/json
+X-Empresa-Id: {{EmpresaId}}
+
+###
+
+GET {{Talleres_Api_HostAddress}}/api/vehiculos
+Accept: application/json
+X-Empresa-Id: {{EmpresaId}}
