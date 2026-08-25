@@ -86,3 +86,63 @@ test("mantiene el proxy interno de Docker fuera del código cliente", async () =
   assert.match(servidor, /startProdServer/);
   assert.match(servidor, /host:\s*anfitrion/);
 });
+
+test("la navegación global cierra cualquier proceso activo", async () => {
+  const pagina = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+
+  const inicioNavegar = pagina.indexOf("function navegar(nuevaVista: Vista)");
+  const finNavegar = pagina.indexOf("\n  function buscar", inicioNavegar);
+  const cuerpoNavegar = pagina.slice(inicioNavegar, finNavegar);
+
+  assert.notEqual(inicioNavegar, -1);
+  assert.match(cuerpoNavegar, /setMostrarNuevaOrden\(false\)/);
+  assert.match(cuerpoNavegar, /setOrdenDetalle\(null\)/);
+  assert.match(cuerpoNavegar, /setMostrarRecepcion\(false\)/);
+  assert.match(pagina, /onChange=\{\(evento\) => buscar\(evento\.target\.value\)\}/);
+  assert.match(pagina, /<NavegacionInferior vista=\{vista\} alNavegar=\{navegar\} \/>/);
+  assert.doesNotMatch(pagina, /!procesoActivo && <NavegacionInferior/);
+});
+
+test("crear una orden desde clientes conserva el cliente y el regreso", async () => {
+  const pagina = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+
+  assert.match(pagina, /alCrearOrden=\{iniciarNuevaOrden\}/);
+  assert.match(pagina, /alCrearOrden\(cliente\.id\)/);
+  assert.match(pagina, /clienteInicialId && clientes\.some/);
+  assert.match(pagina, /`Volver a \$\{navegacion\.find/);
+});
+
+test("alta y edición de clientes usan un formulario completo y persisten mediante la API", async () => {
+  const pagina = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+
+  assert.match(pagina, /onClick=\{alCrearCliente\}><Plus[^>]*\/>Nuevo cliente/);
+  assert.match(pagina, /function FormularioCliente\(/);
+  assert.match(pagina, /name="nombre"/);
+  assert.match(pagina, /name="documentoIdentidad"/);
+  assert.match(pagina, /name="telefono"/);
+  assert.match(pagina, /name="correo"/);
+  assert.match(pagina, /name="direccion"/);
+  assert.match(pagina, /name="activo"/);
+  assert.match(pagina, /method: clienteId \? "PUT" : "POST"/);
+  assert.match(pagina, /onClick=\{\(\) => alEditarCliente\(cliente\)\}/);
+  assert.match(pagina, /defaultValue=\{cliente\?\.documentoIdentidad/);
+  assert.match(pagina, /setClientes\(\(actuales\) =>/);
+  assert.match(pagina, /obtenerMensajeErrorApi/);
+});
+
+test("vehículos permite registrar y actualizar mediante el contrato HTTP", async () => {
+  const pagina = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+
+  assert.match(pagina, /onClick=\{alCrear\}><Plus[^>]*\/>Nuevo vehículo/);
+  assert.match(pagina, /aria-label=\{`Editar vehículo \$\{vehiculo\.placa\}`\}/);
+  assert.match(pagina, /function FormularioVehiculo\(/);
+  assert.match(pagina, /name="clienteId"/);
+  assert.match(pagina, /name="placa"/);
+  assert.match(pagina, /name="marca"/);
+  assert.match(pagina, /name="modelo"/);
+  assert.match(pagina, /name="anio"/);
+  assert.match(pagina, /name="numeroVin"/);
+  assert.match(pagina, /method: vehiculoId \? "PUT" : "POST"/);
+  assert.match(pagina, /setVehiculos\(\(actuales\) =>/);
+  assert.match(pagina, /vehiculo\.id === vehiculoGuardado\.id/);
+});

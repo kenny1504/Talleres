@@ -50,4 +50,20 @@ public sealed class VehiculosController(IVehiculoServicio vehiculoServicio) : Co
         var vehiculo = await vehiculoServicio.CrearAsync(solicitud, cancellationToken);
         return CreatedAtAction(nameof(ObtenerPorId), new { vehiculoId = vehiculo.Id }, vehiculo);
     }
+
+    [HttpPut("{vehiculoId:long}")]
+    [ProducesResponseType<VehiculoDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<VehiculoDto>> Actualizar(
+        long vehiculoId,
+        ActualizarVehiculoSolicitud solicitud,
+        CancellationToken cancellationToken)
+    {
+        var vehiculo = await vehiculoServicio.ActualizarAsync(
+            vehiculoId,
+            solicitud,
+            cancellationToken);
+        return Ok(vehiculo);
+    }
 }

@@ -54,6 +54,47 @@ public sealed class VehiculoServicio(
         return ConvertirDto(vehiculo, cliente.Nombre);
     }
 
+    public async Task<VehiculoDto> ActualizarAsync(
+        long vehiculoId,
+        ActualizarVehiculoSolicitud solicitud,
+        CancellationToken cancellationToken = default)
+    {
+        contextoEmpresa.ObtenerEmpresaIdRequerido();
+        var vehiculo = await dbContext.Vehiculos.SingleOrDefaultAsync(
+                item => item.Id == vehiculoId,
+                cancellationToken)
+            ?? throw new RecursoNoEncontradoException("El vehículo solicitado no existe.");
+
+        var cliente = await dbContext.Clientes
+                          .AsNoTracking()
+                          .SingleOrDefaultAsync(
+                              item => item.Id == solicitud.ClienteId && item.Activo,
+                              cancellationToken)
+                      ?? throw new RecursoNoEncontradoException(
+                          "El cliente indicado no existe o está inactivo.");
+
+        var placa = Normalizar(solicitud.Placa);
+        if (await dbContext.Vehiculos.AnyAsync(
+                item => item.Id != vehiculoId && item.Placa == placa,
+                cancellationToken))
+        {
+            throw new ReglaNegocioException(
+                "Ya existe otro vehículo con la placa indicada.");
+        }
+
+        vehiculo.ClienteId = cliente.Id;
+        vehiculo.Placa = placa;
+        vehiculo.Marca = solicitud.Marca.Trim();
+        vehiculo.Modelo = solicitud.Modelo.Trim();
+        vehiculo.Anio = solicitud.Anio;
+        vehiculo.Color = LimpiarOpcional(solicitud.Color);
+        vehiculo.NumeroVin = LimpiarOpcional(solicitud.NumeroVin)?.ToUpperInvariant();
+        vehiculo.Activo = solicitud.Activo;
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return ConvertirDto(vehiculo, cliente.Nombre);
+    }
+
     public async Task<VehiculoDto> ObtenerPorIdAsync(
         long vehiculoId,
         CancellationToken cancellationToken = default)

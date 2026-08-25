@@ -132,7 +132,11 @@ interface ClienteTaller {
   id: number;
   iniciales: string;
   nombre: string;
+  documentoIdentidad: string;
   telefono: string;
+  correo: string | null;
+  direccion: string | null;
+  activo: boolean;
   cantidadVehiculos: number;
   ordenActiva: string | null;
 }
@@ -141,6 +145,11 @@ interface VehiculoTaller {
   id: number;
   clienteId: number;
   placa: string;
+  marca: string;
+  modelo: string;
+  anio: number;
+  color: string | null;
+  numeroVin: string | null;
   nombre: string;
   detalle: string;
   cliente: string;
@@ -196,14 +205,22 @@ export default function PaginaPrincipal() {
   const [cargandoDatos, setCargandoDatos] = useState(true);
   const [errorDatos, setErrorDatos] = useState("");
   const [guardandoOrden, setGuardandoOrden] = useState(false);
+  const [guardandoCliente, setGuardandoCliente] = useState(false);
+  const [guardandoVehiculo, setGuardandoVehiculo] = useState(false);
   const [busqueda, setBusqueda] = useState("");
   const [filtroEstado, setFiltroEstado] = useState("Todas");
   const [mostrarNuevaOrden, setMostrarNuevaOrden] = useState(false);
+  const [mostrarNuevoCliente, setMostrarNuevoCliente] = useState(false);
+  const [clienteEditando, setClienteEditando] = useState<ClienteTaller | null>(null);
+  const [mostrarFormularioVehiculo, setMostrarFormularioVehiculo] = useState(false);
+  const [vehiculoEditando, setVehiculoEditando] = useState<VehiculoTaller | null>(null);
+  const [clienteInicialNuevaOrdenId, setClienteInicialNuevaOrdenId] = useState<number | null>(null);
   const [ordenDetalle, setOrdenDetalle] = useState<OrdenTaller | null>(null);
   const [mostrarRecepcion, setMostrarRecepcion] = useState(false);
   const [aviso, setAviso] = useState("");
   const [inspecciones, setInspecciones] = useState<Record<number, InspeccionVisual>>({});
-  const procesoActivo = mostrarNuevaOrden || ordenDetalle !== null;
+  const procesoActivo =
+    mostrarNuevaOrden || mostrarNuevoCliente || mostrarFormularioVehiculo || ordenDetalle !== null;
 
   useEffect(() => {
     const controlador = new AbortController();
@@ -261,8 +278,103 @@ export default function PaginaPrincipal() {
   }, [busqueda, filtroEstado, ordenes]);
 
   function navegar(nuevaVista: Vista) {
+    setMostrarNuevaOrden(false);
+    setMostrarNuevoCliente(false);
+    setClienteEditando(null);
+    setMostrarFormularioVehiculo(false);
+    setVehiculoEditando(null);
+    setClienteInicialNuevaOrdenId(null);
+    setOrdenDetalle(null);
+    setMostrarRecepcion(false);
     setVista(nuevaVista);
     setBusqueda("");
+  }
+
+  function buscar(termino: string) {
+    setBusqueda(termino);
+    if (!termino) return;
+
+    setMostrarNuevaOrden(false);
+    setMostrarNuevoCliente(false);
+    setClienteEditando(null);
+    setMostrarFormularioVehiculo(false);
+    setVehiculoEditando(null);
+    setClienteInicialNuevaOrdenId(null);
+    setOrdenDetalle(null);
+    setMostrarRecepcion(false);
+    setVista("ordenes");
+  }
+
+  function iniciarNuevaOrden(clienteId?: number) {
+    setMostrarNuevoCliente(false);
+    setClienteEditando(null);
+    setMostrarFormularioVehiculo(false);
+    setVehiculoEditando(null);
+    setOrdenDetalle(null);
+    setMostrarRecepcion(false);
+    setClienteInicialNuevaOrdenId(clienteId ?? null);
+    setMostrarNuevaOrden(true);
+  }
+
+  function abrirOrden(orden: OrdenTaller) {
+    setMostrarNuevaOrden(false);
+    setMostrarNuevoCliente(false);
+    setClienteEditando(null);
+    setMostrarFormularioVehiculo(false);
+    setVehiculoEditando(null);
+    setClienteInicialNuevaOrdenId(null);
+    setMostrarRecepcion(false);
+    setOrdenDetalle(orden);
+  }
+
+  function regresarDesdeProceso() {
+    if (mostrarRecepcion) {
+      setMostrarRecepcion(false);
+      return;
+    }
+
+    setMostrarNuevaOrden(false);
+    setMostrarNuevoCliente(false);
+    setClienteEditando(null);
+    setMostrarFormularioVehiculo(false);
+    setVehiculoEditando(null);
+    setClienteInicialNuevaOrdenId(null);
+    setOrdenDetalle(null);
+  }
+
+  const etiquetaRegresoProceso = mostrarRecepcion
+    ? "Volver a la orden"
+    : vista === "inicio"
+      ? "Volver al tablero"
+      : `Volver a ${navegacion.find((item) => item.id === vista)?.etiqueta.toLocaleLowerCase("es") ?? "la sección"}`;
+
+  function iniciarNuevoCliente() {
+    setMostrarNuevaOrden(false);
+    setMostrarFormularioVehiculo(false);
+    setVehiculoEditando(null);
+    setClienteInicialNuevaOrdenId(null);
+    setOrdenDetalle(null);
+    setMostrarRecepcion(false);
+    setVista("clientes");
+    setClienteEditando(null);
+    setMostrarNuevoCliente(true);
+  }
+
+  function editarCliente(cliente: ClienteTaller) {
+    iniciarNuevoCliente();
+    setClienteEditando(cliente);
+  }
+
+  function abrirFormularioVehiculo(vehiculo?: VehiculoTaller) {
+    setMostrarNuevaOrden(false);
+    setMostrarNuevoCliente(false);
+    setClienteEditando(null);
+    setClienteInicialNuevaOrdenId(null);
+    setOrdenDetalle(null);
+    setMostrarRecepcion(false);
+    setVista("vehiculos");
+    setVehiculoEditando(vehiculo ?? null);
+    setMostrarFormularioVehiculo(true);
   }
 
   async function crearOrden(evento: FormEvent<HTMLFormElement>) {
@@ -285,6 +397,139 @@ export default function PaginaPrincipal() {
       );
     } finally {
       setGuardandoOrden(false);
+    }
+  }
+
+  async function guardarCliente(evento: FormEvent<HTMLFormElement>) {
+    evento.preventDefault();
+    const datos = new FormData(evento.currentTarget);
+    setGuardandoCliente(true);
+
+    try {
+      const clienteApi = await guardarClienteApi(
+        {
+          nombre: String(datos.get("nombre")),
+          documentoIdentidad: String(datos.get("documentoIdentidad")),
+          telefono: String(datos.get("telefono")),
+          correo: valorOpcionalFormulario(datos.get("correo")),
+          direccion: valorOpcionalFormulario(datos.get("direccion")),
+          activo: clienteEditando ? datos.has("activo") : true,
+        },
+        clienteEditando?.id,
+      );
+      const clienteGuardado = convertirClienteTaller(
+        clienteApi,
+        clienteEditando?.cantidadVehiculos ?? 0,
+        clienteEditando?.ordenActiva ?? null,
+      );
+
+      setClientes((actuales) => {
+        const siguientes = clienteEditando
+          ? actuales.map((cliente) =>
+              cliente.id === clienteGuardado.id ? clienteGuardado : cliente)
+          : [...actuales, clienteGuardado];
+        return siguientes.sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
+      });
+      setVehiculos((actuales) =>
+        actuales.map((vehiculo) =>
+          vehiculo.clienteId === clienteGuardado.id
+            ? { ...vehiculo, cliente: clienteGuardado.nombre }
+            : vehiculo,
+        ),
+      );
+      setOrdenes((actuales) =>
+        actuales.map((orden) =>
+          orden.clienteId === clienteGuardado.id
+            ? { ...orden, cliente: clienteGuardado.nombre }
+            : orden,
+        ),
+      );
+      setMostrarNuevoCliente(false);
+      setClienteEditando(null);
+      setVista("clientes");
+      mostrarAviso(
+        clienteEditando
+          ? `Cliente ${clienteGuardado.nombre} actualizado correctamente`
+          : `Cliente ${clienteGuardado.nombre} registrado correctamente`,
+      );
+    } catch (error) {
+      mostrarAviso(
+        error instanceof Error ? error.message : "No fue posible guardar el cliente",
+      );
+    } finally {
+      setGuardandoCliente(false);
+    }
+  }
+
+  async function guardarVehiculo(evento: FormEvent<HTMLFormElement>) {
+    evento.preventDefault();
+    const datos = new FormData(evento.currentTarget);
+    const propietarioAnteriorId = vehiculoEditando?.clienteId;
+    setGuardandoVehiculo(true);
+
+    try {
+      const vehiculoApi = await guardarVehiculoApi(
+        {
+          clienteId: Number(datos.get("clienteId")),
+          placa: String(datos.get("placa")),
+          marca: String(datos.get("marca")),
+          modelo: String(datos.get("modelo")),
+          anio: Number(datos.get("anio")),
+          color: valorOpcionalFormulario(datos.get("color")),
+          numeroVin: valorOpcionalFormulario(datos.get("numeroVin")),
+          activo: vehiculoEditando ? datos.has("activo") : true,
+        },
+        vehiculoEditando?.id,
+      );
+      const vehiculoGuardado = convertirVehiculoTaller(vehiculoApi);
+
+      setVehiculos((actuales) => {
+        const siguientes = vehiculoEditando
+          ? actuales.map((vehiculo) =>
+              vehiculo.id === vehiculoGuardado.id ? vehiculoGuardado : vehiculo)
+          : [...actuales, vehiculoGuardado];
+        return siguientes.sort((a, b) => a.placa.localeCompare(b.placa, "es"));
+      });
+      setClientes((actuales) =>
+        actuales.map((cliente) => {
+          if (!vehiculoEditando && cliente.id === vehiculoGuardado.clienteId) {
+            return { ...cliente, cantidadVehiculos: cliente.cantidadVehiculos + 1 };
+          }
+          if (propietarioAnteriorId !== vehiculoGuardado.clienteId) {
+            if (cliente.id === propietarioAnteriorId) {
+              return { ...cliente, cantidadVehiculos: Math.max(0, cliente.cantidadVehiculos - 1) };
+            }
+            if (cliente.id === vehiculoGuardado.clienteId) {
+              return { ...cliente, cantidadVehiculos: cliente.cantidadVehiculos + 1 };
+            }
+          }
+          return cliente;
+        }),
+      );
+      setOrdenes((actuales) =>
+        actuales.map((orden) =>
+          orden.vehiculoId === vehiculoGuardado.id
+            ? {
+                ...orden,
+                vehiculo: `Vehículo · ${vehiculoGuardado.placa}`,
+                placa: vehiculoGuardado.placa,
+              }
+            : orden,
+        ),
+      );
+      setMostrarFormularioVehiculo(false);
+      setVehiculoEditando(null);
+      mostrarAviso(
+        vehiculoEditando
+          ? `Vehículo ${vehiculoGuardado.placa} actualizado correctamente`
+          : `Vehículo ${vehiculoGuardado.placa} registrado correctamente`,
+      );
+    } catch (error) {
+      mostrarAviso(
+        error instanceof Error ? error.message : "No fue posible guardar el vehículo",
+      );
+    } finally {
+      setGuardandoVehiculo(false);
     }
   }
 
@@ -349,10 +594,7 @@ export default function PaginaPrincipal() {
             <span className="solo-lectores">Buscar</span>
             <input
               value={busqueda}
-              onChange={(evento) => {
-                setBusqueda(evento.target.value);
-                if (evento.target.value) setVista("ordenes");
-              }}
+              onChange={(evento) => buscar(evento.target.value)}
               placeholder="Buscar orden, cliente o placa"
             />
             <kbd>⌘ K</kbd>
@@ -389,14 +631,49 @@ export default function PaginaPrincipal() {
             <PaginaProceso
               titulo="Nueva orden de servicio"
               descripcion="Registra el vehículo y el motivo de ingreso sin salir del área de trabajo."
-              alRegresar={() => setMostrarNuevaOrden(false)}
+              alRegresar={regresarDesdeProceso}
+              etiquetaRegreso={etiquetaRegresoProceso}
             >
               <div className="contenedor-formulario-orden">
                 <FormularioNuevaOrden
                   clientes={clientes}
                   vehiculos={vehiculos}
+                  clienteInicialId={clienteInicialNuevaOrdenId}
                   guardando={guardandoOrden}
                   alEnviar={crearOrden}
+                />
+              </div>
+            </PaginaProceso>
+          ) : mostrarNuevoCliente ? (
+            <PaginaProceso
+              titulo={clienteEditando ? "Actualizar cliente" : "Nuevo cliente"}
+              descripcion={clienteEditando
+                ? "Corrige los datos de contacto y el estado del cliente."
+                : "Registra los datos de contacto para asociar vehículos y órdenes de servicio."}
+              alRegresar={regresarDesdeProceso}
+              etiquetaRegreso="Volver a clientes"
+            >
+              <div className="contenedor-formulario-orden">
+                <FormularioCliente
+                  cliente={clienteEditando}
+                  guardando={guardandoCliente}
+                  alEnviar={guardarCliente}
+                />
+              </div>
+            </PaginaProceso>
+          ) : mostrarFormularioVehiculo ? (
+            <PaginaProceso
+              titulo={vehiculoEditando ? "Actualizar vehículo" : "Nuevo vehículo"}
+              descripcion="Asocia el vehículo con su propietario y registra sus datos de identificación."
+              alRegresar={regresarDesdeProceso}
+              etiquetaRegreso="Volver a vehículos"
+            >
+              <div className="contenedor-formulario-orden">
+                <FormularioVehiculo
+                  clientes={clientes}
+                  vehiculo={vehiculoEditando}
+                  guardando={guardandoVehiculo}
+                  alEnviar={guardarVehiculo}
                 />
               </div>
             </PaginaProceso>
@@ -410,11 +687,8 @@ export default function PaginaPrincipal() {
               descripcion={mostrarRecepcion
                 ? `${ordenDetalle.vehiculo} · ${ordenDetalle.placa}`
                 : `${ordenDetalle.cliente} · ${ordenDetalle.vehiculo}`}
-              alRegresar={() => {
-                if (mostrarRecepcion) setMostrarRecepcion(false);
-                else setOrdenDetalle(null);
-              }}
-              etiquetaRegreso={mostrarRecepcion ? "Volver a la orden" : "Volver al tablero"}
+              alRegresar={regresarDesdeProceso}
+              etiquetaRegreso={etiquetaRegresoProceso}
             >
               {mostrarRecepcion ? (
                 <FormularioRecepcion
@@ -436,8 +710,8 @@ export default function PaginaPrincipal() {
               ordenes={ordenes}
               cargando={cargandoDatos}
               datosDisponibles={!errorDatos}
-              alCrearOrden={() => setMostrarNuevaOrden(true)}
-              alAbrirOrden={setOrdenDetalle}
+              alCrearOrden={() => iniciarNuevaOrden()}
+              alAbrirOrden={abrirOrden}
               alVerOrdenes={() => navegar("ordenes")}
             />
           ) : vista === "ordenes" ? (
@@ -447,28 +721,32 @@ export default function PaginaPrincipal() {
               datosDisponibles={!errorDatos}
               filtro={filtroEstado}
               alFiltrar={setFiltroEstado}
-              alCrearOrden={() => setMostrarNuevaOrden(true)}
-              alAbrirOrden={setOrdenDetalle}
+              alCrearOrden={() => iniciarNuevaOrden()}
+              alAbrirOrden={abrirOrden}
             />
           ) : vista === "clientes" ? (
             <VistaClientes
               clientes={clientes}
               cargando={cargandoDatos}
               datosDisponibles={!errorDatos}
-              alCrearOrden={() => setMostrarNuevaOrden(true)}
+              alCrearCliente={iniciarNuevoCliente}
+              alEditarCliente={editarCliente}
+              alCrearOrden={iniciarNuevaOrden}
             />
           ) : vista === "vehiculos" ? (
             <VistaVehiculos
               vehiculos={vehiculos}
               cargando={cargandoDatos}
               datosDisponibles={!errorDatos}
+              alCrear={() => abrirFormularioVehiculo()}
+              alEditar={abrirFormularioVehiculo}
             />
           ) : (
             <VistaInventario />
           )}
         </main>
 
-        {!procesoActivo && <NavegacionInferior vista={vista} alNavegar={navegar} />}
+        <NavegacionInferior vista={vista} alNavegar={navegar} />
       </div>
 
       {aviso && (
@@ -765,26 +1043,37 @@ function VistaClientes({
   clientes,
   cargando,
   datosDisponibles,
+  alCrearCliente,
+  alEditarCliente,
   alCrearOrden,
 }: {
   clientes: ClienteTaller[];
   cargando: boolean;
   datosDisponibles: boolean;
-  alCrearOrden: () => void;
+  alCrearCliente: () => void;
+  alEditarCliente: (cliente: ClienteTaller) => void;
+  alCrearOrden: (clienteId: number) => void;
 }) {
   return (
     <>
       <section className="encabezado-pagina">
         <div><span className="sobrelinea">Relaciones</span><h1>Clientes</h1><p>Información de contacto y vehículos en un solo lugar.</p></div>
-        <button className="boton-primario"><Plus size={21} />Nuevo cliente</button>
+        <button className="boton-primario" onClick={alCrearCliente}><Plus size={21} />Nuevo cliente</button>
       </section>
       <section className="rejilla-clientes">
         {clientes.map((cliente) => (
-          <article className="tarjeta-cliente" key={cliente.nombre}>
-            <div className="cliente-superior"><span className="avatar avatar-grande">{cliente.iniciales}</span><button className="boton-icono" aria-label={`Más opciones para ${cliente.nombre}`}><MoreHorizontal size={21} /></button></div>
+          <article className={`tarjeta-cliente ${cliente.activo ? "" : "cliente-inactivo"}`} key={cliente.id}>
+            <div className="cliente-superior">
+              <span className="avatar avatar-grande">{cliente.iniciales}</span>
+              <button className="boton-icono" type="button" onClick={() => alEditarCliente(cliente)} aria-label={`Editar cliente ${cliente.nombre}`}><Pencil size={19} /></button>
+            </div>
             <h3>{cliente.nombre}</h3><p>{cliente.telefono}</p>
+            {!cliente.activo && <span className="estado-cliente-inactivo">Inactivo</span>}
             <div className="datos-cliente"><span><CarFront size={17} />{cliente.cantidadVehiculos} vehículos</span><span><ClipboardList size={17} />{cliente.ordenActiva || "Sin orden activa"}</span></div>
-            <button className="boton-secundario boton-ancho" onClick={alCrearOrden}>Crear orden</button>
+            <div className="acciones-cliente">
+              <button className="boton-secundario" type="button" onClick={() => alEditarCliente(cliente)}><Pencil size={17} />Editar</button>
+              <button className="boton-primario" type="button" disabled={!cliente.activo} onClick={() => alCrearOrden(cliente.id)}>Crear orden</button>
+            </div>
           </article>
         ))}
         {!cargando && clientes.length === 0 && (
@@ -805,20 +1094,24 @@ function VistaVehiculos({
   vehiculos,
   cargando,
   datosDisponibles,
+  alCrear,
+  alEditar,
 }: {
   vehiculos: VehiculoTaller[];
   cargando: boolean;
   datosDisponibles: boolean;
+  alCrear: () => void;
+  alEditar: (vehiculo: VehiculoTaller) => void;
 }) {
   return (
     <>
       <section className="encabezado-pagina">
         <div><span className="sobrelinea">Parque vehicular</span><h1>Vehículos</h1><p>Historial y situación actual de cada unidad.</p></div>
-        <button className="boton-primario"><Plus size={21} />Nuevo vehículo</button>
+        <button className="boton-primario" onClick={alCrear}><Plus size={21} />Nuevo vehículo</button>
       </section>
       <section className="panel lista-vehiculos">
         {vehiculos.map((vehiculo) => (
-          <button key={vehiculo.placa}>
+          <button key={vehiculo.id} onClick={() => alEditar(vehiculo)} aria-label={`Editar vehículo ${vehiculo.placa}`}>
             <span className="icono-vehiculo"><CarFront size={25} /></span>
             <span><strong>{vehiculo.nombre}</strong><small>{vehiculo.detalle}</small></span>
             <span><strong>{vehiculo.placa}</strong><small>{vehiculo.cliente}</small></span>
@@ -911,15 +1204,21 @@ function PaginaProceso({
 function FormularioNuevaOrden({
   clientes,
   vehiculos,
+  clienteInicialId,
   guardando,
   alEnviar,
 }: {
   clientes: ClienteTaller[];
   vehiculos: VehiculoTaller[];
+  clienteInicialId: number | null;
   guardando: boolean;
   alEnviar: (evento: FormEvent<HTMLFormElement>) => void;
 }) {
-  const [clienteId, setClienteId] = useState(clientes[0]?.id ?? 0);
+  const [clienteId, setClienteId] = useState(
+    clienteInicialId && clientes.some((cliente) => cliente.id === clienteInicialId)
+      ? clienteInicialId
+      : clientes[0]?.id ?? 0,
+  );
   const vehiculosCliente = vehiculos.filter((vehiculo) => vehiculo.clienteId === clienteId);
   const formularioDisponible = clientes.length > 0 && vehiculosCliente.length > 0;
 
@@ -953,6 +1252,134 @@ function FormularioNuevaOrden({
       <div className="opciones-prioridad"><label><input type="radio" name="prioridad" defaultChecked />Normal</label><label><input type="radio" name="prioridad" />Prioritaria</label></div>
       <button className="boton-primario boton-ancho" type="submit" disabled={!formularioDisponible || guardando}>
         <Check size={20} />{guardando ? "Creando orden…" : "Crear orden de servicio"}
+      </button>
+    </form>
+  );
+}
+
+function FormularioCliente({
+  cliente,
+  guardando,
+  alEnviar,
+}: {
+  cliente: ClienteTaller | null;
+  guardando: boolean;
+  alEnviar: (evento: FormEvent<HTMLFormElement>) => void;
+}) {
+  return (
+    <form className="formulario" onSubmit={alEnviar}>
+      <div className="paso-formulario">
+        <span>1</span>
+        <div><strong>Identificación</strong><small>Datos necesarios para reconocer al cliente</small></div>
+      </div>
+      <label>
+        Nombre completo
+        <input name="nombre" type="text" required minLength={2} maxLength={150} defaultValue={cliente?.nombre ?? ""} autoComplete="name" placeholder="Ej. María Fernández López" />
+      </label>
+      <label>
+        Documento de identidad
+        <input name="documentoIdentidad" type="text" required minLength={3} maxLength={30} defaultValue={cliente?.documentoIdentidad ?? ""} autoComplete="off" placeholder="Cédula, RUC o pasaporte" />
+      </label>
+      <div className="separador-formulario" />
+      <div className="paso-formulario">
+        <span>2</span>
+        <div><strong>Contacto</strong><small>Información para avisos y seguimiento de órdenes</small></div>
+      </div>
+      <label>
+        Teléfono
+        <input name="telefono" type="tel" required minLength={7} maxLength={30} defaultValue={cliente?.telefono ?? ""} autoComplete="tel" inputMode="tel" placeholder="Ej. 8888-0000" />
+      </label>
+      <label>
+        Correo electrónico <small>(opcional)</small>
+        <input name="correo" type="email" maxLength={150} defaultValue={cliente?.correo ?? ""} autoComplete="email" placeholder="cliente@correo.com" />
+      </label>
+      <label>
+        Dirección <small>(opcional)</small>
+        <textarea name="direccion" rows={3} maxLength={300} defaultValue={cliente?.direccion ?? ""} autoComplete="street-address" placeholder="Barrio, referencia o dirección de contacto" />
+      </label>
+      {cliente && (
+        <label className="opcion-estado-vehiculo">
+          <input name="activo" type="checkbox" defaultChecked={cliente.activo} />
+          Cliente activo y disponible para nuevas órdenes
+        </label>
+      )}
+      <button className="boton-primario boton-ancho" type="submit" disabled={guardando}>
+        <Check size={20} />
+        {guardando ? "Guardando cliente…" : cliente ? "Guardar cambios" : "Registrar cliente"}
+      </button>
+    </form>
+  );
+}
+
+function FormularioVehiculo({
+  clientes,
+  vehiculo,
+  guardando,
+  alEnviar,
+}: {
+  clientes: ClienteTaller[];
+  vehiculo: VehiculoTaller | null;
+  guardando: boolean;
+  alEnviar: (evento: FormEvent<HTMLFormElement>) => void;
+}) {
+  const formularioDisponible = clientes.length > 0;
+  const anioActual = new Date().getFullYear();
+
+  return (
+    <form className="formulario" onSubmit={alEnviar}>
+      <div className="paso-formulario">
+        <span>1</span>
+        <div><strong>Propietario e identificación</strong><small>Selecciona el cliente y registra la placa</small></div>
+      </div>
+      <label>
+        Propietario
+        <select name="clienteId" required defaultValue={vehiculo?.clienteId ?? clientes[0]?.id ?? ""} disabled={!formularioDisponible}>
+          {!formularioDisponible && <option value="">Primero registra un cliente</option>}
+          {clientes.map((cliente) => <option key={cliente.id} value={cliente.id}>{cliente.nombre}</option>)}
+        </select>
+      </label>
+      <label>
+        Placa
+        <input name="placa" type="text" required minLength={2} maxLength={15} defaultValue={vehiculo?.placa ?? ""} autoComplete="off" placeholder="Ej. M 245-781" />
+      </label>
+      <label>
+        Número VIN <small>(opcional)</small>
+        <input name="numeroVin" type="text" maxLength={50} defaultValue={vehiculo?.numeroVin ?? ""} autoComplete="off" placeholder="Número de identificación vehicular" />
+      </label>
+      <div className="separador-formulario" />
+      <div className="paso-formulario">
+        <span>2</span>
+        <div><strong>Características</strong><small>Datos básicos para reconocer la unidad</small></div>
+      </div>
+      <label>
+        Marca
+        <input name="marca" type="text" required minLength={2} maxLength={80} defaultValue={vehiculo?.marca ?? ""} autoComplete="off" placeholder="Ej. Toyota" />
+      </label>
+      <label>
+        Modelo
+        <input name="modelo" type="text" required minLength={1} maxLength={80} defaultValue={vehiculo?.modelo ?? ""} autoComplete="off" placeholder="Ej. Hilux" />
+      </label>
+      <label>
+        Año
+        <input name="anio" type="number" required min={1900} max={2100} defaultValue={vehiculo?.anio ?? anioActual} inputMode="numeric" />
+      </label>
+      <label>
+        Color <small>(opcional)</small>
+        <input name="color" type="text" maxLength={40} defaultValue={vehiculo?.color ?? ""} autoComplete="off" placeholder="Ej. Blanco" />
+      </label>
+      {vehiculo && (
+        <label className="opcion-estado-vehiculo">
+          <input name="activo" type="checkbox" defaultChecked={vehiculo.activo} />
+          Vehículo activo y disponible para nuevas órdenes
+        </label>
+      )}
+      <button className="boton-primario boton-ancho" type="submit" disabled={!formularioDisponible || guardando}>
+        <Check size={20} />
+        {guardando
+          ? "Guardando vehículo…"
+          : vehiculo
+            ? "Guardar cambios"
+            : "Registrar vehículo"}
       </button>
     </form>
   );
@@ -1339,27 +1766,17 @@ async function cargarDatosApi(senal: AbortSignal): Promise<{
     cargarVehiculosApi(senal),
   ]);
 
-  const clientes = clientesApi.map((cliente) => ({
-    id: cliente.id,
-    iniciales: obtenerIniciales(cliente.nombre),
-    nombre: cliente.nombre,
-    telefono: cliente.telefono,
-    cantidadVehiculos: vehiculosApi.filter((vehiculo) => vehiculo.clienteId === cliente.id).length,
-    ordenActiva:
+  const clientes = clientesApi.map((cliente) =>
+    convertirClienteTaller(
+      cliente,
+      vehiculosApi.filter((vehiculo) => vehiculo.clienteId === cliente.id).length,
       ordenes.find(
         (orden) =>
           orden.clienteId === cliente.id && orden.estado !== "Lista para entregar",
       )?.numero ?? null,
-  }));
-  const vehiculos = vehiculosApi.map((vehiculo) => ({
-    id: vehiculo.id,
-    clienteId: vehiculo.clienteId,
-    placa: vehiculo.placa,
-    nombre: `${vehiculo.marca} ${vehiculo.modelo}`,
-    detalle: `${vehiculo.anio} · ${vehiculo.color || "Color no registrado"}`,
-    cliente: vehiculo.nombreCliente,
-    activo: vehiculo.activo,
-  }));
+    ),
+  );
+  const vehiculos = vehiculosApi.map(convertirVehiculoTaller);
 
   return { ordenes, clientes, vehiculos };
 }
@@ -1388,6 +1805,28 @@ async function cargarClientesApi(senal: AbortSignal): Promise<ClienteApi[]> {
   return (await respuesta.json()) as ClienteApi[];
 }
 
+async function guardarClienteApi(solicitud: {
+  nombre: string;
+  documentoIdentidad: string;
+  telefono: string;
+  correo: string | null;
+  direccion: string | null;
+  activo: boolean;
+}, clienteId?: number): Promise<ClienteApi> {
+  const respuesta = await fetch(`${obtenerDireccionApi()}/api/clientes${clienteId ? `/${clienteId}` : ""}`, {
+    method: clienteId ? "PUT" : "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Empresa-Id": process.env.NEXT_PUBLIC_EMPRESA_ID || "1",
+    },
+    body: JSON.stringify(solicitud),
+  });
+  if (!respuesta.ok) {
+    throw new Error(await obtenerMensajeErrorApi(respuesta, "No fue posible guardar el cliente."));
+  }
+  return (await respuesta.json()) as ClienteApi;
+}
+
 async function cargarVehiculosApi(senal: AbortSignal): Promise<VehiculoApi[]> {
   const respuesta = await fetch(`${obtenerDireccionApi()}/api/vehiculos`, {
     headers: { "X-Empresa-Id": process.env.NEXT_PUBLIC_EMPRESA_ID || "1" },
@@ -1395,6 +1834,36 @@ async function cargarVehiculosApi(senal: AbortSignal): Promise<VehiculoApi[]> {
   });
   if (!respuesta.ok) throw new Error("No fue posible consultar los vehículos.");
   return (await respuesta.json()) as VehiculoApi[];
+}
+
+async function guardarVehiculoApi(
+  solicitud: {
+    clienteId: number;
+    placa: string;
+    marca: string;
+    modelo: string;
+    anio: number;
+    color: string | null;
+    numeroVin: string | null;
+    activo: boolean;
+  },
+  vehiculoId?: number,
+): Promise<VehiculoApi> {
+  const respuesta = await fetch(
+    `${obtenerDireccionApi()}/api/vehiculos${vehiculoId ? `/${vehiculoId}` : ""}`,
+    {
+      method: vehiculoId ? "PUT" : "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Empresa-Id": process.env.NEXT_PUBLIC_EMPRESA_ID || "1",
+      },
+      body: JSON.stringify(solicitud),
+    },
+  );
+  if (!respuesta.ok) {
+    throw new Error(await obtenerMensajeErrorApi(respuesta, "No fue posible guardar el vehículo."));
+  }
+  return (await respuesta.json()) as VehiculoApi;
 }
 
 async function crearOrdenApi(solicitud: {
@@ -1443,6 +1912,61 @@ function obtenerIniciales(nombre: string) {
     .slice(0, 2)
     .map((parte) => parte[0]?.toLocaleUpperCase("es") ?? "")
     .join("");
+}
+
+function convertirClienteTaller(
+  cliente: ClienteApi,
+  cantidadVehiculos: number,
+  ordenActiva: string | null,
+): ClienteTaller {
+  return {
+    id: cliente.id,
+    iniciales: obtenerIniciales(cliente.nombre),
+    nombre: cliente.nombre,
+    documentoIdentidad: cliente.documentoIdentidad,
+    telefono: cliente.telefono,
+    correo: cliente.correo,
+    direccion: cliente.direccion,
+    activo: cliente.activo,
+    cantidadVehiculos,
+    ordenActiva,
+  };
+}
+
+function convertirVehiculoTaller(vehiculo: VehiculoApi): VehiculoTaller {
+  return {
+    id: vehiculo.id,
+    clienteId: vehiculo.clienteId,
+    placa: vehiculo.placa,
+    marca: vehiculo.marca,
+    modelo: vehiculo.modelo,
+    anio: vehiculo.anio,
+    color: vehiculo.color,
+    numeroVin: vehiculo.numeroVin,
+    nombre: `${vehiculo.marca} ${vehiculo.modelo}`,
+    detalle: `${vehiculo.anio} · ${vehiculo.color || "Color no registrado"}`,
+    cliente: vehiculo.nombreCliente,
+    activo: vehiculo.activo,
+  };
+}
+
+function valorOpcionalFormulario(valor: FormDataEntryValue | null) {
+  const texto = String(valor ?? "").trim();
+  return texto || null;
+}
+
+async function obtenerMensajeErrorApi(respuesta: Response, mensajePredeterminado: string) {
+  try {
+    const problema = (await respuesta.json()) as {
+      detail?: string;
+      title?: string;
+      errors?: Record<string, string[]>;
+    };
+    const primerErrorValidacion = Object.values(problema.errors ?? {}).flat()[0];
+    return problema.detail || primerErrorValidacion || problema.title || mensajePredeterminado;
+  } catch {
+    return mensajePredeterminado;
+  }
 }
 
 async function guardarRecepcionApi(

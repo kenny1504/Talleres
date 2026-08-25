@@ -18,6 +18,18 @@ public interface IVehiculoServicio
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Actualiza la identificación, propietario, características y estado de un vehículo.
+    /// </summary>
+    /// <param name="vehiculoId">Identificador interno del vehículo.</param>
+    /// <param name="solicitud">Datos completos que sustituirán la información editable.</param>
+    /// <param name="cancellationToken">Token para cancelar la operación.</param>
+    /// <returns>El vehículo actualizado.</returns>
+    Task<VehiculoDto> ActualizarAsync(
+        long vehiculoId,
+        ActualizarVehiculoSolicitud solicitud,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Obtiene un vehículo por su identificador dentro de la empresa actual.
     /// </summary>
     /// <param name="vehiculoId">Identificador interno del vehículo.</param>

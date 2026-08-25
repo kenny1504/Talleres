@@ -888,6 +888,21 @@ textarea:focus-visible {
 .tarjeta-cliente h3 { margin: 17px 0 4px; font-size: 16px; }
 .tarjeta-cliente > p { margin: 0; color: var(--tinta-suave); font-size: 12px; }
 
+.tarjeta-cliente.cliente-inactivo {
+  background: #f8f8f5;
+}
+
+.estado-cliente-inactivo {
+  margin-top: 9px;
+  padding: 4px 8px;
+  display: inline-flex;
+  border-radius: 999px;
+  background: #ecece7;
+  color: var(--tinta-suave);
+  font-size: 10px;
+  font-weight: 750;
+}
+
 .datos-cliente {
   min-height: 59px;
   margin: 17px 0;
@@ -904,6 +919,17 @@ textarea:focus-visible {
   gap: 5px;
   color: var(--tinta-suave);
   font-size: 10px;
+}
+
+.acciones-cliente {
+  display: grid;
+  grid-template-columns: minmax(96px, 0.75fr) minmax(120px, 1.25fr);
+  gap: 9px;
+}
+
+.acciones-cliente button {
+  min-height: 46px;
+  padding-inline: 12px;
 }
 
 .lista-vehiculos > button {
@@ -1202,6 +1228,27 @@ textarea:focus-visible {
 .lista-comprobacion input {
   width: 17px;
   min-height: 17px;
+  accent-color: var(--verde);
+}
+
+.formulario > .opcion-estado-vehiculo {
+  min-height: 50px;
+  padding: 0 13px;
+  display: flex;
+  grid-template-columns: none;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--borde);
+  border-radius: 13px;
+  background: var(--verde-claro);
+  color: var(--verde-profundo);
+  font-size: 12px;
+}
+
+.formulario > .opcion-estado-vehiculo input {
+  width: 18px;
+  min-height: 18px;
+  padding: 0;
   accent-color: var(--verde);
 }
 
@@ -2043,7 +2090,7 @@ textarea:focus-visible {
   .marca-compacta .marca-simbolo { width: 37px; height: 37px; flex-basis: 37px; font-size: 19px; }
   .usuario-texto { display: none; }
   .contenido-principal { padding: 27px 20px 102px; }
-  .contenido-proceso { padding-bottom: 28px; }
+  .contenido-proceso { padding-bottom: 102px; }
   .proceso-activo .barra-superior {
     grid-template-columns: 1fr auto;
   }
