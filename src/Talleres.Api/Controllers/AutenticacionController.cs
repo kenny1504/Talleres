@@ -14,11 +14,12 @@ namespace Talleres.Api.Controllers;
 [Route("api/autenticacion")]
 public sealed class AutenticacionController(
     IAutenticacionServicio autenticacionServicio,
+    IAuthenticationSchemeProvider esquemasAutenticacion,
     IConfiguration configuracion) : ControllerBase
 {
     [HttpGet("externo/{proveedor}")]
     [AllowAnonymous]
-    public IActionResult IniciarSesionExterna(string proveedor)
+    public async Task<IActionResult> IniciarSesionExterna(string proveedor)
     {
         var esquema = proveedor.ToLowerInvariant() switch
         {
@@ -26,6 +27,12 @@ public sealed class AutenticacionController(
             "microsoft" => "Microsoft",
             _ => throw new AccesoDenegadoException("Proveedor de autenticación no admitido.")
         };
+        if (await esquemasAutenticacion.GetSchemeAsync(esquema) is null)
+        {
+            throw new IntegracionNoDisponibleException(
+                $"La autenticación con {esquema} no está configurada.");
+        }
+
         var retorno = Url.ActionLink(nameof(CompletarSesionExterna), values: new { proveedor })!;
         return Challenge(new AuthenticationProperties { RedirectUri = retorno }, esquema);
     }

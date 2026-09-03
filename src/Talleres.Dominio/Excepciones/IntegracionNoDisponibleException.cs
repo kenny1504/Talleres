@@ -1,4 +1,17 @@
 namespace Talleres.Dominio.Excepciones;
 
-public sealed class IntegracionNoDisponibleException(string mensaje, Exception excepcion) :
-    Exception(mensaje, excepcion);
+/// <summary>
+/// Representa una integración externa ausente, mal configurada o temporalmente inaccesible.
+/// </summary>
+public sealed class IntegracionNoDisponibleException : Exception
+{
+    public IntegracionNoDisponibleException(string mensaje)
+        : base(mensaje)
+    {
+    }
+
+    public IntegracionNoDisponibleException(string mensaje, Exception excepcion)
+        : base(mensaje, excepcion)
+    {
+    }
+}

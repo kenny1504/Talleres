@@ -108,7 +108,7 @@ Content-Type: application/json
 
 La API establece una cookie HTTP-only. El `EmpresaId` usado por todas las operaciones se obtiene de esa identidad autenticada. Los superusuarios pueden llamar `POST /api/autenticacion/seleccionar-taller`; los usuarios normales quedan limitados al `IdEmpresa` registrado en NOVA. El endpoint `GET /salud` permanece público.
 
-El acceso también admite Google y Microsoft. Configure `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `MICROSOFT_CLIENT_ID` y `MICROSOFT_CLIENT_SECRET` como secretos del entorno. Registre como callbacks `/api/autenticacion/externo/google/callback` y `/api/autenticacion/externo/microsoft/callback` en cada proveedor.
+El acceso también admite Google y Microsoft. Cada proveedor es opcional y solo se habilita cuando están configurados tanto su identificador como su secreto. Configure `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `MICROSOFT_CLIENT_ID` y `MICROSOFT_CLIENT_SECRET` como secretos del entorno. Registre como callbacks `/api/autenticacion/externo/google/callback` y `/api/autenticacion/externo/microsoft/callback` en cada proveedor.
 
 La migración `AgregarTalleresSincronizados` crea la configuración local e incluye inicialmente la empresa NOVA `3071`. Agregar otra empresa a esa tabla la habilita como taller, siempre que exista en NOVA.
 
@@ -176,7 +176,7 @@ El archivo `.env` es solo para ejecución local y nunca debe subirse a Git. En C
 
 Para una base nueva, ejecute un primer despliegue controlado con `TALLERES_APLICAR_MIGRACIONES=true` y una cuenta con permisos para modificar el esquema. Cuando finalice correctamente, cambie inmediatamente la variable a `false` y vuelva a desplegar. Los despliegues ordinarios deben mantenerla en `false`. El período inicial del chequeo de salud permite completar ese primer arranque sin declarar prematuramente que la API está degradada.
 
-Si la API queda `unhealthy`, revise los logs del servicio `api`: `/salud` comprueba realmente la conexión de `TALLERES_CONNECTION_STRING`. Verifique credenciales, acceso del servidor Coolify al puerto de SQL Server, reglas de firewall y configuración TLS. `SMART_NOVA_CONNECTION_STRING` también debe tener un formato válido al arrancar y conectividad de lectura para las funciones de autenticación e inventario.
+Si la API queda `unhealthy`, revise los logs del servicio `api`: `/salud` comprueba las conexiones de `TALLERES_CONNECTION_STRING` y `SMART_NOVA_CONNECTION_STRING`. Verifique credenciales, acceso del servidor Coolify al puerto de SQL Server, reglas de firewall y configuración TLS. No deje en Coolify los valores demostrativos `sql.example.com`, `usuario_lectura` o `clave` de `.env.example`.
 
 ## Rutas principales
 

@@ -35,7 +35,7 @@ builder.Services
         opciones.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 builder.Services.AddProblemDetails();
 builder.Services.AddHttpContextAccessor();
-builder.Services
+var autenticacion = builder.Services
     .AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(opciones =>
     {
@@ -60,12 +60,20 @@ builder.Services
             return Task.CompletedTask;
         };
     })
-    .AddCookie("Talleres.Externo")
-    .AddGoogle(GoogleDefaults.AuthenticationScheme, opciones =>
+    .AddCookie("Talleres.Externo");
+
+var credencialesGoogle = ObtenerCredencialesProveedor(
+    builder.Configuration,
+    "Google",
+    "GOOGLE_CLIENT_ID",
+    "GOOGLE_CLIENT_SECRET");
+if (credencialesGoogle is not null)
+{
+    autenticacion.AddGoogle(GoogleDefaults.AuthenticationScheme, opciones =>
     {
         opciones.SignInScheme = "Talleres.Externo";
-        opciones.ClientId = ObtenerConfiguracion(builder.Configuration, "Autenticacion:Google:ClientId", "GOOGLE_CLIENT_ID");
-        opciones.ClientSecret = ObtenerConfiguracion(builder.Configuration, "Autenticacion:Google:ClientSecret", "GOOGLE_CLIENT_SECRET");
+        opciones.ClientId = credencialesGoogle.Value.ClientId;
+        opciones.ClientSecret = credencialesGoogle.Value.ClientSecret;
         opciones.CallbackPath = "/api/autenticacion/externo/google/callback";
         opciones.Events.OnRemoteFailure = contexto =>
         {
@@ -73,12 +81,21 @@ builder.Services
             contexto.Response.StatusCode = StatusCodes.Status500InternalServerError;
             return contexto.Response.WriteAsJsonAsync(new { error = contexto.Failure?.Message ?? "Fallo de Google" });
         };
-    })
-    .AddMicrosoftAccount(MicrosoftAccountDefaults.AuthenticationScheme, opciones =>
+    });
+}
+
+var credencialesMicrosoft = ObtenerCredencialesProveedor(
+    builder.Configuration,
+    "Microsoft",
+    "MICROSOFT_CLIENT_ID",
+    "MICROSOFT_CLIENT_SECRET");
+if (credencialesMicrosoft is not null)
+{
+    autenticacion.AddMicrosoftAccount(MicrosoftAccountDefaults.AuthenticationScheme, opciones =>
     {
         opciones.SignInScheme = "Talleres.Externo";
-        opciones.ClientId = ObtenerConfiguracion(builder.Configuration, "Autenticacion:Microsoft:ClientId", "MICROSOFT_CLIENT_ID");
-        opciones.ClientSecret = ObtenerConfiguracion(builder.Configuration, "Autenticacion:Microsoft:ClientSecret", "MICROSOFT_CLIENT_SECRET");
+        opciones.ClientId = credencialesMicrosoft.Value.ClientId;
+        opciones.ClientSecret = credencialesMicrosoft.Value.ClientSecret;
         opciones.CallbackPath = "/api/autenticacion/externo/microsoft/callback";
         opciones.Events.OnRemoteFailure = contexto =>
         {
@@ -87,6 +104,7 @@ builder.Services
             return contexto.Response.WriteAsJsonAsync(new { error = contexto.Failure?.Message ?? "Fallo de Microsoft" });
         };
     });
+}
 builder.Services.AddAuthorization(opciones =>
     opciones.FallbackPolicy = new AuthorizationPolicyBuilder()
         .RequireAuthenticatedUser()
@@ -147,44 +165,37 @@ app.MapControllers();
 app.MapGet(
     "/salud",
     async (
-        TallerDbContext contexto,
+        TallerDbContext contextoTalleres,
+        SmartNovaDbContext contextoNova,
         ILogger<Program> registro,
         CancellationToken cancellationToken) =>
     {
-        using var limiteConexion = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        limiteConexion.CancelAfter(TimeSpan.FromSeconds(10));
+        var comprobaciones = await Task.WhenAll(
+            ComprobarConexionAsync(
+                contextoTalleres,
+                "TallerDb",
+                registro,
+                cancellationToken),
+            ComprobarConexionAsync(
+                contextoNova,
+                "SmartNova",
+                registro,
+                cancellationToken));
+        var talleresDisponible = comprobaciones[0];
+        var novaDisponible = comprobaciones[1];
 
-        var baseDatosDisponible = false;
-        try
-        {
-            baseDatosDisponible = await contexto.Database.CanConnectAsync(limiteConexion.Token);
-        }
-        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
-        {
-            // El servidor remoto no respondió dentro del límite del chequeo de salud.
-            registro.LogWarning(
-                "La comprobación de salud agotó el tiempo de espera al conectar con TallerDb.");
-        }
-        catch (Exception excepcion) when (
-            excepcion is not OperationCanceledException ||
-            !cancellationToken.IsCancellationRequested)
-        {
-            registro.LogWarning(
-                excepcion,
-                "La comprobación de salud no pudo conectar con TallerDb.");
-        }
-
-        return baseDatosDisponible
+        return talleresDisponible && novaDisponible
             ? Results.Ok(new
             {
                 estado = "saludable",
-                baseDatos = "disponible",
+                baseDatosTalleres = "disponible",
+                baseDatosNova = "disponible",
                 fechaUtc = DateTime.UtcNow
             })
             : Results.Problem(
                 statusCode: StatusCodes.Status503ServiceUnavailable,
-                title: "Base de datos no disponible",
-                detail: "La API no pudo establecer conexión con SQL Server.");
+                title: "Bases de datos no disponibles",
+                detail: "La API no pudo establecer conexión con todas sus bases de datos remotas.");
     }).AllowAnonymous();
 
 app.Run();
@@ -196,6 +207,38 @@ static async Task AplicarMigracionesAsync(
     await using var alcance = proveedorServicios.CreateAsyncScope();
     var contexto = alcance.ServiceProvider.GetRequiredService<TallerDbContext>();
     await contexto.Database.MigrateAsync(cancellationToken);
+}
+
+static async Task<bool> ComprobarConexionAsync(
+    DbContext contexto,
+    string nombreConexion,
+    ILogger<Program> registro,
+    CancellationToken cancellationToken)
+{
+    using var limiteConexion = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+    limiteConexion.CancelAfter(TimeSpan.FromSeconds(10));
+
+    try
+    {
+        return await contexto.Database.CanConnectAsync(limiteConexion.Token);
+    }
+    catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+    {
+        registro.LogWarning(
+            "La comprobación de salud agotó el tiempo de espera al conectar con {Conexion}.",
+            nombreConexion);
+        return false;
+    }
+    catch (Exception excepcion) when (
+        excepcion is not OperationCanceledException ||
+        !cancellationToken.IsCancellationRequested)
+    {
+        registro.LogWarning(
+            excepcion,
+            "La comprobación de salud no pudo conectar con {Conexion}.",
+            nombreConexion);
+        return false;
+    }
 }
 
 static void CargarCadenaConexionDesdeArchivoEntornoLocal(WebApplicationBuilder builder)
@@ -322,7 +365,32 @@ static string ObtenerCadenaConexionNova(IConfiguration configuracion)
     return ConfiguracionConexionSql.ValidarRemota(cadenaConexion);
 }
 
-static string ObtenerConfiguracion(IConfiguration configuracion, string clave, string variableEntorno) =>
-    configuracion[clave] ?? Environment.GetEnvironmentVariable(variableEntorno) ?? string.Empty;
+static (string ClientId, string ClientSecret)? ObtenerCredencialesProveedor(
+    IConfiguration configuracion,
+    string proveedor,
+    string variableClientId,
+    string variableClientSecret)
+{
+    var clientId = configuracion[$"Autenticacion:{proveedor}:ClientId"]
+        ?? Environment.GetEnvironmentVariable(variableClientId);
+    var clientSecret = configuracion[$"Autenticacion:{proveedor}:ClientSecret"]
+        ?? Environment.GetEnvironmentVariable(variableClientSecret);
+    var tieneClientId = !string.IsNullOrWhiteSpace(clientId);
+    var tieneClientSecret = !string.IsNullOrWhiteSpace(clientSecret);
+
+    if (!tieneClientId && !tieneClientSecret)
+    {
+        return null;
+    }
+
+    if (!tieneClientId || !tieneClientSecret)
+    {
+        throw new InvalidOperationException(
+            $"La autenticación con {proveedor} requiere configurar " +
+            $"'{variableClientId}' y '{variableClientSecret}'.");
+    }
+
+    return (clientId!, clientSecret!);
+}
 
 public partial class Program;
