@@ -6,7 +6,8 @@ namespace Talleres.Api.Middleware;
 
 public sealed class ManejadorExcepcionesMiddleware(
     RequestDelegate siguiente,
-    ILogger<ManejadorExcepcionesMiddleware> logger)
+    ILogger<ManejadorExcepcionesMiddleware> logger,
+    IWebHostEnvironment entorno)
 {
     public async Task InvokeAsync(HttpContext contexto)
     {
@@ -24,6 +25,18 @@ public sealed class ManejadorExcepcionesMiddleware(
     {
         var (estado, titulo, detalle) = excepcion switch
         {
+            CredencialesInvalidasException => (
+                StatusCodes.Status401Unauthorized,
+                "Credenciales inválidas",
+                excepcion.Message),
+            AccesoDenegadoException => (
+                StatusCodes.Status403Forbidden,
+                "Acceso denegado",
+                excepcion.Message),
+            IntegracionNoDisponibleException => (
+                StatusCodes.Status503ServiceUnavailable,
+                "SMART TPV NOVA no disponible",
+                excepcion.Message),
             RecursoNoEncontradoException => (
                 StatusCodes.Status404NotFound,
                 "Recurso no encontrado",
@@ -56,12 +69,15 @@ public sealed class ManejadorExcepcionesMiddleware(
         }
 
         contexto.Response.StatusCode = estado;
+        var detalleRespuesta = estado >= StatusCodes.Status500InternalServerError && entorno.IsDevelopment()
+            ? excepcion.Message
+            : detalle;
         await contexto.Response.WriteAsJsonAsync(
             new ProblemDetails
             {
                 Status = estado,
                 Title = titulo,
-                Detail = detalle
+                Detail = detalleRespuesta
             },
             contexto.RequestAborted);
     }

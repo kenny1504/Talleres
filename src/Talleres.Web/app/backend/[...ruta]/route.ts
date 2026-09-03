@@ -7,13 +7,13 @@ const nombresEncabezadosSolicitud = [
   "authorization",
   "content-type",
   "cookie",
-  "x-empresa-id",
 ];
 
 const nombresEncabezadosRespuesta = [
   "content-disposition",
   "content-type",
   "location",
+  "set-cookie",
 ];
 
 async function reenviarSolicitudAsync(

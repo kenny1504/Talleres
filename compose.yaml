@@ -10,7 +10,9 @@ services:
       ASPNETCORE_HTTP_PORTS: 8080
       BaseDatos__AplicarMigracionesAlIniciar: "${TALLERES_APLICAR_MIGRACIONES:-false}"
       Http__UsarRedireccionHttps: "false"
+      Autenticacion__CookieSegura: "${TALLERES_COOKIE_SEGURA:-false}"
       ConnectionStrings__TallerDb: "${TALLERES_CONNECTION_STRING:?Configure TALLERES_CONNECTION_STRING en Coolify o en el archivo .env local}"
+      ConnectionStrings__SmartNova: "${SMART_NOVA_CONNECTION_STRING:?Configure SMART_NOVA_CONNECTION_STRING en Coolify o en el archivo .env local}"
       Cors__OrigenesPermitidos__0: "http://localhost:${TALLERES_WEB_PORT:-3000}"
       Cors__OrigenesPermitidos__1: "http://127.0.0.1:${TALLERES_WEB_PORT:-3000}"
     expose:
@@ -29,7 +31,6 @@ services:
       dockerfile: src/Talleres.Web/Dockerfile
       args:
         NEXT_PUBLIC_API_URL: /backend
-        NEXT_PUBLIC_EMPRESA_ID: "${TALLERES_EMPRESA_ID:-1}"
     environment:
       NODE_ENV: production
       PORT: 3000

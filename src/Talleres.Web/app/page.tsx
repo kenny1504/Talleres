@@ -1,6 +1,6 @@
 "use client";
 
-import type { FormEvent } from "react";
+import type { FormEvent, ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
@@ -17,6 +17,7 @@ import {
   Clock3,
   Fuel,
   LayoutDashboard,
+  LogOut,
   MessageCircleMore,
   MoreHorizontal,
   ImagePlus,
@@ -24,6 +25,7 @@ import {
   Plus,
   RotateCcw,
   Search,
+  Settings2,
   Sparkles,
   Trash2,
   TriangleAlert,
@@ -178,6 +180,41 @@ interface NavegacionItem {
   icono: LucideIcon;
 }
 
+interface TallerSesionApi {
+  id: number;
+  nombreLegal: string;
+  nombreComercial: string | null;
+  prefijoTelefono: number;
+  telefono: string;
+  ruc: string | null;
+  correo: string | null;
+  direccion: string | null;
+  ciudad: string | null;
+  barrio: string | null;
+  calle: string | null;
+  logo: string | null;
+  horaApertura: string;
+  horaCierre: string;
+}
+interface BodegaInventarioApi { id: number; nombre: string; esPrincipal: boolean; }
+interface ArticuloInventarioApi { productoId: number; codigo: string; nombre: string; unidadMedida: string; existencia: number; costoUnitario?: number; }
+
+interface SesionTallerApi {
+  usuarioId: string;
+  usuario: string;
+  nombreUsuario: string;
+  esSuperUsuario: boolean;
+  taller: TallerSesionApi;
+  talleresDisponibles: TallerSesionApi[];
+}
+
+interface TallerSincronizadoApi {
+  empresaNovaId: number;
+  nombreLegal: string;
+  nombreComercial: string | null;
+  activo: boolean;
+}
+
 const navegacion: NavegacionItem[] = [
   { id: "inicio", etiqueta: "Inicio", icono: LayoutDashboard },
   { id: "ordenes", etiqueta: "Órdenes", icono: ClipboardList },
@@ -198,6 +235,10 @@ const zonasVehiculo: Array<{ id: ZonaVehiculo; etiqueta: string }> = [
 ];
 
 export default function PaginaPrincipal() {
+  const [sesion, setSesion] = useState<SesionTallerApi | null>();
+  const [cargandoSesion, setCargandoSesion] = useState(true);
+  const [cambiandoTaller, setCambiandoTaller] = useState(false);
+  const [mostrarAdministracion, setMostrarAdministracion] = useState(false);
   const [vista, setVista] = useState<Vista>("inicio");
   const [ordenes, setOrdenes] = useState<OrdenTaller[]>([]);
   const [clientes, setClientes] = useState<ClienteTaller[]>([]);
@@ -224,6 +265,22 @@ export default function PaginaPrincipal() {
 
   useEffect(() => {
     const controlador = new AbortController();
+    obtenerSesionApi(controlador.signal)
+      .then(setSesion)
+      .catch(() => {
+        if (!controlador.signal.aborted) setSesion(null);
+      })
+      .finally(() => {
+        if (!controlador.signal.aborted) setCargandoSesion(false);
+      });
+    return () => controlador.abort();
+  }, []);
+
+  useEffect(() => {
+    if (!sesion) {
+      return;
+    }
+    const controlador = new AbortController();
     cargarDatosApi(controlador.signal)
       .then((datos) => {
         setOrdenes(datos.ordenes);
@@ -242,7 +299,7 @@ export default function PaginaPrincipal() {
         if (!controlador.signal.aborted) setCargandoDatos(false);
       });
     return () => controlador.abort();
-  }, []);
+  }, [sesion]);
 
   useEffect(() => {
     if (!ordenDetalle || ordenDetalle.estado === "Recepción") return;
@@ -278,6 +335,7 @@ export default function PaginaPrincipal() {
   }, [busqueda, filtroEstado, ordenes]);
 
   function navegar(nuevaVista: Vista) {
+    setMostrarAdministracion(false);
     setMostrarNuevaOrden(false);
     setMostrarNuevoCliente(false);
     setClienteEditando(null);
@@ -578,15 +636,61 @@ export default function PaginaPrincipal() {
     window.setTimeout(() => setAviso(""), 3600);
   }
 
+  async function cambiarTaller(empresaNovaId: number) {
+    if (!sesion || empresaNovaId === sesion.taller.id) return;
+    setCambiandoTaller(true);
+    try {
+      const nuevaSesion = await seleccionarTallerApi(empresaNovaId);
+      navegar("inicio");
+      setOrdenes([]);
+      setClientes([]);
+      setVehiculos([]);
+      setCargandoDatos(true);
+      setSesion(nuevaSesion);
+    } catch (error) {
+      mostrarAviso(
+        error instanceof Error ? error.message : "No fue posible cambiar de taller",
+      );
+    } finally {
+      setCambiandoTaller(false);
+    }
+  }
+
+  async function cerrarSesion() {
+    await cerrarSesionApi();
+    setSesion(null);
+    setOrdenes([]);
+    setClientes([]);
+    setVehiculos([]);
+    setMostrarAdministracion(false);
+  }
+
+  if (cargandoSesion) {
+    return (
+      <main className="pantalla-acceso pantalla-cargando" role="status">
+        <span className="marca-simbolo">T</span>
+        <Cargador mensaje="Preparando Talleres…" />
+      </main>
+    );
+  }
+
+  if (!sesion) {
+    return <PantallaInicioSesion alIngresar={setSesion} />;
+  }
+
   return (
     <div className="aplicacion">
-      <BarraLateral vista={vista} alNavegar={navegar} />
+      <BarraLateral
+        vista={vista}
+        nombreTaller={sesion.taller.nombreComercial || sesion.taller.nombreLegal}
+        alNavegar={navegar}
+      />
 
       <div className={`superficie ${procesoActivo ? "proceso-activo" : ""}`}>
         <header className="barra-superior">
           <div className="marca-compacta">
             <span className="marca-simbolo">T</span>
-            <span>Taller Uno</span>
+            <span>{sesion.taller.nombreComercial || sesion.taller.nombreLegal}</span>
           </div>
 
           <label className="buscador-global">
@@ -605,20 +709,47 @@ export default function PaginaPrincipal() {
               <Bell size={22} />
               <span className="punto-notificacion" />
             </button>
+            {sesion.esSuperUsuario && (
+              <button
+                className="boton-icono"
+                onClick={() => setMostrarAdministracion((actual) => !actual)}
+                aria-label="Administrar talleres sincronizados"
+                aria-pressed={mostrarAdministracion}
+              >
+                <Settings2 size={21} />
+              </button>
+            )}
+            {sesion.esSuperUsuario && (
+              <label className="selector-taller">
+                <span className="solo-lectores">Taller activo</span>
+                <select
+                  value={sesion.taller.id}
+                  disabled={cambiandoTaller}
+                  onChange={(evento) => cambiarTaller(Number(evento.target.value))}
+                >
+                  {sesion.talleresDisponibles.map((taller) => (
+                    <option key={taller.id} value={taller.id}>{taller.nombreLegal}</option>
+                  ))}
+                </select>
+              </label>
+            )}
             <div className="usuario">
-              <span className="avatar">JM</span>
+              <span className="avatar">{obtenerIniciales(sesion.nombreUsuario)}</span>
               <span className="usuario-texto">
-                <strong>Javier M.</strong>
-                <small>Jefe de taller</small>
+                <strong>{sesion.nombreUsuario}</strong>
+                <small>{sesion.esSuperUsuario ? "Superusuario" : "Equipo del taller"}</small>
               </span>
             </div>
+            <button className="boton-icono" onClick={cerrarSesion} aria-label="Cerrar sesión">
+              <LogOut size={21} />
+            </button>
           </div>
         </header>
 
         <main className={`contenido-principal ${procesoActivo ? "contenido-proceso" : ""}`}>
           {!procesoActivo && cargandoDatos && (
             <div className="estado-datos" role="status">
-              <Clock3 size={20} /> Consultando datos de la API…
+              <Cargador mensaje="Consultando datos de la API…" icono={<Clock3 size={20} />} />
             </div>
           )}
           {!procesoActivo && errorDatos && (
@@ -627,7 +758,13 @@ export default function PaginaPrincipal() {
               <span><strong>Datos no disponibles.</strong> {errorDatos}</span>
             </div>
           )}
-          {mostrarNuevaOrden ? (
+          {mostrarAdministracion ? (
+            <VistaAdministracion
+              sesion={sesion}
+              alActualizarSesion={setSesion}
+              alCerrar={() => setMostrarAdministracion(false)}
+            />
+          ) : mostrarNuevaOrden ? (
             <PaginaProceso
               titulo="Nueva orden de servicio"
               descripcion="Registra el vehículo y el motivo de ingreso sin salir del área de trabajo."
@@ -708,6 +845,8 @@ export default function PaginaPrincipal() {
           ) : vista === "inicio" ? (
             <VistaInicio
               ordenes={ordenes}
+              nombreUsuario={sesion.nombreUsuario}
+              taller={sesion.taller}
               cargando={cargandoDatos}
               datosDisponibles={!errorDatos}
               alCrearOrden={() => iniciarNuevaOrden()}
@@ -742,7 +881,7 @@ export default function PaginaPrincipal() {
               alEditar={abrirFormularioVehiculo}
             />
           ) : (
-            <VistaInventario />
+            <VistaInventario taller={sesion.taller} />
           )}
         </main>
 
@@ -759,12 +898,251 @@ export default function PaginaPrincipal() {
   );
 }
 
-function BarraLateral({ vista, alNavegar }: { vista: Vista; alNavegar: (vista: Vista) => void }) {
+function Cargador({ mensaje, icono }: { mensaje: string; icono?: ReactNode }) {
+  return <span className="estado-carga"><span className="spinner-carga" aria-hidden="true" />{icono}{mensaje}</span>;
+}
+
+function PantallaInicioSesion({
+  alIngresar,
+}: {
+  alIngresar: (sesion: SesionTallerApi) => void;
+}) {
+  const [enviando, setEnviando] = useState(false);
+  const [proveedorEnviando, setProveedorEnviando] = useState<string | null>(null);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const mensaje = new URLSearchParams(window.location.search).get("error");
+    if (!mensaje) return;
+    const identificador = window.setTimeout(
+      () => setError("No fue posible completar el inicio de sesión externo."),
+      0,
+    );
+    return () => window.clearTimeout(identificador);
+  }, []);
+
+  async function enviar(evento: FormEvent<HTMLFormElement>) {
+    evento.preventDefault();
+    const datos = new FormData(evento.currentTarget);
+    setEnviando(true);
+    setError("");
+    try {
+      const sesion = await iniciarSesionApi({
+        usuario: String(datos.get("usuario")),
+        contrasena: String(datos.get("contrasena")),
+        recordarme: datos.has("recordarme"),
+      });
+      alIngresar(sesion);
+    } catch (excepcion) {
+      setError(
+        excepcion instanceof Error
+          ? excepcion.message
+          : "No fue posible iniciar sesión.",
+      );
+    } finally {
+      setEnviando(false);
+    }
+  }
+
+  return (
+    <main className="pantalla-acceso">
+      <section className="presentacion-acceso" aria-label="Bienvenida a Talleres">
+        <div className="marca marca-acceso">
+          <span className="marca-simbolo">T</span>
+          <span>Talleres</span>
+        </div>
+        <div>
+          <span className="sobrelinea">Integrado con SMART TPV NOVA</span>
+          <h1>La operación del taller, en un solo lugar.</h1>
+          <p>Ingresa con tu cuenta de SMART TPV NOVA. El sistema abrirá únicamente el taller que tienes autorizado.</p>
+        </div>
+        <small>Acceso seguro · Información aislada por empresa</small>
+      </section>
+
+      <section className="contenedor-login">
+        <form className="formulario-login" onSubmit={enviar}>
+          <div>
+            <span className="sobrelinea">Bienvenido</span>
+            <h2>Iniciar sesión</h2>
+            <p>Utiliza las mismas credenciales de SMART TPV NOVA.</p>
+          </div>
+
+          {error && <div className="mensaje-acceso-error" role="alert"><TriangleAlert size={20} />{error}</div>}
+
+          <label>
+            Usuario
+            <input
+              name="usuario"
+              type="text"
+              autoComplete="username"
+              required
+              maxLength={256}
+            />
+          </label>
+          <label>
+            Contraseña
+            <input
+              name="contrasena"
+              type="password"
+              autoComplete="current-password"
+              required
+              maxLength={256}
+            />
+          </label>
+          <label className="opcion-recordarme">
+            <input name="recordarme" type="checkbox" />
+            Mantener mi sesión iniciada
+          </label>
+          <button className="boton-primario boton-ancho" disabled={enviando}>
+            {enviando ? <Cargador mensaje="Validando acceso…" /> : "Ingresar al taller"}
+          </button>
+          <div className="separador-login"><span>o continúa con</span></div>
+          <div className="botones-proveedor-login">
+            <button
+              type="button"
+              className={`boton-proveedor-login ${proveedorEnviando ? "boton-cargando" : ""}`}
+              disabled={Boolean(proveedorEnviando)}
+              onClick={() => { setProveedorEnviando("google"); window.location.assign(`${obtenerDireccionApi()}/api/autenticacion/externo/google`); }}
+            >
+              {proveedorEnviando === "google" ? <Cargador mensaje="Conectando…" /> : "Continuar con Google"}
+            </button>
+            <button
+              type="button"
+              className={`boton-proveedor-login ${proveedorEnviando ? "boton-cargando" : ""}`}
+              disabled={Boolean(proveedorEnviando)}
+              onClick={() => { setProveedorEnviando("microsoft"); window.location.assign(`${obtenerDireccionApi()}/api/autenticacion/externo/microsoft`); }}
+            >
+              {proveedorEnviando === "microsoft" ? <Cargador mensaje="Conectando…" /> : "Continuar con Microsoft"}
+            </button>
+          </div>
+        </form>
+      </section>
+    </main>
+  );
+}
+
+function VistaAdministracion({
+  sesion,
+  alActualizarSesion,
+  alCerrar,
+}: {
+  sesion: SesionTallerApi;
+  alActualizarSesion: (sesion: SesionTallerApi) => void;
+  alCerrar: () => void;
+}) {
+  const [talleres, setTalleres] = useState<TallerSincronizadoApi[]>([]);
+  const [empresaNovaId, setEmpresaNovaId] = useState("");
+  const [cargando, setCargando] = useState(true);
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState("");
+
+  async function cargar() {
+    setCargando(true);
+    try {
+      setTalleres(await listarTalleresSincronizadosApi());
+      setError("");
+    } catch (excepcion) {
+      setError(excepcion instanceof Error ? excepcion.message : "No fue posible consultar los talleres.");
+    } finally {
+      setCargando(false);
+    }
+  }
+
+  useEffect(() => {
+    const identificador = window.setTimeout(() => { void cargar(); }, 0);
+    return () => window.clearTimeout(identificador);
+  }, []);
+
+  async function agregar(evento: FormEvent<HTMLFormElement>) {
+    evento.preventDefault();
+    setGuardando(true);
+    try {
+      await agregarTallerSincronizadoApi(Number(empresaNovaId));
+      setEmpresaNovaId("");
+      await cargar();
+      alActualizarSesion(await obtenerSesionApi(new AbortController().signal));
+    } catch (excepcion) {
+      setError(excepcion instanceof Error ? excepcion.message : "No fue posible agregar el taller.");
+    } finally {
+      setGuardando(false);
+    }
+  }
+
+  async function retirar(id: number) {
+    if (!window.confirm("¿Retirar este taller de la sincronización?")) return;
+    setGuardando(true);
+    try {
+      await retirarTallerSincronizadoApi(id);
+      await cargar();
+      alActualizarSesion(await obtenerSesionApi(new AbortController().signal));
+    } catch (excepcion) {
+      setError(excepcion instanceof Error ? excepcion.message : "No fue posible retirar el taller.");
+    } finally {
+      setGuardando(false);
+    }
+  }
+
+  return (
+    <section className="pagina-administracion">
+      <div className="encabezado-pagina">
+        <div>
+          <span className="sobrelinea">Administración · Superusuario</span>
+          <h1>Talleres sincronizados</h1>
+          <p>Define qué empresas de SMART TPV NOVA pueden operar en Talleres.</p>
+        </div>
+        <button className="boton-secundario" onClick={alCerrar}>Volver al tablero</button>
+      </div>
+
+      <div className="panel panel-administracion">
+        <form className="formulario-agregar-taller" onSubmit={agregar}>
+          <label>
+            Id de empresa en SMART TPV NOVA
+            <input
+              type="number"
+              min="1"
+              required
+              value={empresaNovaId}
+              onChange={(evento) => setEmpresaNovaId(evento.target.value)}
+              placeholder="Ej. 3071"
+            />
+          </label>
+          <button className="boton-primario" disabled={guardando}>{guardando ? <Cargador mensaje="Agregando…" /> : "Agregar taller"}</button>
+        </form>
+        {error && <div className="estado-datos estado-datos-error" role="alert"><TriangleAlert size={20} />{error}</div>}
+        {cargando ? <div className="estado-datos">Consultando empresas configuradas…</div> : (
+          <div className="lista-talleres-admin">
+            {talleres.map((taller) => (
+              <article key={taller.empresaNovaId} className={!taller.activo ? "taller-retirado" : ""}>
+                <div>
+                  <span className="sobrelinea">Empresa {taller.empresaNovaId}</span>
+                  <strong>{taller.nombreComercial || taller.nombreLegal}</strong>
+                  <small>{taller.activo ? "Disponible para iniciar sesión" : "Retirado de la sincronización"}</small>
+                </div>
+                {taller.activo && <button className="boton-secundario" disabled={guardando} onClick={() => retirar(taller.empresaNovaId)}>{guardando ? <Cargador mensaje="Retirando…" /> : "Retirar"}</button>}
+              </article>
+            ))}
+          </div>
+        )}
+      </div>
+      <p className="nota-administracion">El usuario actual: {sesion.nombreUsuario}. La autorización se vuelve a comprobar en SMART TPV NOVA en cada operación.</p>
+    </section>
+  );
+}
+
+function BarraLateral({
+  vista,
+  nombreTaller,
+  alNavegar,
+}: {
+  vista: Vista;
+  nombreTaller: string;
+  alNavegar: (vista: Vista) => void;
+}) {
   return (
     <aside className="barra-lateral">
       <button className="marca" onClick={() => alNavegar("inicio")} aria-label="Ir al inicio">
         <span className="marca-simbolo">T</span>
-        <span className="marca-nombre">Taller Uno</span>
+        <span className="marca-nombre">{nombreTaller}</span>
       </button>
 
       <nav className="navegacion-principal" aria-label="Navegación principal">
@@ -786,7 +1164,7 @@ function BarraLateral({ vista, alNavegar }: { vista: Vista; alNavegar: (vista: V
       <div className="estado-sede">
         <span className="estado-en-linea" />
         <div>
-          <strong>Centro Managua</strong>
+          <strong>{nombreTaller}</strong>
           <small>Operación en línea</small>
         </div>
         <ChevronRight size={18} />
@@ -824,6 +1202,8 @@ function NavegacionInferior({ vista, alNavegar }: { vista: Vista; alNavegar: (vi
 
 function VistaInicio({
   ordenes,
+  nombreUsuario,
+  taller,
   cargando,
   datosDisponibles,
   alCrearOrden,
@@ -831,6 +1211,8 @@ function VistaInicio({
   alVerOrdenes,
 }: {
   ordenes: OrdenTaller[];
+  nombreUsuario: string;
+  taller: TallerSesionApi;
   cargando: boolean;
   datosDisponibles: boolean;
   alCrearOrden: () => void;
@@ -854,7 +1236,7 @@ function VistaInicio({
       <section className="encabezado-pagina encabezado-inicio">
         <div>
           <span className="sobrelinea">{fechaActual}</span>
-          <h1>Buen día, Javier</h1>
+          <h1>Buen día, {nombreUsuario.split(" ")[0]}</h1>
           <p>
             {cargando
               ? "Consultando la operación actual del taller."
@@ -867,6 +1249,25 @@ function VistaInicio({
           <Plus size={21} />
           Nueva orden
         </button>
+      </section>
+
+      <section className="panel informacion-taller" aria-label="Información del taller activo">
+        <div className="titulo-panel">
+          <div>
+            <span className="sobrelinea">Taller activo · Empresa {taller.id}</span>
+            <h2>{taller.nombreComercial || taller.nombreLegal}</h2>
+          </div>
+          <span className="estado-operativo">Operación en línea</span>
+        </div>
+        <div className="datos-taller">
+          <span><strong>Razón social</strong><em>{taller.nombreLegal}</em></span>
+          <span><strong>RUC</strong><em>{taller.ruc || "No registrado"}</em></span>
+          <span><strong>Teléfono</strong><em>+{taller.prefijoTelefono} {taller.telefono}</em></span>
+          <span><strong>Correo</strong><em>{taller.correo || "No registrado"}</em></span>
+          <span className="dato-taller-ancho"><strong>Dirección</strong><em>{[taller.direccion, taller.ciudad, taller.barrio, taller.calle].filter(Boolean).join(", ") || "No registrada"}</em></span>
+          <span><strong>Horario</strong><em>{formatearHora(taller.horaApertura)} – {formatearHora(taller.horaCierre)}</em></span>
+          {taller.logo && <span><strong>Identidad visual</strong><a href={taller.logo} target="_blank" rel="noreferrer">Abrir logo registrado</a></span>}
+        </div>
       </section>
 
       <section className="metricas" aria-label="Resumen del taller">
@@ -1133,7 +1534,32 @@ function VistaVehiculos({
   );
 }
 
-function VistaInventario() {
+function VistaInventario({ taller }: { taller: TallerSesionApi }) {
+  const [bodegas, setBodegas] = useState<BodegaInventarioApi[]>([]);
+  const [bodegaId, setBodegaId] = useState<number | null>(null);
+  const [articulos, setArticulos] = useState<ArticuloInventarioApi[]>([]);
+  const [cargando, setCargando] = useState(true);
+  const [cargandoExistencias, setCargandoExistencias] = useState(false);
+  const [error, setError] = useState("");
+  const [busquedaInventario, setBusquedaInventario] = useState("");
+  const [paginaInventario, setPaginaInventario] = useState(1);
+  const registrosPorPagina = 10;
+  const articulosFiltrados = articulos.filter((articulo) => `${articulo.nombre} ${articulo.codigo}`.toLowerCase().includes(busquedaInventario.toLowerCase().trim()));
+  const totalPaginas = Math.max(1, Math.ceil(articulosFiltrados.length / registrosPorPagina));
+  const articulosPagina = articulosFiltrados.slice((paginaInventario - 1) * registrosPorPagina, paginaInventario * registrosPorPagina);
+
+  useEffect(() => {
+    listarBodegasApi().then((resultado) => { setBodegas(resultado); setBodegaId(resultado.find((item) => item.esPrincipal)?.id ?? resultado[0]?.id ?? null); }).catch((excepcion) => setError(excepcion instanceof Error ? excepcion.message : "No fue posible consultar las bodegas.")).finally(() => setCargando(false));
+  }, [taller.id]);
+  useEffect(() => {
+    if (bodegaId === null) return;
+    const identificador = window.setTimeout(() => {
+      setCargandoExistencias(true); setError("");
+      listarExistenciasApi(bodegaId).then(setArticulos).catch((excepcion) => { setArticulos([]); setError(excepcion instanceof Error ? excepcion.message : "No fue posible consultar las existencias."); }).finally(() => setCargandoExistencias(false));
+    }, 0);
+    return () => window.clearTimeout(identificador);
+  }, [bodegaId]);
+
   return (
     <>
       <section className="encabezado-pagina">
@@ -1141,11 +1567,8 @@ function VistaInventario() {
         <button className="boton-primario"><Plus size={21} />Registrar entrada</button>
       </section>
       <section className="panel inventario">
-        <EstadoVacio
-          icono={Boxes}
-          titulo="Inventario sin datos"
-          detalle="El inventario todavía no dispone de un contrato HTTP persistido."
-        />
+        <div className="controles-inventario"><div className="selector-inventario"><label>Bodega<select value={bodegaId ?? ""} onChange={(evento) => { setBodegaId(Number(evento.target.value)); setPaginaInventario(1); }}>{bodegas.map((bodega) => <option key={bodega.id} value={bodega.id}>{bodega.nombre}{bodega.esPrincipal ? " · Principal" : ""}</option>)}</select></label></div><label className="busqueda-inventario">Buscar<input value={busquedaInventario} onChange={(evento) => { setBusquedaInventario(evento.target.value); setPaginaInventario(1); }} placeholder="Nombre o código" /></label></div>
+        {cargando || cargandoExistencias ? <Cargador mensaje="Consultando existencias…" /> : error ? <div className="estado-datos estado-datos-error" role="alert">{error}</div> : articulos.length === 0 ? <EstadoVacio icono={Boxes} titulo="Sin existencias" detalle="La bodega seleccionada no tiene artículos disponibles." /> : articulosFiltrados.length === 0 ? <EstadoVacio icono={Boxes} titulo="Sin coincidencias" detalle="No hay artículos que coincidan con la búsqueda." /> : <><div className="lista-inventario">{articulosPagina.map((articulo) => <article key={articulo.productoId}><div><strong>{articulo.nombre}</strong><small>{articulo.codigo} · {articulo.unidadMedida}</small></div><b>{articulo.existencia}</b></article>)}</div><div className="paginacion-inventario"><button type="button" disabled={paginaInventario <= 1} onClick={() => setPaginaInventario((pagina) => pagina - 1)}>Anterior</button><span>Página {paginaInventario} de {totalPaginas}</span><button type="button" disabled={paginaInventario >= totalPaginas} onClick={() => setPaginaInventario((pagina) => pagina + 1)}>Siguiente</button></div></>}
       </section>
     </>
   );
@@ -1251,7 +1674,7 @@ function FormularioNuevaOrden({
       <label>Descripción<textarea name="motivo" rows={4} required placeholder="Ej. Se escucha un ruido al frenar..." /></label>
       <div className="opciones-prioridad"><label><input type="radio" name="prioridad" defaultChecked />Normal</label><label><input type="radio" name="prioridad" />Prioritaria</label></div>
       <button className="boton-primario boton-ancho" type="submit" disabled={!formularioDisponible || guardando}>
-        <Check size={20} />{guardando ? "Creando orden…" : "Crear orden de servicio"}
+        {guardando ? <Cargador mensaje="Creando orden…" /> : <><Check size={20} />Crear orden de servicio</>}
       </button>
     </form>
   );
@@ -1304,8 +1727,7 @@ function FormularioCliente({
         </label>
       )}
       <button className="boton-primario boton-ancho" type="submit" disabled={guardando}>
-        <Check size={20} />
-        {guardando ? "Guardando cliente…" : cliente ? "Guardar cambios" : "Registrar cliente"}
+        {guardando ? <Cargador mensaje="Guardando cliente…" /> : <><Check size={20} />{cliente ? "Guardar cambios" : "Registrar cliente"}</>}
       </button>
     </form>
   );
@@ -1374,12 +1796,7 @@ function FormularioVehiculo({
         </label>
       )}
       <button className="boton-primario boton-ancho" type="submit" disabled={!formularioDisponible || guardando}>
-        <Check size={20} />
-        {guardando
-          ? "Guardando vehículo…"
-          : vehiculo
-            ? "Guardar cambios"
-            : "Registrar vehículo"}
+        {guardando ? <Cargador mensaje="Guardando vehículo…" /> : <><Check size={20} />{vehiculo ? "Guardar cambios" : "Registrar vehículo"}</>}
       </button>
     </form>
   );
@@ -1747,6 +2164,15 @@ function normalizarClase(valor: string) {
     .replaceAll(" ", "-");
 }
 
+function formatearHora(hora: string) {
+  const [horas, minutos] = hora.split(":");
+  const fecha = new Date(2000, 0, 1, Number(horas), Number(minutos));
+  return new Intl.DateTimeFormat("es-NI", {
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(fecha);
+}
+
 function obtenerDireccionApi() {
   const direccionApi = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "");
   if (!direccionApi) {
@@ -1754,6 +2180,84 @@ function obtenerDireccionApi() {
   }
   return direccionApi;
 }
+
+async function iniciarSesionApi(solicitud: {
+  usuario: string;
+  contrasena: string;
+  recordarme: boolean;
+}): Promise<SesionTallerApi> {
+  const respuesta = await fetch(`${obtenerDireccionApi()}/api/autenticacion/iniciar`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(solicitud),
+  });
+  if (!respuesta.ok) {
+    throw new Error(await obtenerMensajeErrorApi(respuesta, "No fue posible iniciar sesión."));
+  }
+  return (await respuesta.json()) as SesionTallerApi;
+}
+
+async function obtenerSesionApi(senal: AbortSignal): Promise<SesionTallerApi> {
+  const respuesta = await fetch(`${obtenerDireccionApi()}/api/autenticacion/sesion`, {
+    credentials: "include",
+    signal: senal,
+  });
+  if (!respuesta.ok) throw new Error("No hay una sesión activa.");
+  return (await respuesta.json()) as SesionTallerApi;
+}
+
+async function seleccionarTallerApi(empresaNovaId: number): Promise<SesionTallerApi> {
+  const respuesta = await fetch(
+    `${obtenerDireccionApi()}/api/autenticacion/seleccionar-taller`,
+    {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ empresaNovaId }),
+    },
+  );
+  if (!respuesta.ok) {
+    throw new Error(await obtenerMensajeErrorApi(respuesta, "No fue posible cambiar de taller."));
+  }
+  return (await respuesta.json()) as SesionTallerApi;
+}
+
+async function cerrarSesionApi() {
+  await fetch(`${obtenerDireccionApi()}/api/autenticacion/cerrar`, {
+    method: "POST",
+    credentials: "include",
+  });
+}
+
+async function listarTalleresSincronizadosApi(): Promise<TallerSincronizadoApi[]> {
+  const respuesta = await fetch(`${obtenerDireccionApi()}/api/talleres-sincronizados`, {
+    credentials: "include",
+  });
+  if (!respuesta.ok) throw new Error(await obtenerMensajeErrorApi(respuesta, "No fue posible consultar los talleres."));
+  return (await respuesta.json()) as TallerSincronizadoApi[];
+}
+
+async function agregarTallerSincronizadoApi(empresaNovaId: number) {
+  const respuesta = await fetch(`${obtenerDireccionApi()}/api/talleres-sincronizados`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ empresaNovaId }),
+  });
+  if (!respuesta.ok) throw new Error(await obtenerMensajeErrorApi(respuesta, "No fue posible agregar el taller."));
+}
+
+async function retirarTallerSincronizadoApi(empresaNovaId: number) {
+  const respuesta = await fetch(`${obtenerDireccionApi()}/api/talleres-sincronizados/${empresaNovaId}`, {
+    method: "DELETE",
+    credentials: "include",
+  });
+  if (!respuesta.ok) throw new Error(await obtenerMensajeErrorApi(respuesta, "No fue posible retirar el taller."));
+}
+
+async function listarBodegasApi(): Promise<BodegaInventarioApi[]> { const respuesta = await fetch(`${obtenerDireccionApi()}/api/inventario/bodegas`, { credentials: "include" }); if (!respuesta.ok) throw new Error("No fue posible consultar las bodegas."); return await respuesta.json() as BodegaInventarioApi[]; }
+async function listarExistenciasApi(bodegaId: number): Promise<ArticuloInventarioApi[]> { const respuesta = await fetch(`${obtenerDireccionApi()}/api/inventario/existencias?bodegaId=${bodegaId}`, { credentials: "include" }); if (!respuesta.ok) throw new Error("No fue posible consultar las existencias."); return await respuesta.json() as ArticuloInventarioApi[]; }
 
 async function cargarDatosApi(senal: AbortSignal): Promise<{
   ordenes: OrdenTaller[];
@@ -1785,9 +2289,7 @@ async function cargarOrdenesApi(senal: AbortSignal): Promise<OrdenTaller[]> {
   const direccionApi = obtenerDireccionApi();
 
   const respuesta = await fetch(`${direccionApi}/api/ordenes-servicio`, {
-    headers: {
-      "X-Empresa-Id": process.env.NEXT_PUBLIC_EMPRESA_ID || "1",
-    },
+    credentials: "include",
     signal: senal,
   });
   if (!respuesta.ok) throw new Error("No fue posible consultar las órdenes.");
@@ -1798,7 +2300,7 @@ async function cargarOrdenesApi(senal: AbortSignal): Promise<OrdenTaller[]> {
 
 async function cargarClientesApi(senal: AbortSignal): Promise<ClienteApi[]> {
   const respuesta = await fetch(`${obtenerDireccionApi()}/api/clientes`, {
-    headers: { "X-Empresa-Id": process.env.NEXT_PUBLIC_EMPRESA_ID || "1" },
+    credentials: "include",
     signal: senal,
   });
   if (!respuesta.ok) throw new Error("No fue posible consultar los clientes.");
@@ -1815,9 +2317,9 @@ async function guardarClienteApi(solicitud: {
 }, clienteId?: number): Promise<ClienteApi> {
   const respuesta = await fetch(`${obtenerDireccionApi()}/api/clientes${clienteId ? `/${clienteId}` : ""}`, {
     method: clienteId ? "PUT" : "POST",
+    credentials: "include",
     headers: {
       "Content-Type": "application/json",
-      "X-Empresa-Id": process.env.NEXT_PUBLIC_EMPRESA_ID || "1",
     },
     body: JSON.stringify(solicitud),
   });
@@ -1829,7 +2331,7 @@ async function guardarClienteApi(solicitud: {
 
 async function cargarVehiculosApi(senal: AbortSignal): Promise<VehiculoApi[]> {
   const respuesta = await fetch(`${obtenerDireccionApi()}/api/vehiculos`, {
-    headers: { "X-Empresa-Id": process.env.NEXT_PUBLIC_EMPRESA_ID || "1" },
+    credentials: "include",
     signal: senal,
   });
   if (!respuesta.ok) throw new Error("No fue posible consultar los vehículos.");
@@ -1853,9 +2355,9 @@ async function guardarVehiculoApi(
     `${obtenerDireccionApi()}/api/vehiculos${vehiculoId ? `/${vehiculoId}` : ""}`,
     {
       method: vehiculoId ? "PUT" : "POST",
+      credentials: "include",
       headers: {
         "Content-Type": "application/json",
-        "X-Empresa-Id": process.env.NEXT_PUBLIC_EMPRESA_ID || "1",
       },
       body: JSON.stringify(solicitud),
     },
@@ -1873,9 +2375,9 @@ async function crearOrdenApi(solicitud: {
 }): Promise<OrdenTaller> {
   const respuesta = await fetch(`${obtenerDireccionApi()}/api/ordenes-servicio`, {
     method: "POST",
+    credentials: "include",
     headers: {
       "Content-Type": "application/json",
-      "X-Empresa-Id": process.env.NEXT_PUBLIC_EMPRESA_ID || "1",
     },
     body: JSON.stringify(solicitud),
   });
@@ -1980,9 +2482,9 @@ async function guardarRecepcionApi(
     `${direccionApi}/api/ordenes-servicio/${ordenServicioId}/recepcion`,
     {
       method: esActualizacion ? "PUT" : "POST",
+      credentials: "include",
       headers: {
         "Content-Type": "application/json",
-        "X-Empresa-Id": process.env.NEXT_PUBLIC_EMPRESA_ID || "1",
       },
       body: JSON.stringify({
         kilometraje: inspeccion.kilometraje,
@@ -2012,7 +2514,7 @@ async function cargarInspeccionApi(
   const respuesta = await fetch(
     `${direccionApi}/api/ordenes-servicio/${ordenServicioId}/recepcion`,
     {
-      headers: { "X-Empresa-Id": process.env.NEXT_PUBLIC_EMPRESA_ID || "1" },
+      credentials: "include",
       signal: senal,
     },
   );

@@ -23,6 +23,9 @@ public sealed class TallerDbContext(
     public DbSet<HistorialOrdenServicio> HistorialOrdenesServicio =>
         Set<HistorialOrdenServicio>();
 
+    public DbSet<TallerSincronizado> TalleresSincronizados =>
+        Set<TallerSincronizado>();
+
     public override Task<int> SaveChangesAsync(
         CancellationToken cancellationToken = default)
     {
@@ -32,7 +35,11 @@ public sealed class TallerDbContext(
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        modelBuilder.ApplyConfigurationsFromAssembly(typeof(TallerDbContext).Assembly);
+        modelBuilder.ApplyConfigurationsFromAssembly(
+            typeof(TallerDbContext).Assembly,
+            tipo => tipo.Namespace?.Equals(
+                "Talleres.Infraestructura.Persistencia.Configuraciones",
+                StringComparison.Ordinal) == true);
 
         modelBuilder.Entity<Cliente>()
             .HasQueryFilter(entidad => entidad.EmpresaId == contextoEmpresa.EmpresaId);

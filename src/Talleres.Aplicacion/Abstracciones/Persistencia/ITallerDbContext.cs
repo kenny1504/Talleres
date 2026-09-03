@@ -20,6 +20,8 @@ public interface ITallerDbContext
 
     DbSet<HistorialOrdenServicio> HistorialOrdenesServicio { get; }
 
+    DbSet<TallerSincronizado> TalleresSincronizados { get; }
+
     /// <summary>
     /// Persiste de forma atómica los cambios pendientes en el contexto.
     /// </summary>

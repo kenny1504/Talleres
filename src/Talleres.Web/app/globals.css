@@ -71,6 +71,204 @@ textarea:focus-visible {
   border: 0;
 }
 
+.pantalla-acceso {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: minmax(320px, 0.9fr) minmax(420px, 1.1fr);
+  background: var(--superficie);
+}
+
+.pantalla-cargando {
+  grid-template-columns: auto auto;
+  place-content: center;
+  align-items: center;
+  gap: 14px;
+}
+
+.presentacion-acceso {
+  min-height: 100vh;
+  padding: clamp(32px, 6vw, 84px);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 48px;
+  background: #17241f;
+  color: white;
+}
+
+.marca-acceso {
+  padding: 0;
+}
+
+.presentacion-acceso h1 {
+  max-width: 620px;
+  margin: 14px 0 18px;
+  font-size: clamp(40px, 5vw, 70px);
+  line-height: 1;
+  letter-spacing: -0.055em;
+}
+
+.presentacion-acceso p {
+  max-width: 580px;
+  margin: 0;
+  color: #c2ccc7;
+  font-size: 17px;
+  line-height: 1.65;
+}
+
+.presentacion-acceso .sobrelinea {
+  color: #f4b653;
+}
+
+.presentacion-acceso small {
+  color: #9eaaa5;
+}
+
+.contenedor-login {
+  min-height: 100vh;
+  padding: clamp(26px, 6vw, 90px);
+  display: grid;
+  place-items: center;
+}
+
+.formulario-login {
+  width: min(480px, 100%);
+  padding: clamp(28px, 5vw, 48px);
+  display: grid;
+  gap: 23px;
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  background: white;
+  box-shadow: var(--sombra);
+}
+
+.formulario-login h2 {
+  margin: 7px 0;
+  font-size: 34px;
+  letter-spacing: -0.04em;
+}
+
+.formulario-login p {
+  margin: 0;
+  color: var(--tinta-suave);
+}
+
+.formulario-login > label:not(.opcion-recordarme) {
+  display: grid;
+  gap: 9px;
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.formulario-login input[type="text"],
+.formulario-login input[type="password"] {
+  min-height: 52px;
+  width: 100%;
+  padding: 0 15px;
+  border: 1px solid var(--borde);
+  border-radius: 13px;
+  background: var(--superficie);
+}
+
+.opcion-recordarme {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--tinta-suave);
+  font-size: 13px;
+}
+
+.opcion-recordarme input {
+  width: 20px;
+  height: 20px;
+}
+
+.mensaje-acceso-error {
+  min-height: 48px;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-radius: 12px;
+  background: var(--rojo-claro);
+  color: var(--rojo);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.estado-carga {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+}
+
+.spinner-carga {
+  width: 17px;
+  height: 17px;
+  flex: 0 0 17px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: giro-carga .7s linear infinite;
+}
+
+@keyframes giro-carga {
+  to { transform: rotate(360deg); }
+}
+
+.pantalla-cargando .estado-carga {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.separador-login {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--tinta-suave);
+  font-size: 12px;
+}
+
+.separador-login::before,
+.separador-login::after {
+  content: "";
+  height: 1px;
+  flex: 1;
+  background: var(--borde);
+}
+
+.botones-proveedor-login {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.boton-proveedor-login {
+  min-height: 48px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--borde);
+  border-radius: 12px;
+  color: var(--tinta);
+  background: white;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.boton-proveedor-login:hover,
+.boton-proveedor-login:focus-visible {
+  border-color: var(--verde);
+  background: var(--superficie);
+}
+
+.boton-proveedor-login.boton-cargando {
+  cursor: wait;
+  opacity: .72;
+  pointer-events: none;
+}
+
 .aplicacion {
   min-height: 100vh;
   display: grid;
@@ -256,6 +454,17 @@ textarea:focus-visible {
   gap: 15px;
 }
 
+.selector-taller select {
+  min-height: 46px;
+  max-width: 250px;
+  padding: 0 36px 0 13px;
+  border: 1px solid var(--borde);
+  border-radius: 13px;
+  background: white;
+  font-size: 13px;
+  font-weight: 700;
+}
+
 .boton-icono {
   position: relative;
   width: 46px;
@@ -316,6 +525,233 @@ textarea:focus-visible {
   width: min(1480px, 100%);
   margin: 0 auto;
   padding: 34px clamp(22px, 3vw, 46px) 54px;
+}
+
+.informacion-taller {
+  margin-bottom: 24px;
+  padding: 22px 26px 24px;
+}
+
+.inventario { padding: 24px; }
+.controles-inventario { display: flex; align-items: flex-end; gap: 18px; margin-bottom: 22px; }
+.selector-inventario { max-width: 360px; flex: 1; }
+.selector-inventario label { display: grid; gap: 8px; font-weight: 700; }
+.selector-inventario select { min-height: 46px; padding: 0 12px; border: 1px solid var(--borde); border-radius: 11px; background: var(--superficie); }
+.busqueda-inventario { display: grid; gap: 8px; min-width: 260px; font-weight: 700; }
+.busqueda-inventario input { min-height: 46px; padding: 0 13px; border: 1px solid var(--borde); border-radius: 11px; background: var(--superficie); }
+.lista-inventario { display: grid; gap: 10px; }
+.lista-inventario article { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 15px 17px; border: 1px solid var(--borde); border-radius: 13px; }
+.lista-inventario strong, .lista-inventario small { display: block; }
+.lista-inventario small { margin-top: 4px; color: var(--tinta-suave); }
+.lista-inventario b { color: var(--verde-profundo); font-size: 18px; }
+.paginacion-inventario { display: flex; align-items: center; justify-content: center; gap: 18px; margin-top: 22px; }
+.paginacion-inventario button { min-height: 44px; padding: 0 16px; border: 1px solid var(--borde); border-radius: 10px; background: white; font-weight: 700; }
+.paginacion-inventario button:disabled { opacity: .45; }
+
+.estado-operativo {
+  padding: 7px 11px;
+  border-radius: 999px;
+  background: var(--verde-claro);
+  color: var(--verde-profundo);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.datos-taller {
+  margin-top: 22px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px 26px;
+}
+
+.datos-taller span,
+.datos-taller strong {
+  display: block;
+}
+
+.datos-taller em {
+  display: block;
+  color: var(--tinta);
+  font-size: 14px;
+  font-style: normal;
+  line-height: 1.45;
+}
+
+.dato-taller-ancho {
+  grid-column: span 2;
+}
+
+.pagina-administracion {
+  max-width: 980px;
+  margin: 0 auto;
+}
+
+.panel-administracion {
+  padding: clamp(18px, 3vw, 32px);
+}
+
+.formulario-agregar-taller {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--borde);
+}
+
+.formulario-agregar-taller label {
+  flex: 1;
+  display: grid;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.formulario-agregar-taller input {
+  min-height: 49px;
+  padding: 0 14px;
+  border: 1px solid var(--borde);
+  border-radius: 13px;
+  background: var(--superficie);
+}
+
+.lista-talleres-admin {
+  display: grid;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.lista-talleres-admin article {
+  min-height: 82px;
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  border: 1px solid var(--borde);
+  border-radius: 14px;
+  background: white;
+}
+
+.lista-talleres-admin article > div,
+.lista-talleres-admin strong,
+.lista-talleres-admin small {
+  display: block;
+}
+
+.lista-talleres-admin strong {
+  margin-top: 4px;
+  font-size: 16px;
+}
+
+.lista-talleres-admin small {
+  margin-top: 4px;
+  color: var(--tinta-suave);
+  font-size: 12px;
+}
+
+.lista-talleres-admin .taller-retirado {
+  opacity: 0.62;
+}
+
+.nota-administracion {
+  margin: 16px 3px;
+  color: var(--tinta-suave);
+  font-size: 12px;
+}
+
+.datos-taller span {
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.datos-taller strong {
+  margin-bottom: 4px;
+  color: var(--tinta-suave);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.marca-nombre,
+.marca-compacta > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+  .pantalla-acceso {
+    grid-template-columns: 1fr;
+  }
+
+  .presentacion-acceso {
+    min-height: auto;
+    padding: 30px clamp(24px, 7vw, 54px);
+    gap: 28px;
+  }
+
+  .presentacion-acceso h1 {
+    font-size: clamp(34px, 8vw, 52px);
+  }
+
+  .presentacion-acceso small {
+    display: none;
+  }
+
+  .contenedor-login {
+    min-height: auto;
+    padding: 28px 24px 46px;
+  }
+
+  .datos-taller {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .informacion-taller {
+    padding: 20px;
+  }
+
+  .selector-taller select {
+    max-width: 180px;
+  }
+}
+
+@media (max-width: 620px) {
+  .presentacion-acceso p {
+    display: none;
+  }
+
+  .formulario-login {
+    padding: 25px 20px;
+  }
+
+  .controles-inventario { align-items: stretch; flex-direction: column; }
+  .selector-inventario, .busqueda-inventario { max-width: none; min-width: 0; width: 100%; }
+
+  .datos-taller {
+    grid-template-columns: 1fr;
+  }
+
+  .informacion-taller {
+    padding: 18px;
+  }
+
+  .dato-taller-ancho {
+    grid-column: auto;
+  }
+
+  .formulario-agregar-taller {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .formulario-agregar-taller .boton-primario {
+    width: 100%;
+  }
+
+  .selector-taller select {
+    max-width: 170px;
+  }
 }
 
 .encabezado-pagina {
@@ -2154,9 +2590,11 @@ textarea:focus-visible {
 }
 
 @media (max-width: 680px) {
-  .barra-superior { grid-template-columns: auto 1fr auto; gap: 10px; padding-inline: 13px; }
+  .barra-superior { grid-template-columns: auto 1fr; gap: 10px; padding-inline: 13px; }
   .marca-compacta > span:last-child { display: none; }
-  .buscador-global { min-width: 0; }
+  .buscador-global { display: none; }
+  .acciones-superiores { justify-self: end; }
+  .acciones-superiores > .boton-icono:first-child { display: none; }
   .buscador-global kbd,
   .acciones-superiores .usuario { display: none; }
   .contenido-principal { padding-inline: 13px; }

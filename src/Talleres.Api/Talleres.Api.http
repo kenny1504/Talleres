@@ -1,14 +1,30 @@
 @Talleres_Api_HostAddress = http://localhost:5056
-@EmpresaId = 1
+@UsuarioNova = usuario@example.com
+@ContrasenaNova = cambie-esta-clave
 
 GET {{Talleres_Api_HostAddress}}/salud
 Accept: application/json
 
 ###
 
+POST {{Talleres_Api_HostAddress}}/api/autenticacion/iniciar
+Content-Type: application/json
+
+{
+  "usuario": "{{UsuarioNova}}",
+  "contrasena": "{{ContrasenaNova}}",
+  "recordarme": false
+}
+
+###
+
+GET {{Talleres_Api_HostAddress}}/api/autenticacion/sesion
+Accept: application/json
+
+###
+
 POST {{Talleres_Api_HostAddress}}/api/clientes
 Content-Type: application/json
-X-Empresa-Id: {{EmpresaId}}
 
 {
   "nombre": "Ana López",
@@ -22,10 +38,39 @@ X-Empresa-Id: {{EmpresaId}}
 
 GET {{Talleres_Api_HostAddress}}/api/clientes
 Accept: application/json
-X-Empresa-Id: {{EmpresaId}}
 
 ###
 
 GET {{Talleres_Api_HostAddress}}/api/vehiculos
 Accept: application/json
-X-Empresa-Id: {{EmpresaId}}
+
+###
+
+POST {{Talleres_Api_HostAddress}}/api/vehiculos
+Content-Type: application/json
+
+{
+  "clienteId": 1,
+  "placa": "M 245-781",
+  "marca": "Toyota",
+  "modelo": "Hilux",
+  "anio": 2025,
+  "color": "Blanco",
+  "numeroVin": "VIN-EJEMPLO-001"
+}
+
+###
+
+PUT {{Talleres_Api_HostAddress}}/api/vehiculos/1
+Content-Type: application/json
+
+{
+  "clienteId": 1,
+  "placa": "M 245-781",
+  "marca": "Toyota",
+  "modelo": "Hilux",
+  "anio": 2025,
+  "color": "Gris",
+  "numeroVin": "VIN-EJEMPLO-001",
+  "activo": true
+}

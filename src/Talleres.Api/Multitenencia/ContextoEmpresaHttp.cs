@@ -1,4 +1,5 @@
-using Talleres.Api.Middleware;
+using System.Security.Claims;
+using Talleres.Api.Autenticacion;
 using Talleres.Aplicacion.Abstracciones.Multitenencia;
 
 namespace Talleres.Api.Multitenencia;
@@ -10,9 +11,8 @@ public sealed class ContextoEmpresaHttp(IHttpContextAccessor httpContextAccessor
     {
         get
         {
-            var valor = httpContextAccessor.HttpContext?
-                .Request.Headers[ValidacionEmpresaMiddleware.NombreEncabezado]
-                .ToString();
+            var valor = httpContextAccessor.HttpContext?.User
+                .FindFirstValue(ReclamosSesion.EmpresaNovaId);
 
             return long.TryParse(valor, out var empresaId) && empresaId > 0
                 ? empresaId

@@ -23,7 +23,7 @@ async function renderizar() {
   );
 }
 
-test("representa el sistema Taller Uno en español", async () => {
+test("representa el acceso protegido a Talleres en español", async () => {
   const respuesta = await renderizar();
   assert.equal(respuesta.status, 200);
   assert.match(respuesta.headers.get("content-type") ?? "", /^text\/html\b/i);
@@ -31,8 +31,7 @@ test("representa el sistema Taller Uno en español", async () => {
   const html = await respuesta.text();
   assert.match(html, /<html[^>]*\blang=["']es["']/i);
   assert.match(html, /<title>Taller Uno \| Operación del taller<\/title>/i);
-  assert.match(html, /Buen día, Javier/i);
-  assert.match(html, /En taller/i);
+  assert.match(html, /Preparando Talleres/i);
   assert.match(html, /href=["']\/favicon\.svg["']/i);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape|Building your site/i);
 });
@@ -80,11 +79,27 @@ test("mantiene el proxy interno de Docker fuera del código cliente", async () =
   ]);
 
   assert.match(proxy, /process\.env\.TALLERES_API_INTERNA_URL/);
-  assert.match(proxy, /"x-empresa-id"/);
+  assert.match(proxy, /"set-cookie"/);
+  assert.doesNotMatch(proxy, /x-empresa-id/i);
   assert.match(proxy, /cache:\s*"no-store"/);
   assert.doesNotMatch(proxy, /http:\/\/api:8080/);
   assert.match(servidor, /startProdServer/);
   assert.match(servidor, /host:\s*anfitrion/);
+});
+
+test("el login usa la identidad de NOVA y no acepta la empresa desde el navegador", async () => {
+  const pagina = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+
+  assert.match(pagina, /function PantallaInicioSesion/);
+  assert.match(pagina, /SMART TPV NOVA/);
+  assert.match(pagina, /api\/autenticacion\/iniciar/);
+  assert.match(pagina, /api\/autenticacion\/seleccionar-taller/);
+  assert.match(pagina, /if \(!sesion\) \{\s*return <PantallaInicioSesion/);
+  assert.match(pagina, /function VistaAdministracion/);
+  assert.match(pagina, /sesion\.esSuperUsuario && \(/);
+  assert.match(pagina, /api\/talleres-sincronizados/);
+  assert.match(pagina, /credentials:\s*"include"/);
+  assert.doesNotMatch(pagina, /NEXT_PUBLIC_EMPRESA_ID|X-Empresa-Id/);
 });
 
 test("la navegación global cierra cualquier proceso activo", async () => {

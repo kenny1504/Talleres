@@ -1,17 +1,26 @@
 using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authentication.Google;
+using Microsoft.AspNetCore.Authentication.MicrosoftAccount;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Talleres.Api.Middleware;
 using Talleres.Api.Multitenencia;
 using Talleres.Aplicacion.Abstracciones.Multitenencia;
 using Talleres.Aplicacion.Abstracciones.Persistencia;
+using Talleres.Aplicacion.Abstracciones.Integraciones;
 using Talleres.Aplicacion.Servicios;
 using Talleres.Aplicacion.Servicios.Contratos;
 using Talleres.Infraestructura.Persistencia;
+using Talleres.Infraestructura.Integraciones.SmartNova;
+using Talleres.Infraestructura.Integraciones.SmartNova.Entidades;
 
 var builder = WebApplication.CreateBuilder(args);
 CargarCadenaConexionDesdeArchivoEntornoLocal(builder);
 const string politicaCorsFrontal = "FrontalWeb";
 var cadenaConexion = ObtenerCadenaConexionRemota(builder.Configuration);
+var cadenaConexionNova = ObtenerCadenaConexionNova(builder.Configuration);
 var origenesPermitidos = builder.Configuration
     .GetSection("Cors:OrigenesPermitidos")
     .Get<string[]>() ?? [];
@@ -26,13 +35,70 @@ builder.Services
         opciones.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 builder.Services.AddProblemDetails();
 builder.Services.AddHttpContextAccessor();
+builder.Services
+    .AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+    .AddCookie(opciones =>
+    {
+        opciones.Cookie.Name = "Talleres.Sesion";
+        opciones.Cookie.HttpOnly = true;
+        opciones.Cookie.SameSite = SameSiteMode.Lax;
+        opciones.Cookie.SecurePolicy = builder.Configuration.GetValue(
+            "Autenticacion:CookieSegura",
+            !builder.Environment.IsDevelopment())
+            ? CookieSecurePolicy.Always
+            : CookieSecurePolicy.None;
+        opciones.ExpireTimeSpan = TimeSpan.FromHours(8);
+        opciones.SlidingExpiration = true;
+        opciones.Events.OnRedirectToLogin = contexto =>
+        {
+            contexto.Response.StatusCode = StatusCodes.Status401Unauthorized;
+            return Task.CompletedTask;
+        };
+        opciones.Events.OnRedirectToAccessDenied = contexto =>
+        {
+            contexto.Response.StatusCode = StatusCodes.Status403Forbidden;
+            return Task.CompletedTask;
+        };
+    })
+    .AddCookie("Talleres.Externo")
+    .AddGoogle(GoogleDefaults.AuthenticationScheme, opciones =>
+    {
+        opciones.SignInScheme = "Talleres.Externo";
+        opciones.ClientId = ObtenerConfiguracion(builder.Configuration, "Autenticacion:Google:ClientId", "GOOGLE_CLIENT_ID");
+        opciones.ClientSecret = ObtenerConfiguracion(builder.Configuration, "Autenticacion:Google:ClientSecret", "GOOGLE_CLIENT_SECRET");
+        opciones.CallbackPath = "/api/autenticacion/externo/google/callback";
+        opciones.Events.OnRemoteFailure = contexto =>
+        {
+            contexto.HandleResponse();
+            contexto.Response.StatusCode = StatusCodes.Status500InternalServerError;
+            return contexto.Response.WriteAsJsonAsync(new { error = contexto.Failure?.Message ?? "Fallo de Google" });
+        };
+    })
+    .AddMicrosoftAccount(MicrosoftAccountDefaults.AuthenticationScheme, opciones =>
+    {
+        opciones.SignInScheme = "Talleres.Externo";
+        opciones.ClientId = ObtenerConfiguracion(builder.Configuration, "Autenticacion:Microsoft:ClientId", "MICROSOFT_CLIENT_ID");
+        opciones.ClientSecret = ObtenerConfiguracion(builder.Configuration, "Autenticacion:Microsoft:ClientSecret", "MICROSOFT_CLIENT_SECRET");
+        opciones.CallbackPath = "/api/autenticacion/externo/microsoft/callback";
+        opciones.Events.OnRemoteFailure = contexto =>
+        {
+            contexto.HandleResponse();
+            contexto.Response.StatusCode = StatusCodes.Status500InternalServerError;
+            return contexto.Response.WriteAsJsonAsync(new { error = contexto.Failure?.Message ?? "Fallo de Microsoft" });
+        };
+    });
+builder.Services.AddAuthorization(opciones =>
+    opciones.FallbackPolicy = new AuthorizationPolicyBuilder()
+        .RequireAuthenticatedUser()
+        .Build());
 builder.Services.AddCors(opciones =>
     opciones.AddPolicy(
         politicaCorsFrontal,
         politica => politica
             .WithOrigins(origenesPermitidos)
             .AllowAnyHeader()
-            .AllowAnyMethod()));
+            .AllowAnyMethod()
+            .AllowCredentials()));
 
 builder.Services.AddScoped<IContextoEmpresa, ContextoEmpresaHttp>();
 builder.Services.AddDbContext<TallerDbContext>(opciones =>
@@ -44,11 +110,20 @@ builder.Services.AddDbContext<TallerDbContext>(opciones =>
             errorNumbersToAdd: null)));
 builder.Services.AddScoped<ITallerDbContext>(proveedor =>
     proveedor.GetRequiredService<TallerDbContext>());
+builder.Services.AddDbContext<SmartNovaDbContext>(opciones =>
+    opciones.UseSqlServer(
+        cadenaConexionNova,
+        opcionesSql => opcionesSql.EnableRetryOnFailure()));
+builder.Services.AddScoped<IPasswordHasher<UsuarioSmartNova>, PasswordHasher<UsuarioSmartNova>>();
+builder.Services.AddScoped<IIdentidadSmartNova, IdentidadSmartNova>();
+builder.Services.AddScoped<IInventarioSmartNova, InventarioSmartNova>();
 
 builder.Services.AddScoped<IClienteServicio, ClienteServicio>();
 builder.Services.AddScoped<IVehiculoServicio, VehiculoServicio>();
 builder.Services.AddScoped<IOrdenServicioServicio, OrdenServicioServicio>();
 builder.Services.AddScoped<IRecepcionVehiculoServicio, RecepcionVehiculoServicio>();
+builder.Services.AddScoped<IAutenticacionServicio, AutenticacionServicio>();
+builder.Services.AddScoped<ITalleresSincronizadosServicio, TalleresSincronizadosServicio>();
 
 var app = builder.Build();
 
@@ -66,7 +141,8 @@ if (builder.Configuration.GetValue("Http:UsarRedireccionHttps", true))
 }
 
 app.UseCors(politicaCorsFrontal);
-app.UseMiddleware<ValidacionEmpresaMiddleware>();
+app.UseAuthentication();
+app.UseAuthorization();
 app.MapControllers();
 app.MapGet(
     "/salud",
@@ -96,7 +172,7 @@ app.MapGet(
                 statusCode: StatusCodes.Status503ServiceUnavailable,
                 title: "Base de datos no disponible",
                 detail: "La API no pudo establecer conexión con SQL Server.");
-    });
+    }).AllowAnonymous();
 
 app.Run();
 
@@ -111,9 +187,14 @@ static async Task AplicarMigracionesAsync(
 
 static void CargarCadenaConexionDesdeArchivoEntornoLocal(WebApplicationBuilder builder)
 {
-    if (!builder.Environment.IsDevelopment() ||
+    var conexionTallerConfigurada =
         !string.IsNullOrWhiteSpace(builder.Configuration.GetConnectionString("TallerDb")) ||
-        !string.IsNullOrWhiteSpace(builder.Configuration["TALLERES_CONNECTION_STRING"]))
+        !string.IsNullOrWhiteSpace(builder.Configuration["TALLERES_CONNECTION_STRING"]);
+    var conexionNovaConfigurada =
+        !string.IsNullOrWhiteSpace(builder.Configuration.GetConnectionString("SmartNova")) ||
+        !string.IsNullOrWhiteSpace(builder.Configuration["SMART_NOVA_CONNECTION_STRING"]);
+    if (!builder.Environment.IsDevelopment() ||
+        (conexionTallerConfigurada && conexionNovaConfigurada))
     {
         return;
     }
@@ -130,9 +211,20 @@ static void CargarCadenaConexionDesdeArchivoEntornoLocal(WebApplicationBuilder b
     var cadenaConexion = LeerValorArchivoEntorno(
         archivoEntorno,
         "TALLERES_CONNECTION_STRING");
-    if (!string.IsNullOrWhiteSpace(cadenaConexion))
+    if (!string.IsNullOrWhiteSpace(cadenaConexion) &&
+        string.IsNullOrWhiteSpace(builder.Configuration.GetConnectionString("TallerDb")) &&
+        string.IsNullOrWhiteSpace(builder.Configuration["TALLERES_CONNECTION_STRING"]))
     {
         builder.Configuration["TALLERES_CONNECTION_STRING"] = cadenaConexion;
+    }
+
+    var cadenaConexionNova = LeerValorArchivoEntorno(
+        archivoEntorno,
+        "SMART_NOVA_CONNECTION_STRING");
+    if (!string.IsNullOrWhiteSpace(cadenaConexionNova) &&
+        string.IsNullOrWhiteSpace(builder.Configuration["SMART_NOVA_CONNECTION_STRING"]))
+    {
+        builder.Configuration["SMART_NOVA_CONNECTION_STRING"] = cadenaConexionNova;
     }
 }
 
@@ -202,5 +294,22 @@ static string ObtenerCadenaConexionRemota(IConfiguration configuracion)
 
     return ConfiguracionConexionSql.ValidarRemota(cadenaConexion);
 }
+
+static string ObtenerCadenaConexionNova(IConfiguration configuracion)
+{
+    var cadenaConexion = configuracion.GetConnectionString("SmartNova")
+        ?? configuracion["SMART_NOVA_CONNECTION_STRING"];
+    if (string.IsNullOrWhiteSpace(cadenaConexion))
+    {
+        throw new InvalidOperationException(
+            "No se configuró SMART TPV NOVA mediante " +
+            "'ConnectionStrings:SmartNova' o 'SMART_NOVA_CONNECTION_STRING'.");
+    }
+
+    return ConfiguracionConexionSql.ValidarRemota(cadenaConexion);
+}
+
+static string ObtenerConfiguracion(IConfiguration configuracion, string clave, string variableEntorno) =>
+    configuracion[clave] ?? Environment.GetEnvironmentVariable(variableEntorno) ?? string.Empty;
 
 public partial class Program;
