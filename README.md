@@ -17,6 +17,8 @@ El frontal vive en `src/Talleres.Web` y está diseñado primero para tablet hori
 - Distribución de dos columnas en tablet horizontal y computador, y flujo secuencial en tablet vertical.
 - Controles táctiles amplios, estados visibles y adaptación posterior a escritorio y móvil.
 - Carga de órdenes, clientes y vehículos exclusivamente desde la API configurada.
+- Inicio de sesión con usuarios de SMART TPV NOVA y selección táctil de taller para superusuarios.
+- Información legal, contacto, dirección y horario del taller activo obtenida directamente de NOVA.
 
 ## Alcance implementado
 
@@ -27,6 +29,8 @@ El frontal vive en `src/Talleres.Web` y está diseñado primero para tablet hori
 - Transiciones controladas del estado de las órdenes.
 - Historial de estados.
 - Aislamiento multitenant por `EmpresaId` en consultas y escrituras.
+- Empresa activa obtenida de una cookie de sesión HTTP-only; el cliente no puede elegirla mediante encabezados.
+- Denegación de acceso para usuarios normales cuya empresa no esté configurada como taller sincronizado.
 - Validaciones estructurales mediante Data Annotations.
 - Excepciones de negocio convertidas a `ProblemDetails` por middleware global.
 
@@ -50,6 +54,7 @@ Los controladores delegan el trabajo a servicios. La aplicación depende de `ITa
 - SDK de .NET 9.
 - Node.js 22.13 o superior.
 - Una instancia remota de SQL Server accesible y configurada con TLS 1.2 o posterior.
+- Acceso de lectura a la base de SMART TPV NOVA (`AspNetUsers` y `Empresa`).
 - Herramienta `dotnet-ef` 9.x para administrar migraciones.
 
 ## Puesta en marcha
@@ -79,23 +84,33 @@ Para ejecutarla fuera de Docker, puede configurar la conexión remota mediante u
 
 ```powershell
 $env:ConnectionStrings__TallerDb = "Server=sql.example.com,1433;Database=Talleres;User ID=usuario;Password=clave;Encrypt=True;TrustServerCertificate=False"
+$env:ConnectionStrings__SmartNova = "Server=sql.example.com,1433;Database=Galileo;User ID=usuario_lectura;Password=clave;Encrypt=True;TrustServerCertificate=False"
 ```
 
-También se admite `TALLERES_CONNECTION_STRING` como nombre de variable. En desarrollo, si
-ninguna de esas variables está definida, la API carga `TALLERES_CONNECTION_STRING` desde el
+También se admiten `TALLERES_CONNECTION_STRING` y `SMART_NOVA_CONNECTION_STRING`. En desarrollo, si
+las variables correspondientes no están definidas, la API las carga desde el
 archivo `.env` ubicado junto a `Talleres.sln`. Esto permite usar `dotnet run` y los perfiles del
 IDE sin copiar credenciales a `launchSettings.json`. Las variables del proceso siempre tienen
 precedencia sobre el archivo local.
 
-Todas las rutas bajo `/api` requieren el encabezado:
+El inicio de sesión se realiza mediante:
 
 ```http
-X-Empresa-Id: 1
+POST /api/autenticacion/iniciar
+Content-Type: application/json
+
+{
+  "usuario": "usuario@ejemplo.com",
+  "contrasena": "su-contraseña",
+  "recordarme": false
+}
 ```
 
-El archivo [`src/Talleres.Api/Talleres.Api.http`](src/Talleres.Api/Talleres.Api.http) incluye solicitudes de ejemplo. El endpoint `GET /salud` no requiere empresa.
+La API establece una cookie HTTP-only. El `EmpresaId` usado por todas las operaciones se obtiene de esa identidad autenticada. Los superusuarios pueden llamar `POST /api/autenticacion/seleccionar-taller`; los usuarios normales quedan limitados al `IdEmpresa` registrado en NOVA. El endpoint `GET /salud` permanece público.
 
-> El encabezado multitenant permite desarrollar y probar el aislamiento. Antes de publicar, `EmpresaId` debe obtenerse de una identidad autenticada y autorizada, no confiarse directamente al cliente.
+El acceso también admite Google y Microsoft. Configure `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `MICROSOFT_CLIENT_ID` y `MICROSOFT_CLIENT_SECRET` como secretos del entorno. Registre como callbacks `/api/autenticacion/externo/google/callback` y `/api/autenticacion/externo/microsoft/callback` en cada proveedor.
+
+La migración `AgregarTalleresSincronizados` crea la configuración local e incluye inicialmente la empresa NOVA `3071`. Agregar otra empresa a esa tabla la habilita como taller, siempre que exista en NOVA.
 
 ## Ejecución completa con Docker
 
@@ -107,7 +122,7 @@ La preparación del entorno se realiza una única vez:
 Copy-Item .env.example .env
 ```
 
-Edite `.env` y reemplace `TALLERES_CONNECTION_STRING` por la cadena real de la base remota. El archivo `.env` está excluido de Git y no debe subirse al repositorio.
+Edite `.env` y reemplace `TALLERES_CONNECTION_STRING` y `SMART_NOVA_CONNECTION_STRING` por las cadenas reales. La cuenta de NOVA debe tener el mínimo acceso de lectura necesario. El archivo `.env` está excluido de Git y no debe subirse al repositorio.
 
 `TALLERES_APLICAR_MIGRACIONES` permanece en `false` por defecto. Cámbielo a `true` únicamente cuando la API tenga autorización para aplicar las migraciones de EF Core sobre esa base.
 
@@ -134,7 +149,7 @@ Para detener el sistema sin eliminar la base de datos:
 docker compose down
 ```
 
-Los puertos, la dirección de publicación del frontal, la empresa de desarrollo, la cadena remota y la aplicación controlada de migraciones pueden configurarse en `.env` antes de levantar los servicios. Al copiar `.env.example`, `TALLERES_WEB_IP_PUBLICACION=0.0.0.0` permite abrir el frontal desde una tablet de la red local.
+Los puertos, la dirección de publicación del frontal, ambas cadenas remotas, la seguridad de la cookie y la aplicación controlada de migraciones pueden configurarse en `.env` antes de levantar los servicios. Al copiar `.env.example`, `TALLERES_WEB_IP_PUBLICACION=0.0.0.0` permite abrir el frontal desde una tablet de la red local.
 
 La API no publica un puerto en el anfitrión; desde el navegador se accede a sus funciones mediante el frontal y su proxy interno. Docker no crea, almacena ni elimina la base de datos remota.
 
@@ -146,20 +161,34 @@ Configure estas variables en la sección **Environment Variables** de Coolify:
 
 | Variable | Requerida | Valor recomendado |
 |---|---:|---|
-| `TALLERES_CONNECTION_STRING` | Sí | Cadena secreta de SQL Server remoto |
+| `TALLERES_CONNECTION_STRING` | Sí | Cadena secreta de la base propia de Talleres |
+| `SMART_NOVA_CONNECTION_STRING` | Sí | Cadena secreta de SMART TPV NOVA; preferiblemente con permisos de lectura |
 | `TALLERES_APLICAR_MIGRACIONES` | No | `false`; habilitarla solo deliberadamente |
-| `TALLERES_EMPRESA_ID` | No | `1` mientras se implementa autenticación |
+| `TALLERES_COOKIE_SEGURA` | No | `true` cuando el dominio use exclusivamente HTTPS |
 | `TALLERES_WEB_IP_PUBLICACION` | No | `127.0.0.1` |
 | `TALLERES_WEB_PORT` | No | `0`, para que Docker asigne un puerto anfitrión libre |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Solo si se usa Google | Credenciales secretas del proveedor OAuth |
+| `MICROSOFT_CLIENT_ID` / `MICROSOFT_CLIENT_SECRET` | Solo si se usa Microsoft | Credenciales secretas del proveedor OAuth |
 
 Asigne el dominio público solamente al servicio `web` e indique el puerto interno `3000` en el dominio de Coolify, por ejemplo `https://talleres.example.com:3000`. No asigne un dominio al servicio `api`: no publica ningún puerto del servidor y el frontal reenvía `/backend` de forma privada a `http://api:8080` dentro de la red de Docker.
 
-El archivo `.env` es solo para ejecución local y nunca debe subirse a Git. En Coolify, la cadena de conexión se guarda como variable secreta del recurso.
+El archivo `.env` es solo para ejecución local y nunca debe subirse a Git. En Coolify, las cadenas de conexión se guardan como variables secretas del recurso. No copie las comillas exteriores usadas en `.env.example` al campo de valor de Coolify y conserve la variable como literal cuando su contraseña contenga `$` u otros caracteres que el sistema pueda interpretar.
+
+Para una base nueva, ejecute un primer despliegue controlado con `TALLERES_APLICAR_MIGRACIONES=true` y una cuenta con permisos para modificar el esquema. Cuando finalice correctamente, cambie inmediatamente la variable a `false` y vuelva a desplegar. Los despliegues ordinarios deben mantenerla en `false`. El período inicial del chequeo de salud permite completar ese primer arranque sin declarar prematuramente que la API está degradada.
+
+Si la API queda `unhealthy`, revise los logs del servicio `api`: `/salud` comprueba realmente la conexión de `TALLERES_CONNECTION_STRING`. Verifique credenciales, acceso del servidor Coolify al puerto de SQL Server, reglas de firewall y configuración TLS. `SMART_NOVA_CONNECTION_STRING` también debe tener un formato válido al arrancar y conectividad de lectura para las funciones de autenticación e inventario.
 
 ## Rutas principales
 
 | Método | Ruta | Operación |
 |---|---|---|
+| `POST` | `/api/autenticacion/iniciar` | Valida credenciales de NOVA e inicia sesión |
+| `GET` | `/api/autenticacion/sesion` | Consulta usuario, taller activo y talleres disponibles |
+| `POST` | `/api/autenticacion/seleccionar-taller` | Cambia el taller activo de un superusuario |
+| `POST` | `/api/autenticacion/cerrar` | Cierra la sesión |
+| `GET` | `/api/talleres-sincronizados` | Lista las empresas NOVA configuradas (solo superusuarios) |
+| `POST` | `/api/talleres-sincronizados` | Agrega una empresa NOVA para sincronización (solo superusuarios) |
+| `DELETE` | `/api/talleres-sincronizados/{empresaNovaId}` | Retira una empresa de la sincronización (solo superusuarios) |
 | `GET` | `/api/clientes` | Lista clientes |
 | `POST` | `/api/clientes` | Crea un cliente |
 | `GET` | `/api/clientes/{id}` | Obtiene un cliente |

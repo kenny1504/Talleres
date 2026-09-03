@@ -157,4 +157,14 @@ Antes de considerar terminada cualquier funcionalidad:
 8. Validar `docker compose config` y, cuando Docker esté disponible, construir y comprobar la salud de los servicios afectados.
 9. Revisar `git status --short --ignored` para confirmar que no se incluirán secretos ni artefactos generados.
 
+## 15. Consideraciones
+1. Evitar ingresar logica inecesaria en Smart TPV NOVA
+2. Toda logica ingresada debe ser airlada a la logica propia del sistema Smart TPV NOVA, es decir no debes modificar nada de lo ya existente se debe trabajar en procesos independiente
+3. toda modificacion en Smart TPV NOVA debe estar en una carpeta, en caso que se cree un controller y aun no exista una carpeta "talleres" entonces crearla y asi sucesivamente
+3. No modificar colores en la plantilla , es decir si en la plantilla (frontal) se esta trabajando con los textos en negro entonces no ingresar textos morados.
+4. Priorizar la experiencia de usuarios, las pantallas deben ser sencillas y faciles de usar ( sin sacrificas la usabilida, es decir no eliminar funcionalidades importantes u interesantes)
+5. No exagerar el tamaños de card,recuadros u textos de tamaños, optimizar tamaños y distribuciones
+
+
+
 Si alguna verificación no puede ejecutarse, debe informarse explícitamente; no se presume que el cambio está terminado.

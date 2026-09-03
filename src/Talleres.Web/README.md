@@ -25,7 +25,6 @@ Para levantar el frontal junto con la API, use `docker compose up --build` desde
 | Variable | Uso |
 |---|---|
 | `NEXT_PUBLIC_API_URL` | Dirección pública de la API ASP.NET Core. |
-| `NEXT_PUBLIC_EMPRESA_ID` | Empresa de desarrollo enviada mediante `X-Empresa-Id`; no reemplaza autenticación. |
 
 No colocar secretos en variables `NEXT_PUBLIC_*`, porque sus valores quedan disponibles en el navegador.
 

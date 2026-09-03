@@ -110,6 +110,12 @@ public sealed class AutenticacionServicioPruebas
             string contrasena,
             CancellationToken cancellationToken) => Task.FromResult<UsuarioSmartNovaDto?>(usuario);
 
+        public Task<UsuarioSmartNovaDto?> AutenticarProveedorAsync(
+            string proveedor,
+            string claveProveedor,
+            string? correo,
+            CancellationToken cancellationToken) => Task.FromResult<UsuarioSmartNovaDto?>(usuario);
+
         public Task<UsuarioSmartNovaDto?> ObtenerUsuarioActivoAsync(
             string usuarioId,
             CancellationToken cancellationToken) => Task.FromResult<UsuarioSmartNovaDto?>(usuario);

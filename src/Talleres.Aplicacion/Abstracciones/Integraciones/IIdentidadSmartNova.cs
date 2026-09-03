@@ -19,6 +19,14 @@ public interface IIdentidadSmartNova
         string contrasena,
         CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Busca un usuario activo asociado con una identidad administrada por un proveedor externo.
+    /// </summary>
+    /// <param name="proveedor">Nombre estable del proveedor de autenticación.</param>
+    /// <param name="claveProveedor">Identificador del usuario emitido por el proveedor.</param>
+    /// <param name="correo">Correo informado por el proveedor para resolver asociaciones existentes.</param>
+    /// <param name="cancellationToken">Token para cancelar la consulta.</param>
+    /// <returns>Usuario activo asociado con la identidad externa; de lo contrario, nulo.</returns>
     Task<UsuarioSmartNovaDto?> AutenticarProveedorAsync(
         string proveedor,
         string claveProveedor,

@@ -146,7 +146,10 @@ app.UseAuthorization();
 app.MapControllers();
 app.MapGet(
     "/salud",
-    async (TallerDbContext contexto, CancellationToken cancellationToken) =>
+    async (
+        TallerDbContext contexto,
+        ILogger<Program> registro,
+        CancellationToken cancellationToken) =>
     {
         using var limiteConexion = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         limiteConexion.CancelAfter(TimeSpan.FromSeconds(10));
@@ -159,6 +162,16 @@ app.MapGet(
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
             // El servidor remoto no respondió dentro del límite del chequeo de salud.
+            registro.LogWarning(
+                "La comprobación de salud agotó el tiempo de espera al conectar con TallerDb.");
+        }
+        catch (Exception excepcion) when (
+            excepcion is not OperationCanceledException ||
+            !cancellationToken.IsCancellationRequested)
+        {
+            registro.LogWarning(
+                excepcion,
+                "La comprobación de salud no pudo conectar con TallerDb.");
         }
 
         return baseDatosDisponible

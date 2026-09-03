@@ -13,16 +13,20 @@ services:
       Autenticacion__CookieSegura: "${TALLERES_COOKIE_SEGURA:-false}"
       ConnectionStrings__TallerDb: "${TALLERES_CONNECTION_STRING:?Configure TALLERES_CONNECTION_STRING en Coolify o en el archivo .env local}"
       ConnectionStrings__SmartNova: "${SMART_NOVA_CONNECTION_STRING:?Configure SMART_NOVA_CONNECTION_STRING en Coolify o en el archivo .env local}"
+      GOOGLE_CLIENT_ID: "${GOOGLE_CLIENT_ID:-}"
+      GOOGLE_CLIENT_SECRET: "${GOOGLE_CLIENT_SECRET:-}"
+      MICROSOFT_CLIENT_ID: "${MICROSOFT_CLIENT_ID:-}"
+      MICROSOFT_CLIENT_SECRET: "${MICROSOFT_CLIENT_SECRET:-}"
       Cors__OrigenesPermitidos__0: "http://localhost:${TALLERES_WEB_PORT:-3000}"
       Cors__OrigenesPermitidos__1: "http://127.0.0.1:${TALLERES_WEB_PORT:-3000}"
     expose:
       - "8080"
     healthcheck:
       test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8080/salud"]
-      interval: 5s
-      timeout: 5s
+      interval: 10s
+      timeout: 15s
       retries: 12
-      start_period: 10s
+      start_period: 120s
     restart: unless-stopped
 
   web:
