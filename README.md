@@ -153,7 +153,7 @@ Los puertos, la dirección de publicación del frontal, ambas cadenas remotas, l
 
 La API no publica un puerto en el anfitrión; desde el navegador se accede a sus funciones mediante el frontal y su proxy interno. Docker no crea, almacena ni elimina la base de datos remota.
 
-Las claves de protección usadas para firmar las cookies de sesión se conservan en el volumen Docker `claves-proteccion-api`. Este volumen debe mantenerse entre despliegues para evitar cerrar las sesiones activas cada vez que se sustituya el contenedor.
+Las claves de protección usadas para firmar las cookies de sesión se conservan en el volumen Docker `claves-proteccion-api`. Este volumen debe mantenerse entre despliegues para evitar cerrar las sesiones activas cada vez que se sustituya el contenedor. Al arrancar, la imagen corrige únicamente los permisos de ese directorio y luego ejecuta la API con el usuario sin privilegios de .NET.
 
 ## Despliegue en Coolify
 

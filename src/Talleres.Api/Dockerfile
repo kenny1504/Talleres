@@ -19,13 +19,13 @@ FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS final
 WORKDIR /aplicacion
 
 RUN apt-get update \
-    && apt-get install --yes --no-install-recommends curl \
+    && apt-get install --yes --no-install-recommends curl gosu \
     && rm -rf /var/lib/apt/lists/*
 
 ENV ASPNETCORE_HTTP_PORTS=8080
 EXPOSE 8080
 
 COPY --from=compilacion /aplicacion/publicada .
-USER $APP_UID
+COPY --chmod=755 src/Talleres.Api/iniciar-api.sh /usr/local/bin/iniciar-api
 
-ENTRYPOINT ["dotnet", "Talleres.Api.dll"]
+ENTRYPOINT ["/usr/local/bin/iniciar-api"]
