@@ -43,6 +43,20 @@ async function reenviarSolicitudAsync(
     if (valor) encabezadosSolicitud.set(nombre, valor);
   }
 
+  const direccionPublica = new URL(solicitud.url);
+  const protocoloPublico = solicitud.headers.get("x-forwarded-proto")
+    ?.split(",", 1)[0]
+    ?.trim();
+  encabezadosSolicitud.set(
+    "x-forwarded-host",
+    solicitud.headers.get("x-forwarded-host")?.split(",", 1)[0]?.trim() ||
+      direccionPublica.host,
+  );
+  encabezadosSolicitud.set(
+    "x-forwarded-proto",
+    protocoloPublico || direccionPublica.protocol.replace(":", ""),
+  );
+
   const tieneCuerpo = solicitud.method !== "GET" && solicitud.method !== "HEAD";
 
   try {

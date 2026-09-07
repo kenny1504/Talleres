@@ -108,7 +108,7 @@ Content-Type: application/json
 
 La API establece una cookie HTTP-only. El `EmpresaId` usado por todas las operaciones se obtiene de esa identidad autenticada. Los superusuarios pueden llamar `POST /api/autenticacion/seleccionar-taller`; los usuarios normales quedan limitados al `IdEmpresa` registrado en NOVA. El endpoint `GET /salud` permanece público.
 
-El acceso también admite Google y Microsoft. Cada proveedor es opcional y solo se habilita cuando están configurados tanto su identificador como su secreto. Configure `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `MICROSOFT_CLIENT_ID` y `MICROSOFT_CLIENT_SECRET` como secretos del entorno. Registre como callbacks `/api/autenticacion/externo/google/callback` y `/api/autenticacion/externo/microsoft/callback` en cada proveedor.
+El acceso también admite Google y Microsoft. Cada proveedor es opcional y solo se habilita cuando están configurados tanto su identificador como su secreto. Configure `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `MICROSOFT_CLIENT_ID` y `MICROSOFT_CLIENT_SECRET` como secretos del entorno. Como la API se publica a través del frontal, registre los callbacks con el dominio público y el prefijo `/backend`, por ejemplo `https://talleres.example.com/backend/api/autenticacion/externo/google/callback` y `https://talleres.example.com/backend/api/autenticacion/externo/microsoft/callback`. El nombre `api:8080` es exclusivamente interno de Docker y no es una URL OAuth válida.
 
 La migración `AgregarTalleresSincronizados` crea la configuración local e incluye inicialmente la empresa NOVA `3071`. Agregar otra empresa a esa tabla la habilita como taller, siempre que exista en NOVA.
 
@@ -153,6 +153,8 @@ Los puertos, la dirección de publicación del frontal, ambas cadenas remotas, l
 
 La API no publica un puerto en el anfitrión; desde el navegador se accede a sus funciones mediante el frontal y su proxy interno. Docker no crea, almacena ni elimina la base de datos remota.
 
+Las claves de protección usadas para firmar las cookies de sesión se conservan en el volumen Docker `claves-proteccion-api`. Este volumen debe mantenerse entre despliegues para evitar cerrar las sesiones activas cada vez que se sustituya el contenedor.
+
 ## Despliegue en Coolify
 
 Coolify debe desplegar el repositorio como **Docker Compose**, usando `/compose.yaml` como ruta del archivo. No seleccione `src/Talleres.Api/Dockerfile` como recurso independiente: ese Dockerfile solo construye la API, mientras que `compose.yaml` construye y coordina la API y el sistema web en contenedores separados.
@@ -165,12 +167,15 @@ Configure estas variables en la sección **Environment Variables** de Coolify:
 | `SMART_NOVA_CONNECTION_STRING` | Sí | Cadena secreta de SMART TPV NOVA; preferiblemente con permisos de lectura |
 | `TALLERES_APLICAR_MIGRACIONES` | No | `false`; habilitarla solo deliberadamente |
 | `TALLERES_COOKIE_SEGURA` | No | `true` cuando el dominio use exclusivamente HTTPS |
+| `TALLERES_URL_PUBLICA` | Sí para OAuth externo | Origen público del frontal, por ejemplo `https://talleres.example.com`, sin barra final |
 | `TALLERES_WEB_IP_PUBLICACION` | No | `127.0.0.1` |
 | `TALLERES_WEB_PORT` | No | `0`, para que Docker asigne un puerto anfitrión libre |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Solo si se usa Google | Credenciales secretas del proveedor OAuth |
 | `MICROSOFT_CLIENT_ID` / `MICROSOFT_CLIENT_SECRET` | Solo si se usa Microsoft | Credenciales secretas del proveedor OAuth |
 
 Asigne el dominio público solamente al servicio `web` e indique el puerto interno `3000` en el dominio de Coolify, por ejemplo `https://talleres.example.com:3000`. No asigne un dominio al servicio `api`: no publica ningún puerto del servidor y el frontal reenvía `/backend` de forma privada a `http://api:8080` dentro de la red de Docker.
+
+Para Google, configure como origen JavaScript autorizado `https://talleres.example.com` y como URI de redirección autorizada `https://talleres.example.com/backend/api/autenticacion/externo/google/callback`. Ambos valores deben coincidir exactamente con el dominio real, incluido `https`. Después de cambiar `TALLERES_URL_PUBLICA` o las credenciales externas, vuelva a desplegar para aplicar la configuración.
 
 El archivo `.env` es solo para ejecución local y nunca debe subirse a Git. En Coolify, las cadenas de conexión se guardan como variables secretas del recurso. No copie las comillas exteriores usadas en `.env.example` al campo de valor de Coolify y conserve la variable como literal cuando su contraseña contenga `$` u otros caracteres que el sistema pueda interpretar.
 

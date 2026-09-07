@@ -82,6 +82,8 @@ test("mantiene el proxy interno de Docker fuera del código cliente", async () =
   assert.match(proxy, /"set-cookie"/);
   assert.doesNotMatch(proxy, /x-empresa-id/i);
   assert.match(proxy, /cache:\s*"no-store"/);
+  assert.match(proxy, /"x-forwarded-host"/);
+  assert.match(proxy, /"x-forwarded-proto"/);
   assert.doesNotMatch(proxy, /http:\/\/api:8080/);
   assert.match(servidor, /startProdServer/);
   assert.match(servidor, /host:\s*anfitrion/);

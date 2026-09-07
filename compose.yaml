@@ -11,6 +11,8 @@ services:
       BaseDatos__AplicarMigracionesAlIniciar: "${TALLERES_APLICAR_MIGRACIONES:-false}"
       Http__UsarRedireccionHttps: "false"
       Autenticacion__CookieSegura: "${TALLERES_COOKIE_SEGURA:-false}"
+      Autenticacion__FrontalUrl: "${TALLERES_URL_PUBLICA:-}"
+      Proxy__PrefijoPublico: "/backend"
       ConnectionStrings__TallerDb: "${TALLERES_CONNECTION_STRING:?Configure TALLERES_CONNECTION_STRING en Coolify o en el archivo .env local}"
       ConnectionStrings__SmartNova: "${SMART_NOVA_CONNECTION_STRING:?Configure SMART_NOVA_CONNECTION_STRING en Coolify o en el archivo .env local}"
       GOOGLE_CLIENT_ID: "${GOOGLE_CLIENT_ID:-}"
@@ -19,8 +21,11 @@ services:
       MICROSOFT_CLIENT_SECRET: "${MICROSOFT_CLIENT_SECRET:-}"
       Cors__OrigenesPermitidos__0: "http://localhost:${TALLERES_WEB_PORT:-3000}"
       Cors__OrigenesPermitidos__1: "http://127.0.0.1:${TALLERES_WEB_PORT:-3000}"
+      Cors__OrigenesPermitidos__2: "${TALLERES_URL_PUBLICA:-http://localhost:${TALLERES_WEB_PORT:-3000}}"
     expose:
       - "8080"
+    volumes:
+      - claves-proteccion-api:/home/app/.aspnet/DataProtection-Keys
     healthcheck:
       test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8080/salud"]
       interval: 10s
@@ -55,3 +60,6 @@ services:
       start_period: 10s
     init: true
     restart: unless-stopped
+
+volumes:
+  claves-proteccion-api:

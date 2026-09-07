@@ -154,8 +154,10 @@ public sealed class AutenticacionController(
 
     private string ObtenerFrontal(string sufijo = "")
     {
-        var frontal = configuracion["Autenticacion:FrontalUrl"]
-            ?? "http://localhost:3000";
+        var frontalConfigurado = configuracion["Autenticacion:FrontalUrl"];
+        var frontal = !string.IsNullOrWhiteSpace(frontalConfigurado)
+            ? frontalConfigurado.TrimEnd('/')
+            : $"{Request.Scheme}://{Request.Host}";
         return string.IsNullOrWhiteSpace(sufijo) ? frontal : $"{frontal}/?{sufijo}";
     }
 }

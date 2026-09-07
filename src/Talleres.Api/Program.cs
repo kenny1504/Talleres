@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authentication.Google;
 using Microsoft.AspNetCore.Authentication.MicrosoftAccount;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using Talleres.Api.Middleware;
 using Talleres.Api.Multitenencia;
@@ -35,6 +36,17 @@ builder.Services
         opciones.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 builder.Services.AddProblemDetails();
 builder.Services.AddHttpContextAccessor();
+builder.Services.Configure<ForwardedHeadersOptions>(opciones =>
+{
+    opciones.ForwardedHeaders = ForwardedHeaders.XForwardedFor |
+        ForwardedHeaders.XForwardedHost |
+        ForwardedHeaders.XForwardedProto;
+
+    // La API solo está expuesta dentro de la red privada de Docker. El proxy web
+    // es quien normaliza estos encabezados antes de reenviar cada solicitud.
+    opciones.KnownNetworks.Clear();
+    opciones.KnownProxies.Clear();
+});
 var autenticacion = builder.Services
     .AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(opciones =>
@@ -152,6 +164,24 @@ if (builder.Configuration.GetValue<bool>("BaseDatos:AplicarMigracionesAlIniciar"
         app.Lifetime.ApplicationStopping);
 }
 
+app.UseForwardedHeaders();
+
+var prefijoPublico = builder.Configuration["Proxy:PrefijoPublico"]?.TrimEnd('/');
+if (!string.IsNullOrWhiteSpace(prefijoPublico))
+{
+    if (!prefijoPublico.StartsWith('/'))
+    {
+        throw new InvalidOperationException(
+            "'Proxy:PrefijoPublico' debe comenzar con '/'.");
+    }
+
+    app.Use((contexto, siguiente) =>
+    {
+        contexto.Request.PathBase = prefijoPublico;
+        return siguiente(contexto);
+    });
+}
+
 app.UseMiddleware<ManejadorExcepcionesMiddleware>();
 if (builder.Configuration.GetValue("Http:UsarRedireccionHttps", true))
 {
@@ -183,6 +213,16 @@ app.MapGet(
                 cancellationToken));
         var talleresDisponible = comprobaciones[0];
         var novaDisponible = comprobaciones[1];
+        var conexionesNoDisponibles = new List<string>(2);
+        if (!talleresDisponible)
+        {
+            conexionesNoDisponibles.Add("TallerDb");
+        }
+
+        if (!novaDisponible)
+        {
+            conexionesNoDisponibles.Add("SmartNova");
+        }
 
         return talleresDisponible && novaDisponible
             ? Results.Ok(new
@@ -195,7 +235,7 @@ app.MapGet(
             : Results.Problem(
                 statusCode: StatusCodes.Status503ServiceUnavailable,
                 title: "Bases de datos no disponibles",
-                detail: "La API no pudo establecer conexión con todas sus bases de datos remotas.");
+                detail: $"La API no pudo establecer conexión con: {string.Join(", ", conexionesNoDisponibles)}.");
     }).AllowAnonymous();
 
 app.Run();
@@ -220,7 +260,15 @@ static async Task<bool> ComprobarConexionAsync(
 
     try
     {
-        return await contexto.Database.CanConnectAsync(limiteConexion.Token);
+        var disponible = await contexto.Database.CanConnectAsync(limiteConexion.Token);
+        if (!disponible)
+        {
+            registro.LogWarning(
+                "La comprobación de salud indicó que {Conexion} no está disponible.",
+                nombreConexion);
+        }
+
+        return disponible;
     }
     catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
     {
