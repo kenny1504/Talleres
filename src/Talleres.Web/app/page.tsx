@@ -2339,7 +2339,11 @@ function DetalleOrden({
 
       <div className="columna-inspeccion-orden">
         {orden.estado !== "Recepción" ? (
-          <ResumenInspeccion inspeccion={inspeccion} alEditar={alRecibir} />
+          <ResumenInspeccion
+            ordenServicioId={orden.id}
+            inspeccion={inspeccion}
+            alEditar={alRecibir}
+          />
         ) : (
           <section className="llamada-recepcion">
             <span className="icono-llamada"><ClipboardCheck size={28} /></span>
@@ -2682,9 +2686,11 @@ function MapaInspeccion({
 }
 
 function ResumenInspeccion({
+  ordenServicioId,
   inspeccion,
   alEditar,
 }: {
+  ordenServicioId: number;
   inspeccion?: InspeccionVisual;
   alEditar: () => void;
 }) {
@@ -2717,14 +2723,14 @@ function ResumenInspeccion({
             {inspeccion.evidencias.map((evidencia) => (
               <a
                 key={evidencia.id}
-                href={direccionEvidencia(orden.id, evidencia.id)}
+                href={direccionEvidencia(ordenServicioId, evidencia.id)}
                 target="_blank"
                 rel="noreferrer"
                 aria-label={`Abrir ${evidencia.nombreArchivo}`}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={direccionEvidencia(orden.id, evidencia.id)}
+                  src={direccionEvidencia(ordenServicioId, evidencia.id)}
                   alt={`Evidencia de inspección ${evidencia.nombreArchivo}`}
                   loading="lazy"
                 />

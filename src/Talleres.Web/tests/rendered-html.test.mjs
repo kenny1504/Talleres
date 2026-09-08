@@ -267,6 +267,9 @@ test("la inspección carga y muestra evidencias privadas de Amazon S3", async ()
   assert.match(pagina, /image\/jpeg,image\/png,image\/webp/);
   assert.match(pagina, /recepcion\/evidencias/);
   assert.match(pagina, /function direccionEvidencia/);
+  assert.match(pagina, /<ResumenInspeccion\s+ordenServicioId=\{orden\.id\}/);
+  assert.match(pagina, /function ResumenInspeccion\(\{\s*ordenServicioId,/);
+  assert.match(pagina, /direccionEvidencia\(ordenServicioId, evidencia\.id\)/);
   assert.match(pagina, /Evidencia fotográfica/);
   assert.match(pagina, /disabled=\{guardando\}/);
   assert.match(estilos, /\.galeria-evidencias\s*\{/);
