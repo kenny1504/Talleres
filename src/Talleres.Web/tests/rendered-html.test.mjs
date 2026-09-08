@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import { access, readFile } from "node:fs/promises";
+import { createServer } from "node:http";
+import { once } from "node:events";
 import test from "node:test";
 
 async function renderizar() {
@@ -79,7 +81,8 @@ test("mantiene el proxy interno de Docker fuera del código cliente", async () =
   ]);
 
   assert.match(proxy, /process\.env\.TALLERES_API_INTERNA_URL/);
-  assert.match(proxy, /"set-cookie"/);
+  assert.match(proxy, /headers\.getSetCookie\(\)/);
+  assert.match(proxy, /append\("set-cookie", cookie\)/);
   assert.doesNotMatch(proxy, /x-empresa-id/i);
   assert.match(proxy, /cache:\s*"no-store"/);
   assert.match(proxy, /"x-forwarded-host"/);
@@ -87,6 +90,54 @@ test("mantiene el proxy interno de Docker fuera del código cliente", async () =
   assert.doesNotMatch(proxy, /http:\/\/api:8080/);
   assert.match(servidor, /startProdServer/);
   assert.match(servidor, /host:\s*anfitrion/);
+});
+
+test("el proxy conserva por separado todas las cookies de autenticación", async () => {
+  const cookies = [
+    "Talleres.Externo=identidad; Path=/backend; HttpOnly; Secure; SameSite=Lax",
+    ".AspNetCore.Correlation.Google=; Path=/backend; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Secure; SameSite=None",
+  ];
+  const servidorApi = createServer((solicitud, respuesta) => {
+    assert.equal(solicitud.headers["x-forwarded-host"], "talleres.example.com");
+    assert.equal(solicitud.headers["x-forwarded-proto"], "https");
+    respuesta.writeHead(302, {
+      location: "https://talleres.example.com/",
+      "set-cookie": cookies,
+    });
+    respuesta.end();
+  });
+
+  servidorApi.listen(0, "127.0.0.1");
+  await once(servidorApi, "listening");
+
+  try {
+    const direccion = servidorApi.address();
+    assert.ok(direccion && typeof direccion !== "string");
+    process.env.TALLERES_API_INTERNA_URL = `http://127.0.0.1:${direccion.port}`;
+
+    const direccionWorker = new URL("../dist/server/index.js", import.meta.url);
+    direccionWorker.searchParams.set("prueba-proxy", `${process.pid}-${Date.now()}`);
+    const { default: worker } = await import(direccionWorker.href);
+    const respuesta = await worker.fetch(
+      new Request("https://talleres.example.com/backend/api/autenticacion/externo/google/callback"),
+      {
+        ASSETS: {
+          fetch: async () => new Response("No encontrado", { status: 404 }),
+        },
+      },
+      {
+        waitUntil() {},
+        passThroughOnException() {},
+      },
+    );
+
+    assert.equal(respuesta.status, 302);
+    assert.deepEqual(respuesta.headers.getSetCookie(), cookies);
+  } finally {
+    delete process.env.TALLERES_API_INTERNA_URL;
+    servidorApi.close();
+    await once(servidorApi, "close");
+  }
 });
 
 test("el login usa la identidad de NOVA y no acepta la empresa desde el navegador", async () => {

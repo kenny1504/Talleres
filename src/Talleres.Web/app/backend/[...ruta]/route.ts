@@ -13,7 +13,6 @@ const nombresEncabezadosRespuesta = [
   "content-disposition",
   "content-type",
   "location",
-  "set-cookie",
 ];
 
 async function reenviarSolicitudAsync(
@@ -73,6 +72,10 @@ async function reenviarSolicitudAsync(
     for (const nombre of nombresEncabezadosRespuesta) {
       const valor = respuesta.headers.get(nombre);
       if (valor) encabezadosRespuesta.set(nombre, valor);
+    }
+
+    for (const cookie of respuesta.headers.getSetCookie()) {
+      encabezadosRespuesta.append("set-cookie", cookie);
     }
 
     return new Response(respuesta.body, {

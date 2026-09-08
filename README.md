@@ -177,6 +177,8 @@ Asigne el dominio público solamente al servicio `web` e indique el puerto inter
 
 Para Google, configure como origen JavaScript autorizado `https://talleres.example.com` y como URI de redirección autorizada `https://talleres.example.com/backend/api/autenticacion/externo/google/callback`. Ambos valores deben coincidir exactamente con el dominio real, incluido `https`. Después de cambiar `TALLERES_URL_PUBLICA` o las credenciales externas, vuelva a desplegar para aplicar la configuración.
 
+El proxy conserva individualmente todas las cookies emitidas por la API. Esto es necesario durante el retorno de Google o Microsoft, porque en una misma respuesta se establece la identidad externa y se elimina la cookie temporal de correlación.
+
 El archivo `.env` es solo para ejecución local y nunca debe subirse a Git. En Coolify, las cadenas de conexión se guardan como variables secretas del recurso. No copie las comillas exteriores usadas en `.env.example` al campo de valor de Coolify y conserve la variable como literal cuando su contraseña contenga `$` u otros caracteres que el sistema pueda interpretar.
 
 Para una base nueva, ejecute un primer despliegue controlado con `TALLERES_APLICAR_MIGRACIONES=true` y una cuenta con permisos para modificar el esquema. Cuando finalice correctamente, cambie inmediatamente la variable a `false` y vuelva a desplegar. Los despliegues ordinarios deben mantenerla en `false`. El período inicial del chequeo de salud permite completar ese primer arranque sin declarar prematuramente que la API está degradada.
