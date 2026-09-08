@@ -163,7 +163,10 @@ builder.Services.AddScoped<IEvidenciaInspeccionServicio, EvidenciaInspeccionServ
 builder.Services.AddSingleton<IAlmacenamientoEvidencias>(_ =>
     new AlmacenamientoEvidenciasS3(
         () => CrearClienteS3(builder.Configuration),
-        builder.Configuration["AWS_S3_BUCKET"]));
+        ObtenerConfiguracionS3(
+            builder.Configuration,
+            "UrlBucket",
+            "AWS_S3_BUCKET")));
 builder.Services.AddScoped<IAutenticacionServicio, AutenticacionServicio>();
 builder.Services.AddScoped<ITalleresSincronizadosServicio, TalleresSincronizadosServicio>();
 
@@ -419,19 +422,29 @@ static void CargarConfiguracionS3DesdeArchivoEntornoLocal(WebApplicationBuilder 
                  "AWS_REGION",
                  "AWS_ACCESS_KEY_ID",
                  "AWS_SECRET_ACCESS_KEY",
-                 "AWS_SESSION_TOKEN"
+                 "AWS_SESSION_TOKEN",
+                 "AmazonS3__UrlBucket",
+                 "AmazonS3__Region",
+                 "AmazonS3__AwsAccesKey",
+                 "AmazonS3__AwsSecretKey"
              })
     {
         if (string.IsNullOrWhiteSpace(builder.Configuration[clave]))
         {
-            builder.Configuration[clave] = LeerValorArchivoEntorno(archivoEntorno, clave);
+            var valor = LeerValorArchivoEntorno(archivoEntorno, clave);
+            if (string.IsNullOrWhiteSpace(valor))
+            {
+                continue;
+            }
+
+            builder.Configuration[clave.Replace("__", ":")] = valor;
         }
     }
 }
 
 static IAmazonS3 CrearClienteS3(IConfiguration configuracion)
 {
-    var region = configuracion["AWS_REGION"];
+    var region = ObtenerConfiguracionS3(configuracion, "Region", "AWS_REGION");
     if (string.IsNullOrWhiteSpace(region))
     {
         throw new IntegracionNoDisponibleException(
@@ -442,8 +455,14 @@ static IAmazonS3 CrearClienteS3(IConfiguration configuracion)
     {
         RegionEndpoint = RegionEndpoint.GetBySystemName(region)
     };
-    var accessKey = configuracion["AWS_ACCESS_KEY_ID"];
-    var secretKey = configuracion["AWS_SECRET_ACCESS_KEY"];
+    var accessKey = ObtenerConfiguracionS3(
+        configuracion,
+        "AwsAccesKey",
+        "AWS_ACCESS_KEY_ID");
+    var secretKey = ObtenerConfiguracionS3(
+        configuracion,
+        "AwsSecretKey",
+        "AWS_SECRET_ACCESS_KEY");
     var sessionToken = configuracion["AWS_SESSION_TOKEN"];
 
     if (string.IsNullOrWhiteSpace(accessKey) && string.IsNullOrWhiteSpace(secretKey))
@@ -461,6 +480,17 @@ static IAmazonS3 CrearClienteS3(IConfiguration configuracion)
         ? new BasicAWSCredentials(accessKey, secretKey)
         : new SessionAWSCredentials(accessKey, secretKey, sessionToken);
     return new AmazonS3Client(credenciales, opciones);
+}
+
+static string? ObtenerConfiguracionS3(
+    IConfiguration configuracion,
+    string claveAmazonS3,
+    string variableEntorno)
+{
+    var valorEntorno = configuracion[variableEntorno];
+    return !string.IsNullOrWhiteSpace(valorEntorno)
+        ? valorEntorno
+        : configuracion[$"AmazonS3:{claveAmazonS3}"];
 }
 
 static string ObtenerCadenaConexionRemota(IConfiguration configuracion)

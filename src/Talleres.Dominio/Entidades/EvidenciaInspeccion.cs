@@ -1,7 +1,7 @@
 namespace Talleres.Dominio.Entidades;
 
 /// <summary>
-/// Describe una fotografía privada almacenada como evidencia de una inspección.
+/// Describe una fotografía almacenada como evidencia de una inspección.
 /// </summary>
 public sealed class EvidenciaInspeccion : IEntidadEmpresa
 {

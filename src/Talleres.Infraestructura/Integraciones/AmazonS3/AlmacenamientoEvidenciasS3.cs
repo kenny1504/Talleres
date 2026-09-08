@@ -40,7 +40,12 @@ public sealed class AlmacenamientoEvidenciasS3(
                     Key = clave,
                     InputStream = contenido,
                     ContentType = tipoContenido,
-                    AutoCloseStream = false
+                    AutoCloseStream = false,
+                    CannedACL = S3CannedACL.PublicRead,
+                    Headers =
+                    {
+                        Expires = new DateTime(2040, 1, 1, 0, 0, 0, DateTimeKind.Utc)
+                    }
                 },
                 cancellationToken);
             return clave;
@@ -59,36 +64,19 @@ public sealed class AlmacenamientoEvidenciasS3(
         }
     }
 
-    public async Task<Uri> CrearDireccionLecturaAsync(
+    public Task<Uri> CrearDireccionLecturaAsync(
         string claveObjeto,
         string nombreArchivo,
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        try
-        {
-            var direccion = await cliente.Value.GetPreSignedURLAsync(
-                new GetPreSignedUrlRequest
-                {
-                    BucketName = ObtenerBucket(),
-                    Key = claveObjeto,
-                    Verb = HttpVerb.GET,
-                    Expires = DateTime.UtcNow.AddMinutes(10)
-                });
-            return new Uri(direccion);
-        }
-        catch (AmazonS3Exception excepcion)
-        {
-            throw new IntegracionNoDisponibleException(
-                $"No fue posible abrir la fotografía '{nombreArchivo}' desde Amazon S3.",
-                excepcion);
-        }
-        catch (AmazonClientException excepcion)
-        {
-            throw new IntegracionNoDisponibleException(
-                $"No fue posible autenticar la lectura de la fotografía '{nombreArchivo}' en Amazon S3.",
-                excepcion);
-        }
+        _ = nombreArchivo;
+        var claveEscapada = string.Join(
+            "/",
+            claveObjeto.Split('/').Select(Uri.EscapeDataString));
+        var direccion = new Uri(
+            $"https://{ObtenerBucket()}.s3.amazonaws.com/{claveEscapada}");
+        return Task.FromResult(direccion);
     }
 
     public async Task EliminarAsync(
@@ -120,5 +108,5 @@ public sealed class AlmacenamientoEvidenciasS3(
         !string.IsNullOrWhiteSpace(nombreBucket)
             ? nombreBucket
             : throw new IntegracionNoDisponibleException(
-                "Amazon S3 no está configurado. Defina AWS_S3_BUCKET, AWS_REGION y las credenciales del entorno.");
+                "Amazon S3 no está configurado. Defina el bucket y las credenciales del entorno.");
 }

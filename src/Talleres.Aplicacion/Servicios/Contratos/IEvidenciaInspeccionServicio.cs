@@ -20,12 +20,12 @@ public interface IEvidenciaInspeccionServicio
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Obtiene una dirección temporal después de validar empresa, orden y evidencia.
+    /// Obtiene la dirección pública después de validar empresa, orden y evidencia.
     /// </summary>
     /// <param name="ordenServicioId">Orden propietaria de la recepción.</param>
     /// <param name="evidenciaId">Evidencia solicitada.</param>
     /// <param name="cancellationToken">Token para cancelar la operación.</param>
-    /// <returns>Dirección firmada de solo lectura.</returns>
+    /// <returns>Dirección pública permanente de solo lectura.</returns>
     Task<Uri> CrearDireccionLecturaAsync(
         long ordenServicioId,
         long evidenciaId,

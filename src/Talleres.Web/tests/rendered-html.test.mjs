@@ -257,7 +257,7 @@ test("vehículos permite registrar y actualizar mediante el contrato HTTP", asyn
   assert.match(pagina, /vehiculo\.id === vehiculoGuardado\.id/);
 });
 
-test("la inspección carga y muestra evidencias privadas de Amazon S3", async () => {
+test("la inspección carga y muestra evidencias públicas de Amazon S3", async () => {
   const [pagina, estilos] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
