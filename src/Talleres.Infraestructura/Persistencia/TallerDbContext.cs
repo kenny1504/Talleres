@@ -14,11 +14,17 @@ public sealed class TallerDbContext(
 
     public DbSet<Vehiculo> Vehiculos => Set<Vehiculo>();
 
+    public DbSet<MarcaVehiculo> MarcasVehiculo => Set<MarcaVehiculo>();
+
+    public DbSet<ModeloVehiculo> ModelosVehiculo => Set<ModeloVehiculo>();
+
     public DbSet<OrdenServicio> OrdenesServicio => Set<OrdenServicio>();
 
     public DbSet<RecepcionVehiculo> RecepcionesVehiculo => Set<RecepcionVehiculo>();
 
     public DbSet<DanioVehiculo> DaniosVehiculo => Set<DanioVehiculo>();
+
+    public DbSet<EvidenciaInspeccion> EvidenciasInspeccion => Set<EvidenciaInspeccion>();
 
     public DbSet<HistorialOrdenServicio> HistorialOrdenesServicio =>
         Set<HistorialOrdenServicio>();
@@ -45,11 +51,17 @@ public sealed class TallerDbContext(
             .HasQueryFilter(entidad => entidad.EmpresaId == contextoEmpresa.EmpresaId);
         modelBuilder.Entity<Vehiculo>()
             .HasQueryFilter(entidad => entidad.EmpresaId == contextoEmpresa.EmpresaId);
+        modelBuilder.Entity<MarcaVehiculo>()
+            .HasQueryFilter(entidad => entidad.EmpresaId == contextoEmpresa.EmpresaId);
+        modelBuilder.Entity<ModeloVehiculo>()
+            .HasQueryFilter(entidad => entidad.EmpresaId == contextoEmpresa.EmpresaId);
         modelBuilder.Entity<OrdenServicio>()
             .HasQueryFilter(entidad => entidad.EmpresaId == contextoEmpresa.EmpresaId);
         modelBuilder.Entity<RecepcionVehiculo>()
             .HasQueryFilter(entidad => entidad.EmpresaId == contextoEmpresa.EmpresaId);
         modelBuilder.Entity<DanioVehiculo>()
+            .HasQueryFilter(entidad => entidad.EmpresaId == contextoEmpresa.EmpresaId);
+        modelBuilder.Entity<EvidenciaInspeccion>()
             .HasQueryFilter(entidad => entidad.EmpresaId == contextoEmpresa.EmpresaId);
         modelBuilder.Entity<HistorialOrdenServicio>()
             .HasQueryFilter(entidad => entidad.EmpresaId == contextoEmpresa.EmpresaId);

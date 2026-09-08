@@ -92,6 +92,7 @@ public sealed class RecepcionVehiculoServicio(
         var empresaId = contextoEmpresa.ObtenerEmpresaIdRequerido();
         var recepcion = await dbContext.RecepcionesVehiculo
                             .Include(item => item.Danios)
+                            .Include(item => item.Evidencias)
                             .Include(item => item.OrdenServicio)
                             .SingleOrDefaultAsync(
                                 item => item.OrdenServicioId == ordenServicioId,
@@ -161,6 +162,15 @@ public sealed class RecepcionVehiculoServicio(
                                danio.Tipo,
                                danio.Severidad,
                                danio.Observacion))
+                           .ToArray(),
+                       recepcion.Evidencias
+                           .OrderBy(evidencia => evidencia.Id)
+                           .Select(evidencia => new EvidenciaInspeccionDto(
+                               evidencia.Id,
+                               evidencia.NombreArchivo,
+                               evidencia.TipoContenido,
+                               evidencia.Longitud,
+                               evidencia.FechaCargaUtc))
                            .ToArray()))
                    .SingleOrDefaultAsync(cancellationToken)
                ?? throw new RecursoNoEncontradoException(
@@ -183,6 +193,15 @@ public sealed class RecepcionVehiculoServicio(
                 danio.Tipo,
                 danio.Severidad,
                 danio.Observacion))
+            .ToArray(),
+        recepcion.Evidencias
+            .OrderBy(evidencia => evidencia.Id)
+            .Select(evidencia => new EvidenciaInspeccionDto(
+                evidencia.Id,
+                evidencia.NombreArchivo,
+                evidencia.TipoContenido,
+                evidencia.Longitud,
+                evidencia.FechaCargaUtc))
             .ToArray());
 
     private static string? LimpiarOpcional(string? valor) =>

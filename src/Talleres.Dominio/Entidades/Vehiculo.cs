@@ -13,9 +13,7 @@ public sealed class Vehiculo : IEntidadEmpresa
 
     public required string Placa { get; set; }
 
-    public required string Marca { get; set; }
-
-    public required string Modelo { get; set; }
+    public long ModeloVehiculoId { get; set; }
 
     public int Anio { get; set; }
 
@@ -28,6 +26,8 @@ public sealed class Vehiculo : IEntidadEmpresa
     public DateTime FechaCreacion { get; set; }
 
     public Cliente Cliente { get; set; } = null!;
+
+    public ModeloVehiculo Modelo { get; set; } = null!;
 
     public ICollection<OrdenServicio> OrdenesServicio { get; } = [];
 }

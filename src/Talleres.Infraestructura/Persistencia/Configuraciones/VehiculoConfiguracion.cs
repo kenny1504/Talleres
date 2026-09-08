@@ -18,12 +18,6 @@ public sealed class VehiculoConfiguracion : IEntityTypeConfiguration<Vehiculo>
         builder.Property(vehiculo => vehiculo.Placa)
             .HasMaxLength(15)
             .IsRequired();
-        builder.Property(vehiculo => vehiculo.Marca)
-            .HasMaxLength(80)
-            .IsRequired();
-        builder.Property(vehiculo => vehiculo.Modelo)
-            .HasMaxLength(80)
-            .IsRequired();
         builder.Property(vehiculo => vehiculo.Color).HasMaxLength(40);
         builder.Property(vehiculo => vehiculo.NumeroVin).HasMaxLength(50);
         builder.Property(vehiculo => vehiculo.FechaCreacion).HasPrecision(0);
@@ -35,6 +29,12 @@ public sealed class VehiculoConfiguracion : IEntityTypeConfiguration<Vehiculo>
         builder.HasOne(vehiculo => vehiculo.Cliente)
             .WithMany(cliente => cliente.Vehiculos)
             .HasForeignKey(vehiculo => vehiculo.ClienteId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne(vehiculo => vehiculo.Modelo)
+            .WithMany(modelo => modelo.Vehiculos)
+            .HasForeignKey(vehiculo => new { vehiculo.EmpresaId, vehiculo.ModeloVehiculoId })
+            .HasPrincipalKey(modelo => new { modelo.EmpresaId, modelo.Id })
             .OnDelete(DeleteBehavior.Restrict);
     }
 }

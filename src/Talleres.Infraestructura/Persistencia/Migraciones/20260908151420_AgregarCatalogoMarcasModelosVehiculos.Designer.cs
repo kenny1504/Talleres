@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Talleres.Infraestructura.Persistencia;
 
@@ -11,9 +12,11 @@ using Talleres.Infraestructura.Persistencia;
 namespace Talleres.Infraestructura.Persistencia.Migraciones
 {
     [DbContext(typeof(TallerDbContext))]
-    partial class TallerDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260908151420_AgregarCatalogoMarcasModelosVehiculos")]
+    partial class AgregarCatalogoMarcasModelosVehiculos
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -145,54 +148,6 @@ namespace Talleres.Infraestructura.Persistencia.Migraciones
                     b.HasIndex("EmpresaId", "OrdenServicioId", "Fecha");
 
                     b.ToTable("HistorialOrdenesServicio", (string)null);
-                });
-
-            modelBuilder.Entity("Talleres.Dominio.Entidades.EvidenciaInspeccion", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
-
-                    b.Property<string>("ClaveObjeto")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.Property<long>("EmpresaId")
-                        .HasColumnType("bigint");
-
-                    b.Property<DateTime>("FechaCargaUtc")
-                        .HasPrecision(0)
-                        .HasColumnType("datetime2(0)");
-
-                    b.Property<long>("Longitud")
-                        .HasColumnType("bigint");
-
-                    b.Property<string>("NombreArchivo")
-                        .IsRequired()
-                        .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
-
-                    b.Property<long>("RecepcionVehiculoId")
-                        .HasColumnType("bigint");
-
-                    b.Property<string>("TipoContenido")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ClaveObjeto")
-                        .IsUnique();
-
-                    b.HasIndex("RecepcionVehiculoId");
-
-                    b.HasIndex("EmpresaId", "RecepcionVehiculoId");
-
-                    b.ToTable("EvidenciasInspeccion", (string)null);
                 });
 
             modelBuilder.Entity("Talleres.Dominio.Entidades.MarcaVehiculo", b =>
@@ -462,17 +417,6 @@ namespace Talleres.Infraestructura.Persistencia.Migraciones
                     b.Navigation("OrdenServicio");
                 });
 
-            modelBuilder.Entity("Talleres.Dominio.Entidades.EvidenciaInspeccion", b =>
-                {
-                    b.HasOne("Talleres.Dominio.Entidades.RecepcionVehiculo", "RecepcionVehiculo")
-                        .WithMany("Evidencias")
-                        .HasForeignKey("RecepcionVehiculoId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("RecepcionVehiculo");
-                });
-
             modelBuilder.Entity("Talleres.Dominio.Entidades.ModeloVehiculo", b =>
                 {
                     b.HasOne("Talleres.Dominio.Entidades.MarcaVehiculo", "Marca")
@@ -562,8 +506,6 @@ namespace Talleres.Infraestructura.Persistencia.Migraciones
             modelBuilder.Entity("Talleres.Dominio.Entidades.RecepcionVehiculo", b =>
                 {
                     b.Navigation("Danios");
-
-                    b.Navigation("Evidencias");
                 });
 
             modelBuilder.Entity("Talleres.Dominio.Entidades.Vehiculo", b =>

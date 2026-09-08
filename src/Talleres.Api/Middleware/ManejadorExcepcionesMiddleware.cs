@@ -35,7 +35,7 @@ public sealed class ManejadorExcepcionesMiddleware(
                 excepcion.Message),
             IntegracionNoDisponibleException => (
                 StatusCodes.Status503ServiceUnavailable,
-                "SMART TPV NOVA no disponible",
+                "Servicio externo no disponible",
                 excepcion.Message),
             RecursoNoEncontradoException => (
                 StatusCodes.Status404NotFound,

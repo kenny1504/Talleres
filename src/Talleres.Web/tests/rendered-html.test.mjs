@@ -180,6 +180,45 @@ test("crear una orden desde clientes conserva el cliente y el regreso", async ()
   assert.match(pagina, /`Volver a \$\{navegacion\.find/);
 });
 
+test("nueva orden registra clientes y vehículos sin abandonar el formulario", async () => {
+  const [pagina, estilos] = await Promise.all([
+    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(pagina, /aria-label="Registrar nuevo cliente"/);
+  assert.match(pagina, /aria-label="Registrar nuevo vehículo"/);
+  assert.match(pagina, /aria-haspopup="dialog"/);
+  assert.match(pagina, /role="dialog"/);
+  assert.match(pagina, /aria-modal="true"/);
+  assert.match(pagina, /alRegistrarCliente=\{registrarClienteDesdeOrden\}/);
+  assert.match(pagina, /alRegistrarVehiculo=\{registrarVehiculoDesdeOrden\}/);
+  assert.match(pagina, /setClienteId\(clienteGuardado\.id\)/);
+  assert.match(pagina, /setVehiculoId\(vehiculoGuardado\.id\)/);
+  assert.match(pagina, /Al guardar quedará seleccionado automáticamente/);
+  assert.match(estilos, /\.campo-con-accion\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\) auto/s);
+  assert.match(estilos, /\.boton-alta-rapida\s*\{[^}]*width:\s*44px;[^}]*height:\s*44px/s);
+  assert.match(estilos, /\.fondo-modal-alta\s*\{[^}]*position:\s*fixed/s);
+  assert.match(estilos, /@media \(max-width:\s*680px\)[\s\S]*\.modal-alta\s*\{[^}]*max-height:\s*calc\(100dvh - 16px\)/s);
+});
+
+test("la descripción de una orden admite dictado por voz y edición manual", async () => {
+  const [pagina, estilos] = await Promise.all([
+    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(pagina, /webkitSpeechRecognition/);
+  assert.match(pagina, /reconocimiento\.lang = "es-NI"/);
+  assert.match(pagina, /aria-pressed=\{dictando\}/);
+  assert.match(pagina, /Dictar descripción/);
+  assert.match(pagina, /Detener dictado/);
+  assert.match(pagina, /value=\{motivo\}/);
+  assert.match(pagina, /onChange=\{\(evento\) => setMotivo\(evento\.target\.value\)\}/);
+  assert.match(pagina, /Permite el acceso al micrófono/);
+  assert.match(estilos, /\.boton-dictado\s*\{[^}]*min-height:\s*44px/s);
+});
+
 test("alta y edición de clientes usan un formulario completo y persisten mediante la API", async () => {
   const pagina = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
 
@@ -206,11 +245,30 @@ test("vehículos permite registrar y actualizar mediante el contrato HTTP", asyn
   assert.match(pagina, /function FormularioVehiculo\(/);
   assert.match(pagina, /name="clienteId"/);
   assert.match(pagina, /name="placa"/);
-  assert.match(pagina, /name="marca"/);
-  assert.match(pagina, /name="modelo"/);
+  assert.match(pagina, /value=\{marcaVehiculoId \|\| ""\}/);
+  assert.match(pagina, /name="modeloVehiculoId"/);
+  assert.match(pagina, /modelo\.marcaVehiculoId === marcaVehiculoId/);
+  assert.match(pagina, /api\/catalogos-vehiculos\/marcas/);
+  assert.match(pagina, /api\/catalogos-vehiculos\/modelos/);
   assert.match(pagina, /name="anio"/);
   assert.match(pagina, /name="numeroVin"/);
   assert.match(pagina, /method: vehiculoId \? "PUT" : "POST"/);
   assert.match(pagina, /setVehiculos\(\(actuales\) =>/);
   assert.match(pagina, /vehiculo\.id === vehiculoGuardado\.id/);
+});
+
+test("la inspección carga y muestra evidencias privadas de Amazon S3", async () => {
+  const [pagina, estilos] = await Promise.all([
+    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(pagina, /name="fotografias"/);
+  assert.match(pagina, /image\/jpeg,image\/png,image\/webp/);
+  assert.match(pagina, /recepcion\/evidencias/);
+  assert.match(pagina, /function direccionEvidencia/);
+  assert.match(pagina, /Evidencia fotográfica/);
+  assert.match(pagina, /disabled=\{guardando\}/);
+  assert.match(estilos, /\.galeria-evidencias\s*\{/);
+  assert.match(estilos, /\.galeria-evidencias img\s*\{[^}]*object-fit:\s*cover/s);
 });

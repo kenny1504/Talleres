@@ -10,11 +10,8 @@ public sealed class ActualizarVehiculoSolicitud
     [Required, StringLength(15, MinimumLength = 2)]
     public required string Placa { get; init; }
 
-    [Required, StringLength(80, MinimumLength = 2)]
-    public required string Marca { get; init; }
-
-    [Required, StringLength(80, MinimumLength = 1)]
-    public required string Modelo { get; init; }
+    [Range(1, long.MaxValue)]
+    public long ModeloVehiculoId { get; init; }
 
     [Range(1900, 2100)]
     public int Anio { get; init; }

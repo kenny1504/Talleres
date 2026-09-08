@@ -22,12 +22,13 @@ public sealed class OrdenServicioPruebas
         var vehiculoServicio = new VehiculoServicio(dbContext, empresa);
         var ordenServicio = new OrdenServicioServicio(dbContext, empresa);
         var recepcionServicio = new RecepcionVehiculoServicio(dbContext, empresa);
+        var modeloId = await CrearCatalogoAsync(dbContext, empresa.EmpresaId);
 
         var cliente = await clienteServicio.CrearAsync(
             CrearCliente("CLIENTE-1"),
             CancellationToken.None);
         var vehiculo = await vehiculoServicio.CrearAsync(
-            CrearVehiculo(cliente.Id, "M123456"),
+            CrearVehiculo(cliente.Id, modeloId, "M123456"),
             CancellationToken.None);
         var orden = await ordenServicio.CrearAsync(
             new CrearOrdenServicioSolicitud
@@ -107,6 +108,7 @@ public sealed class OrdenServicioPruebas
         var clienteServicio = new ClienteServicio(dbContext, empresa);
         var vehiculoServicio = new VehiculoServicio(dbContext, empresa);
         var ordenServicio = new OrdenServicioServicio(dbContext, empresa);
+        var modeloId = await CrearCatalogoAsync(dbContext, empresa.EmpresaId);
 
         var propietario = await clienteServicio.CrearAsync(
             CrearCliente("PROPIETARIO"),
@@ -115,7 +117,7 @@ public sealed class OrdenServicioPruebas
             CrearCliente("OTRO-CLIENTE"),
             CancellationToken.None);
         var vehiculo = await vehiculoServicio.CrearAsync(
-            CrearVehiculo(propietario.Id, "M654321"),
+            CrearVehiculo(propietario.Id, modeloId, "M654321"),
             CancellationToken.None);
 
         var excepcion = await Assert.ThrowsAsync<ReglaNegocioException>(() =>
@@ -138,12 +140,13 @@ public sealed class OrdenServicioPruebas
         var clienteServicio = new ClienteServicio(dbContext, empresa);
         var vehiculoServicio = new VehiculoServicio(dbContext, empresa);
         var ordenServicio = new OrdenServicioServicio(dbContext, empresa);
+        var modeloId = await CrearCatalogoAsync(dbContext, empresa.EmpresaId);
 
         var cliente = await clienteServicio.CrearAsync(
             CrearCliente("CLIENTE-ESTADO"),
             CancellationToken.None);
         var vehiculo = await vehiculoServicio.CrearAsync(
-            CrearVehiculo(cliente.Id, "M000001"),
+            CrearVehiculo(cliente.Id, modeloId, "M000001"),
             CancellationToken.None);
         var orden = await ordenServicio.CrearAsync(
             new CrearOrdenServicioSolicitud
@@ -178,13 +181,37 @@ public sealed class OrdenServicioPruebas
         Telefono = "8888-0000"
     };
 
-    private static CrearVehiculoSolicitud CrearVehiculo(long clienteId, string placa) => new()
+    private static CrearVehiculoSolicitud CrearVehiculo(
+        long clienteId,
+        long modeloVehiculoId,
+        string placa) => new()
     {
         ClienteId = clienteId,
         Placa = placa,
-        Marca = "Toyota",
-        Modelo = "Corolla",
+        ModeloVehiculoId = modeloVehiculoId,
         Anio = 2020
     };
+
+    private static async Task<long> CrearCatalogoAsync(
+        TallerDbContext contexto,
+        long empresaId)
+    {
+        var marca = new Talleres.Dominio.Entidades.MarcaVehiculo
+        {
+            EmpresaId = empresaId,
+            Nombre = "Toyota",
+            FechaCreacion = DateTime.UtcNow
+        };
+        var modelo = new Talleres.Dominio.Entidades.ModeloVehiculo
+        {
+            EmpresaId = empresaId,
+            Marca = marca,
+            Nombre = "Corolla",
+            FechaCreacion = DateTime.UtcNow
+        };
+        contexto.ModelosVehiculo.Add(modelo);
+        await contexto.SaveChangesAsync();
+        return modelo.Id;
+    }
 }
 

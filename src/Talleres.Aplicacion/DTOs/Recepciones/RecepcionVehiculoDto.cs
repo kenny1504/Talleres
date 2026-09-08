@@ -9,4 +9,5 @@ public sealed record RecepcionVehiculoDto(
     bool DejaLlaves,
     bool DejaDocumentos,
     DateTime FechaRecepcion,
-    IReadOnlyCollection<DanioVehiculoDto> Danios);
+    IReadOnlyCollection<DanioVehiculoDto> Danios,
+    IReadOnlyCollection<EvidenciaInspeccionDto> Evidencias);

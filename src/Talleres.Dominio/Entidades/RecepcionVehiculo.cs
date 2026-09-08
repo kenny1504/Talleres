@@ -26,4 +26,6 @@ public sealed class RecepcionVehiculo : IEntidadEmpresa
     public OrdenServicio OrdenServicio { get; set; } = null!;
 
     public ICollection<DanioVehiculo> Danios { get; } = [];
+
+    public ICollection<EvidenciaInspeccion> Evidencias { get; } = [];
 }

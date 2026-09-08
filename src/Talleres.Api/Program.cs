@@ -1,4 +1,7 @@
 using System.Text.Json.Serialization;
+using Amazon;
+using Amazon.Runtime;
+using Amazon.S3;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.Google;
 using Microsoft.AspNetCore.Authentication.MicrosoftAccount;
@@ -16,9 +19,12 @@ using Talleres.Aplicacion.Servicios.Contratos;
 using Talleres.Infraestructura.Persistencia;
 using Talleres.Infraestructura.Integraciones.SmartNova;
 using Talleres.Infraestructura.Integraciones.SmartNova.Entidades;
+using Talleres.Infraestructura.Integraciones.AmazonS3;
+using Talleres.Dominio.Excepciones;
 
 var builder = WebApplication.CreateBuilder(args);
 CargarCadenaConexionDesdeArchivoEntornoLocal(builder);
+CargarConfiguracionS3DesdeArchivoEntornoLocal(builder);
 const string politicaCorsFrontal = "FrontalWeb";
 var cadenaConexion = ObtenerCadenaConexionRemota(builder.Configuration);
 var cadenaConexionNova = ObtenerCadenaConexionNova(builder.Configuration);
@@ -150,8 +156,14 @@ builder.Services.AddScoped<IInventarioSmartNova, InventarioSmartNova>();
 
 builder.Services.AddScoped<IClienteServicio, ClienteServicio>();
 builder.Services.AddScoped<IVehiculoServicio, VehiculoServicio>();
+builder.Services.AddScoped<ICatalogoVehiculoServicio, CatalogoVehiculoServicio>();
 builder.Services.AddScoped<IOrdenServicioServicio, OrdenServicioServicio>();
 builder.Services.AddScoped<IRecepcionVehiculoServicio, RecepcionVehiculoServicio>();
+builder.Services.AddScoped<IEvidenciaInspeccionServicio, EvidenciaInspeccionServicio>();
+builder.Services.AddSingleton<IAlmacenamientoEvidencias>(_ =>
+    new AlmacenamientoEvidenciasS3(
+        () => CrearClienteS3(builder.Configuration),
+        builder.Configuration["AWS_S3_BUCKET"]));
 builder.Services.AddScoped<IAutenticacionServicio, AutenticacionServicio>();
 builder.Services.AddScoped<ITalleresSincronizadosServicio, TalleresSincronizadosServicio>();
 
@@ -383,6 +395,72 @@ static string? LeerValorArchivoEntorno(string rutaArchivo, string claveBuscada)
     }
 
     return null;
+}
+
+static void CargarConfiguracionS3DesdeArchivoEntornoLocal(WebApplicationBuilder builder)
+{
+    if (!builder.Environment.IsDevelopment())
+    {
+        return;
+    }
+
+    var archivoEntorno = BuscarArchivoEntornoDelRepositorio(
+        builder.Environment.ContentRootPath,
+        Directory.GetCurrentDirectory(),
+        AppContext.BaseDirectory);
+    if (archivoEntorno is null)
+    {
+        return;
+    }
+
+    foreach (var clave in new[]
+             {
+                 "AWS_S3_BUCKET",
+                 "AWS_REGION",
+                 "AWS_ACCESS_KEY_ID",
+                 "AWS_SECRET_ACCESS_KEY",
+                 "AWS_SESSION_TOKEN"
+             })
+    {
+        if (string.IsNullOrWhiteSpace(builder.Configuration[clave]))
+        {
+            builder.Configuration[clave] = LeerValorArchivoEntorno(archivoEntorno, clave);
+        }
+    }
+}
+
+static IAmazonS3 CrearClienteS3(IConfiguration configuracion)
+{
+    var region = configuracion["AWS_REGION"];
+    if (string.IsNullOrWhiteSpace(region))
+    {
+        throw new IntegracionNoDisponibleException(
+            "Amazon S3 no está configurado. Defina AWS_REGION.");
+    }
+
+    var opciones = new AmazonS3Config
+    {
+        RegionEndpoint = RegionEndpoint.GetBySystemName(region)
+    };
+    var accessKey = configuracion["AWS_ACCESS_KEY_ID"];
+    var secretKey = configuracion["AWS_SECRET_ACCESS_KEY"];
+    var sessionToken = configuracion["AWS_SESSION_TOKEN"];
+
+    if (string.IsNullOrWhiteSpace(accessKey) && string.IsNullOrWhiteSpace(secretKey))
+    {
+        return new AmazonS3Client(opciones);
+    }
+
+    if (string.IsNullOrWhiteSpace(accessKey) || string.IsNullOrWhiteSpace(secretKey))
+    {
+        throw new IntegracionNoDisponibleException(
+            "Amazon S3 requiere configurar juntos AWS_ACCESS_KEY_ID y AWS_SECRET_ACCESS_KEY.");
+    }
+
+    AWSCredentials credenciales = string.IsNullOrWhiteSpace(sessionToken)
+        ? new BasicAWSCredentials(accessKey, secretKey)
+        : new SessionAWSCredentials(accessKey, secretKey, sessionToken);
+    return new AmazonS3Client(credenciales, opciones);
 }
 
 static string ObtenerCadenaConexionRemota(IConfiguration configuracion)

@@ -46,14 +46,34 @@ Accept: application/json
 
 ###
 
+POST {{Talleres_Api_HostAddress}}/api/catalogos-vehiculos/marcas
+Content-Type: application/json
+
+{
+  "nombre": "Toyota",
+  "activa": true
+}
+
+###
+
+POST {{Talleres_Api_HostAddress}}/api/catalogos-vehiculos/modelos
+Content-Type: application/json
+
+{
+  "marcaVehiculoId": 1,
+  "nombre": "Hilux",
+  "activo": true
+}
+
+###
+
 POST {{Talleres_Api_HostAddress}}/api/vehiculos
 Content-Type: application/json
 
 {
   "clienteId": 1,
   "placa": "M 245-781",
-  "marca": "Toyota",
-  "modelo": "Hilux",
+  "modeloVehiculoId": 1,
   "anio": 2025,
   "color": "Blanco",
   "numeroVin": "VIN-EJEMPLO-001"
@@ -67,8 +87,7 @@ Content-Type: application/json
 {
   "clienteId": 1,
   "placa": "M 245-781",
-  "marca": "Toyota",
-  "modelo": "Hilux",
+  "modeloVehiculoId": 1,
   "anio": 2025,
   "color": "Gris",
   "numeroVin": "VIN-EJEMPLO-001",

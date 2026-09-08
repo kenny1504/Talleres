@@ -1,7 +1,7 @@
 "use client";
 
 import type { FormEvent, ReactNode } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
   Bell,
@@ -19,6 +19,7 @@ import {
   LayoutDashboard,
   LogOut,
   MessageCircleMore,
+  Mic,
   MoreHorizontal,
   ImagePlus,
   Pencil,
@@ -26,6 +27,7 @@ import {
   RotateCcw,
   Search,
   Settings2,
+  Square,
   Sparkles,
   Trash2,
   TriangleAlert,
@@ -91,7 +93,48 @@ interface InspeccionVisual {
   dejaLlaves: boolean;
   dejaDocumentos: boolean;
   danios: DanioVisual[];
+  evidencias: EvidenciaInspeccion[];
 }
+
+interface EvidenciaInspeccion {
+  id: number;
+  nombreArchivo: string;
+  tipoContenido: string;
+  longitud: number;
+  fechaCargaUtc: string;
+}
+
+interface AlternativaReconocimientoVoz {
+  transcript: string;
+}
+
+interface ResultadoReconocimientoVoz {
+  readonly isFinal: boolean;
+  readonly 0: AlternativaReconocimientoVoz;
+}
+
+interface EventoReconocimientoVoz {
+  readonly resultIndex: number;
+  readonly results: ArrayLike<ResultadoReconocimientoVoz>;
+}
+
+interface EventoErrorReconocimientoVoz {
+  readonly error: string;
+}
+
+interface ReconocimientoVoz {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  onresult: ((evento: EventoReconocimientoVoz) => void) | null;
+  onerror: ((evento: EventoErrorReconocimientoVoz) => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+  abort: () => void;
+}
+
+type ConstructorReconocimientoVoz = new () => ReconocimientoVoz;
 
 interface OrdenServicioApi {
   id: number;
@@ -121,7 +164,9 @@ interface VehiculoApi {
   clienteId: number;
   nombreCliente: string;
   placa: string;
+  marcaVehiculoId: number;
   marca: string;
+  modeloVehiculoId: number;
   modelo: string;
   anio: number;
   color: string | null;
@@ -147,7 +192,9 @@ interface VehiculoTaller {
   id: number;
   clienteId: number;
   placa: string;
+  marcaVehiculoId: number;
   marca: string;
+  modeloVehiculoId: number;
   modelo: string;
   anio: number;
   color: string | null;
@@ -156,6 +203,22 @@ interface VehiculoTaller {
   detalle: string;
   cliente: string;
   activo: boolean;
+}
+
+interface MarcaVehiculoApi {
+  id: number;
+  nombre: string;
+  activa: boolean;
+  fechaCreacion: string;
+}
+
+interface ModeloVehiculoApi {
+  id: number;
+  marcaVehiculoId: number;
+  nombreMarca: string;
+  nombre: string;
+  activo: boolean;
+  fechaCreacion: string;
 }
 
 interface DanioVehiculoApi {
@@ -172,6 +235,7 @@ interface RecepcionVehiculoApi {
   dejaLlaves: boolean;
   dejaDocumentos: boolean;
   danios: DanioVehiculoApi[];
+  evidencias: EvidenciaInspeccion[];
 }
 
 interface NavegacionItem {
@@ -243,6 +307,8 @@ export default function PaginaPrincipal() {
   const [ordenes, setOrdenes] = useState<OrdenTaller[]>([]);
   const [clientes, setClientes] = useState<ClienteTaller[]>([]);
   const [vehiculos, setVehiculos] = useState<VehiculoTaller[]>([]);
+  const [marcasVehiculo, setMarcasVehiculo] = useState<MarcaVehiculoApi[]>([]);
+  const [modelosVehiculo, setModelosVehiculo] = useState<ModeloVehiculoApi[]>([]);
   const [cargandoDatos, setCargandoDatos] = useState(true);
   const [errorDatos, setErrorDatos] = useState("");
   const [guardandoOrden, setGuardandoOrden] = useState(false);
@@ -286,6 +352,8 @@ export default function PaginaPrincipal() {
         setOrdenes(datos.ordenes);
         setClientes(datos.clientes);
         setVehiculos(datos.vehiculos);
+        setMarcasVehiculo(datos.marcasVehiculo);
+        setModelosVehiculo(datos.modelosVehiculo);
         setErrorDatos("");
       })
       .catch(() => {
@@ -293,6 +361,8 @@ export default function PaginaPrincipal() {
         setOrdenes([]);
         setClientes([]);
         setVehiculos([]);
+        setMarcasVehiculo([]);
+        setModelosVehiculo([]);
         setErrorDatos("No fue posible comunicarse con la API configurada.");
       })
       .finally(() => {
@@ -458,6 +528,58 @@ export default function PaginaPrincipal() {
     }
   }
 
+  function incorporarClienteGuardado(
+    clienteGuardado: ClienteTaller,
+    clienteAnterior: ClienteTaller | null,
+  ) {
+    setClientes((actuales) => {
+      const siguientes = clienteAnterior
+        ? actuales.map((cliente) =>
+            cliente.id === clienteGuardado.id ? clienteGuardado : cliente)
+        : [...actuales, clienteGuardado];
+      return siguientes.sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
+    });
+    setVehiculos((actuales) =>
+      actuales.map((vehiculo) =>
+        vehiculo.clienteId === clienteGuardado.id
+          ? { ...vehiculo, cliente: clienteGuardado.nombre }
+          : vehiculo,
+      ),
+    );
+    setOrdenes((actuales) =>
+      actuales.map((orden) =>
+        orden.clienteId === clienteGuardado.id
+          ? { ...orden, cliente: clienteGuardado.nombre }
+          : orden,
+      ),
+    );
+  }
+
+  async function registrarClienteDesdeOrden(datos: FormData) {
+    setGuardandoCliente(true);
+    try {
+      const clienteApi = await guardarClienteApi({
+        nombre: String(datos.get("nombre")),
+        documentoIdentidad: String(datos.get("documentoIdentidad")),
+        telefono: String(datos.get("telefono")),
+        correo: valorOpcionalFormulario(datos.get("correo")),
+        direccion: valorOpcionalFormulario(datos.get("direccion")),
+        activo: true,
+      });
+      const clienteGuardado = convertirClienteTaller(clienteApi, 0, null);
+      incorporarClienteGuardado(clienteGuardado, null);
+      mostrarAviso(`Cliente ${clienteGuardado.nombre} registrado y seleccionado`);
+      return clienteGuardado;
+    } catch (error) {
+      mostrarAviso(
+        error instanceof Error ? error.message : "No fue posible guardar el cliente",
+      );
+      throw error;
+    } finally {
+      setGuardandoCliente(false);
+    }
+  }
+
   async function guardarCliente(evento: FormEvent<HTMLFormElement>) {
     evento.preventDefault();
     const datos = new FormData(evento.currentTarget);
@@ -481,27 +603,7 @@ export default function PaginaPrincipal() {
         clienteEditando?.ordenActiva ?? null,
       );
 
-      setClientes((actuales) => {
-        const siguientes = clienteEditando
-          ? actuales.map((cliente) =>
-              cliente.id === clienteGuardado.id ? clienteGuardado : cliente)
-          : [...actuales, clienteGuardado];
-        return siguientes.sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
-      });
-      setVehiculos((actuales) =>
-        actuales.map((vehiculo) =>
-          vehiculo.clienteId === clienteGuardado.id
-            ? { ...vehiculo, cliente: clienteGuardado.nombre }
-            : vehiculo,
-        ),
-      );
-      setOrdenes((actuales) =>
-        actuales.map((orden) =>
-          orden.clienteId === clienteGuardado.id
-            ? { ...orden, cliente: clienteGuardado.nombre }
-            : orden,
-        ),
-      );
+      incorporarClienteGuardado(clienteGuardado, clienteEditando);
       setMostrarNuevoCliente(false);
       setClienteEditando(null);
       setVista("clientes");
@@ -519,10 +621,104 @@ export default function PaginaPrincipal() {
     }
   }
 
+  function incorporarVehiculoGuardado(
+    vehiculoGuardado: VehiculoTaller,
+    vehiculoAnterior: VehiculoTaller | null,
+  ) {
+    const propietarioAnteriorId = vehiculoAnterior?.clienteId;
+    setVehiculos((actuales) => {
+      const siguientes = vehiculoAnterior
+        ? actuales.map((vehiculo) =>
+            vehiculo.id === vehiculoGuardado.id ? vehiculoGuardado : vehiculo)
+        : [...actuales, vehiculoGuardado];
+      return siguientes.sort((a, b) => a.placa.localeCompare(b.placa, "es"));
+    });
+    setClientes((actuales) =>
+      actuales.map((cliente) => {
+        if (!vehiculoAnterior && cliente.id === vehiculoGuardado.clienteId) {
+          return { ...cliente, cantidadVehiculos: cliente.cantidadVehiculos + 1 };
+        }
+        if (propietarioAnteriorId !== vehiculoGuardado.clienteId) {
+          if (cliente.id === propietarioAnteriorId) {
+            return { ...cliente, cantidadVehiculos: Math.max(0, cliente.cantidadVehiculos - 1) };
+          }
+          if (cliente.id === vehiculoGuardado.clienteId) {
+            return { ...cliente, cantidadVehiculos: cliente.cantidadVehiculos + 1 };
+          }
+        }
+        return cliente;
+      }),
+    );
+    setOrdenes((actuales) =>
+      actuales.map((orden) =>
+        orden.vehiculoId === vehiculoGuardado.id
+          ? {
+              ...orden,
+              vehiculo: `Vehículo · ${vehiculoGuardado.placa}`,
+              placa: vehiculoGuardado.placa,
+            }
+          : orden,
+      ),
+    );
+  }
+
+  async function crearMarcaVehiculo(nombre: string) {
+    try {
+      const marca = await guardarMarcaVehiculoApi(nombre);
+      setMarcasVehiculo((actuales) =>
+        [...actuales, marca].sort((a, b) => a.nombre.localeCompare(b.nombre, "es")),
+      );
+      mostrarAviso(`Marca ${marca.nombre} agregada al catálogo`);
+      return marca;
+    } catch (error) {
+      mostrarAviso(error instanceof Error ? error.message : "No fue posible guardar la marca");
+      throw error;
+    }
+  }
+
+  async function crearModeloVehiculo(marcaVehiculoId: number, nombre: string) {
+    try {
+      const modelo = await guardarModeloVehiculoApi(marcaVehiculoId, nombre);
+      setModelosVehiculo((actuales) =>
+        [...actuales, modelo].sort((a, b) => a.nombre.localeCompare(b.nombre, "es")),
+      );
+      mostrarAviso(`Modelo ${modelo.nombre} agregado al catálogo`);
+      return modelo;
+    } catch (error) {
+      mostrarAviso(error instanceof Error ? error.message : "No fue posible guardar el modelo");
+      throw error;
+    }
+  }
+
+  async function registrarVehiculoDesdeOrden(datos: FormData) {
+    setGuardandoVehiculo(true);
+    try {
+      const vehiculoApi = await guardarVehiculoApi({
+        clienteId: Number(datos.get("clienteId")),
+        placa: String(datos.get("placa")),
+        modeloVehiculoId: Number(datos.get("modeloVehiculoId")),
+        anio: Number(datos.get("anio")),
+        color: valorOpcionalFormulario(datos.get("color")),
+        numeroVin: valorOpcionalFormulario(datos.get("numeroVin")),
+        activo: true,
+      });
+      const vehiculoGuardado = convertirVehiculoTaller(vehiculoApi);
+      incorporarVehiculoGuardado(vehiculoGuardado, null);
+      mostrarAviso(`Vehículo ${vehiculoGuardado.placa} registrado y seleccionado`);
+      return vehiculoGuardado;
+    } catch (error) {
+      mostrarAviso(
+        error instanceof Error ? error.message : "No fue posible guardar el vehículo",
+      );
+      throw error;
+    } finally {
+      setGuardandoVehiculo(false);
+    }
+  }
+
   async function guardarVehiculo(evento: FormEvent<HTMLFormElement>) {
     evento.preventDefault();
     const datos = new FormData(evento.currentTarget);
-    const propietarioAnteriorId = vehiculoEditando?.clienteId;
     setGuardandoVehiculo(true);
 
     try {
@@ -530,8 +726,7 @@ export default function PaginaPrincipal() {
         {
           clienteId: Number(datos.get("clienteId")),
           placa: String(datos.get("placa")),
-          marca: String(datos.get("marca")),
-          modelo: String(datos.get("modelo")),
+          modeloVehiculoId: Number(datos.get("modeloVehiculoId")),
           anio: Number(datos.get("anio")),
           color: valorOpcionalFormulario(datos.get("color")),
           numeroVin: valorOpcionalFormulario(datos.get("numeroVin")),
@@ -540,41 +735,7 @@ export default function PaginaPrincipal() {
         vehiculoEditando?.id,
       );
       const vehiculoGuardado = convertirVehiculoTaller(vehiculoApi);
-
-      setVehiculos((actuales) => {
-        const siguientes = vehiculoEditando
-          ? actuales.map((vehiculo) =>
-              vehiculo.id === vehiculoGuardado.id ? vehiculoGuardado : vehiculo)
-          : [...actuales, vehiculoGuardado];
-        return siguientes.sort((a, b) => a.placa.localeCompare(b.placa, "es"));
-      });
-      setClientes((actuales) =>
-        actuales.map((cliente) => {
-          if (!vehiculoEditando && cliente.id === vehiculoGuardado.clienteId) {
-            return { ...cliente, cantidadVehiculos: cliente.cantidadVehiculos + 1 };
-          }
-          if (propietarioAnteriorId !== vehiculoGuardado.clienteId) {
-            if (cliente.id === propietarioAnteriorId) {
-              return { ...cliente, cantidadVehiculos: Math.max(0, cliente.cantidadVehiculos - 1) };
-            }
-            if (cliente.id === vehiculoGuardado.clienteId) {
-              return { ...cliente, cantidadVehiculos: cliente.cantidadVehiculos + 1 };
-            }
-          }
-          return cliente;
-        }),
-      );
-      setOrdenes((actuales) =>
-        actuales.map((orden) =>
-          orden.vehiculoId === vehiculoGuardado.id
-            ? {
-                ...orden,
-                vehiculo: `Vehículo · ${vehiculoGuardado.placa}`,
-                placa: vehiculoGuardado.placa,
-              }
-            : orden,
-        ),
-      );
+      incorporarVehiculoGuardado(vehiculoGuardado, vehiculoEditando);
       setMostrarFormularioVehiculo(false);
       setVehiculoEditando(null);
       mostrarAviso(
@@ -604,12 +765,23 @@ export default function PaginaPrincipal() {
       dejaLlaves: datos.has("dejaLlaves"),
       dejaDocumentos: datos.has("dejaDocumentos"),
       danios,
+      evidencias: inspecciones[ordenDetalle.id]?.evidencias || [],
     };
 
+    const fotografias = datos
+      .getAll("fotografias")
+      .filter((valor): valor is File => valor instanceof File && valor.size > 0);
+
+    let resultadoGuardado: { inspeccion: InspeccionVisual; advertencia?: string };
     try {
-      await guardarRecepcionApi(ordenDetalle.id, inspeccion, esActualizacion);
-    } catch {
-      mostrarAviso("No fue posible guardar la recepción en la API");
+      resultadoGuardado = await guardarRecepcionApi(
+        ordenDetalle.id,
+        inspeccion,
+        esActualizacion,
+        fotografias,
+      );
+    } catch (error) {
+      mostrarAviso(error instanceof Error ? error.message : "No fue posible guardar la recepción en la API");
       return;
     }
     setOrdenes((actuales) =>
@@ -621,13 +793,16 @@ export default function PaginaPrincipal() {
           : orden,
       ),
     );
-    setInspecciones((actuales) => ({ ...actuales, [ordenDetalle.id]: inspeccion }));
+    setInspecciones((actuales) => ({
+      ...actuales,
+      [ordenDetalle.id]: resultadoGuardado.inspeccion,
+    }));
     setMostrarRecepcion(false);
     setOrdenDetalle(null);
     mostrarAviso(
-      esActualizacion
+      resultadoGuardado.advertencia || (esActualizacion
         ? "Inspección actualizada correctamente"
-        : "Recepción guardada; la orden pasó a diagnóstico",
+        : "Recepción guardada; la orden pasó a diagnóstico"),
     );
   }
 
@@ -775,9 +950,17 @@ export default function PaginaPrincipal() {
                 <FormularioNuevaOrden
                   clientes={clientes}
                   vehiculos={vehiculos}
+                  marcasVehiculo={marcasVehiculo}
+                  modelosVehiculo={modelosVehiculo}
                   clienteInicialId={clienteInicialNuevaOrdenId}
                   guardando={guardandoOrden}
+                  guardandoCliente={guardandoCliente}
+                  guardandoVehiculo={guardandoVehiculo}
                   alEnviar={crearOrden}
+                  alRegistrarCliente={registrarClienteDesdeOrden}
+                  alRegistrarVehiculo={registrarVehiculoDesdeOrden}
+                  alCrearMarca={crearMarcaVehiculo}
+                  alCrearModelo={crearModeloVehiculo}
                 />
               </div>
             </PaginaProceso>
@@ -808,9 +991,13 @@ export default function PaginaPrincipal() {
               <div className="contenedor-formulario-orden">
                 <FormularioVehiculo
                   clientes={clientes}
+                  marcas={marcasVehiculo}
+                  modelos={modelosVehiculo}
                   vehiculo={vehiculoEditando}
                   guardando={guardandoVehiculo}
                   alEnviar={guardarVehiculo}
+                  alCrearMarca={crearMarcaVehiculo}
+                  alCrearModelo={crearModeloVehiculo}
                 />
               </div>
             </PaginaProceso>
@@ -1627,56 +1814,301 @@ function PaginaProceso({
 function FormularioNuevaOrden({
   clientes,
   vehiculos,
+  marcasVehiculo,
+  modelosVehiculo,
   clienteInicialId,
   guardando,
+  guardandoCliente,
+  guardandoVehiculo,
   alEnviar,
+  alRegistrarCliente,
+  alRegistrarVehiculo,
+  alCrearMarca,
+  alCrearModelo,
 }: {
   clientes: ClienteTaller[];
   vehiculos: VehiculoTaller[];
+  marcasVehiculo: MarcaVehiculoApi[];
+  modelosVehiculo: ModeloVehiculoApi[];
   clienteInicialId: number | null;
   guardando: boolean;
+  guardandoCliente: boolean;
+  guardandoVehiculo: boolean;
   alEnviar: (evento: FormEvent<HTMLFormElement>) => void;
+  alRegistrarCliente: (datos: FormData) => Promise<ClienteTaller>;
+  alRegistrarVehiculo: (datos: FormData) => Promise<VehiculoTaller>;
+  alCrearMarca: (nombre: string) => Promise<MarcaVehiculoApi>;
+  alCrearModelo: (marcaVehiculoId: number, nombre: string) => Promise<ModeloVehiculoApi>;
 }) {
   const [clienteId, setClienteId] = useState(
     clienteInicialId && clientes.some((cliente) => cliente.id === clienteInicialId)
       ? clienteInicialId
       : clientes[0]?.id ?? 0,
   );
-  const vehiculosCliente = vehiculos.filter((vehiculo) => vehiculo.clienteId === clienteId);
+  const [vehiculoId, setVehiculoId] = useState(
+    vehiculos.find((vehiculo) =>
+      vehiculo.clienteId === (clienteInicialId ?? clientes[0]?.id))?.id ?? 0,
+  );
+  const [altaVisible, setAltaVisible] = useState<"cliente" | "vehiculo" | null>(null);
+  const [motivo, setMotivo] = useState("");
+  const [dictando, setDictando] = useState(false);
+  const [dictadoCompatible, setDictadoCompatible] = useState<boolean | null>(null);
+  const [mensajeDictado, setMensajeDictado] = useState("");
+  const reconocimientoVoz = useRef<ReconocimientoVoz | null>(null);
+  const vehiculosCliente = useMemo(
+    () => vehiculos.filter((vehiculo) => vehiculo.clienteId === clienteId),
+    [clienteId, vehiculos],
+  );
   const formularioDisponible = clientes.length > 0 && vehiculosCliente.length > 0;
 
+  useEffect(() => {
+    if (!altaVisible) return;
+
+    const desbordamientoAnterior = document.body.style.overflow;
+    const cerrarConEscape = (evento: KeyboardEvent) => {
+      if (evento.key === "Escape") setAltaVisible(null);
+    };
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", cerrarConEscape);
+
+    return () => {
+      document.body.style.overflow = desbordamientoAnterior;
+      window.removeEventListener("keydown", cerrarConEscape);
+    };
+  }, [altaVisible]);
+
+  useEffect(() => {
+    return () => reconocimientoVoz.current?.abort();
+  }, []);
+
+  function alternarDictado() {
+    if (dictando) {
+      reconocimientoVoz.current?.stop();
+      return;
+    }
+
+    const ventanaConReconocimiento = window as typeof window & {
+      SpeechRecognition?: ConstructorReconocimientoVoz;
+      webkitSpeechRecognition?: ConstructorReconocimientoVoz;
+    };
+    const Constructor = ventanaConReconocimiento.SpeechRecognition
+      ?? ventanaConReconocimiento.webkitSpeechRecognition;
+    if (!Constructor) {
+      setDictadoCompatible(false);
+      setMensajeDictado("El dictado por voz no está disponible en este navegador.");
+      return;
+    }
+
+    const reconocimiento = new Constructor();
+    const motivoAntesDeDictar = motivo.trim();
+    let dictadoConError = false;
+    setDictadoCompatible(true);
+    reconocimiento.lang = "es-NI";
+    reconocimiento.continuous = true;
+    reconocimiento.interimResults = true;
+    reconocimiento.onresult = (evento) => {
+      let transcripcion = "";
+      for (let indice = 0; indice < evento.results.length; indice += 1) {
+        transcripcion += evento.results[indice][0].transcript;
+      }
+      setMotivo([motivoAntesDeDictar, transcripcion.trim()].filter(Boolean).join(" "));
+    };
+    reconocimiento.onerror = (evento) => {
+      dictadoConError = true;
+      const mensajes: Record<string, string> = {
+        "not-allowed": "Permite el acceso al micrófono para usar el dictado.",
+        "audio-capture": "No se encontró un micrófono disponible.",
+        network: "No fue posible procesar la voz. Revisa la conexión e inténtalo de nuevo.",
+        "no-speech": "No se detectó voz. Toca el micrófono para volver a intentarlo.",
+      };
+      setMensajeDictado(mensajes[evento.error] ?? "El dictado se interrumpió. Puedes intentarlo de nuevo.");
+    };
+    reconocimiento.onend = () => {
+      setDictando(false);
+      reconocimientoVoz.current = null;
+      if (!dictadoConError) {
+        setMensajeDictado("Dictado finalizado. Revisa o corrige la descripción si es necesario.");
+      }
+    };
+
+    reconocimientoVoz.current = reconocimiento;
+    setMensajeDictado("Escuchando… habla con claridad.");
+    setDictando(true);
+    try {
+      reconocimiento.start();
+    } catch {
+      setDictando(false);
+      reconocimientoVoz.current = null;
+      setMensajeDictado("No fue posible iniciar el dictado. Inténtalo nuevamente.");
+    }
+  }
+
+  async function registrarCliente(evento: FormEvent<HTMLFormElement>) {
+    evento.preventDefault();
+    try {
+      const clienteGuardado = await alRegistrarCliente(new FormData(evento.currentTarget));
+      setClienteId(clienteGuardado.id);
+      setVehiculoId(0);
+      setAltaVisible(null);
+    } catch {
+      // El aviso global conserva el formulario abierto para que el usuario pueda corregirlo.
+    }
+  }
+
+  async function registrarVehiculo(evento: FormEvent<HTMLFormElement>) {
+    evento.preventDefault();
+    try {
+      const vehiculoGuardado = await alRegistrarVehiculo(new FormData(evento.currentTarget));
+      setClienteId(vehiculoGuardado.clienteId);
+      setVehiculoId(vehiculoGuardado.id);
+      setAltaVisible(null);
+    } catch {
+      // El aviso global conserva el formulario abierto para que el usuario pueda corregirlo.
+    }
+  }
+
   return (
-    <form className="formulario" onSubmit={alEnviar}>
-      <div className="paso-formulario"><span>1</span><div><strong>Cliente y vehículo</strong><small>Selecciona a quién vamos a atender</small></div></div>
-      <label>
-        Cliente
-        <select
-          name="clienteId"
-          required
-          value={clienteId || ""}
-          onChange={(evento) => setClienteId(Number(evento.target.value))}
-        >
-          {clientes.length === 0 && <option value="">No hay clientes registrados</option>}
-          {clientes.map((cliente) => <option key={cliente.id} value={cliente.id}>{cliente.nombre}</option>)}
-        </select>
-      </label>
-      <label>
-        Vehículo
-        <select name="vehiculoId" required disabled={!formularioDisponible}>
-          {vehiculosCliente.length === 0 && <option value="">El cliente no tiene vehículos</option>}
-          {vehiculosCliente.map((vehiculo) => (
-            <option key={vehiculo.id} value={vehiculo.id}>{vehiculo.nombre} · {vehiculo.placa}</option>
-          ))}
-        </select>
-      </label>
-      <div className="separador-formulario" />
-      <div className="paso-formulario"><span>2</span><div><strong>Motivo de visita</strong><small>Describe lo que reporta el cliente</small></div></div>
-      <label>Descripción<textarea name="motivo" rows={4} required placeholder="Ej. Se escucha un ruido al frenar..." /></label>
-      <div className="opciones-prioridad"><label><input type="radio" name="prioridad" defaultChecked />Normal</label><label><input type="radio" name="prioridad" />Prioritaria</label></div>
-      <button className="boton-primario boton-ancho" type="submit" disabled={!formularioDisponible || guardando}>
-        {guardando ? <Cargador mensaje="Creando orden…" /> : <><Check size={20} />Crear orden de servicio</>}
-      </button>
-    </form>
+    <div className="flujo-nueva-orden">
+      <form className="formulario formulario-nueva-orden" onSubmit={alEnviar}>
+        <div className="paso-formulario"><span>1</span><div><strong>Cliente y vehículo</strong><small>Selecciona a quién vamos a atender</small></div></div>
+        <div className="campo-con-accion">
+          <label>
+            Cliente
+            <select
+              name="clienteId"
+              required
+              value={clienteId || ""}
+              onChange={(evento) => {
+                const siguienteClienteId = Number(evento.target.value);
+                setClienteId(siguienteClienteId);
+                setVehiculoId(
+                  vehiculos.find((vehiculo) => vehiculo.clienteId === siguienteClienteId)?.id ?? 0,
+                );
+              }}
+            >
+              {clientes.length === 0 && <option value="">No hay clientes registrados</option>}
+              {clientes.map((cliente) => <option key={cliente.id} value={cliente.id}>{cliente.nombre}</option>)}
+            </select>
+          </label>
+          <button
+            className="boton-alta-rapida"
+            type="button"
+            aria-label="Registrar nuevo cliente"
+            aria-haspopup="dialog"
+            onClick={() => setAltaVisible("cliente")}
+          >
+            <Plus size={19} />
+          </button>
+        </div>
+        <div className="campo-con-accion">
+          <label>
+            Vehículo
+            <select
+              name="vehiculoId"
+              required
+              disabled={!formularioDisponible}
+              value={vehiculoId || ""}
+              onChange={(evento) => setVehiculoId(Number(evento.target.value))}
+            >
+              {vehiculosCliente.length === 0 && <option value="">El cliente no tiene vehículos</option>}
+              {vehiculosCliente.map((vehiculo) => (
+                <option key={vehiculo.id} value={vehiculo.id}>{vehiculo.nombre} · {vehiculo.placa}</option>
+              ))}
+            </select>
+          </label>
+          <button
+            className="boton-alta-rapida"
+            type="button"
+            disabled={!clienteId}
+            aria-label="Registrar nuevo vehículo"
+            aria-haspopup="dialog"
+            onClick={() => setAltaVisible("vehiculo")}
+          >
+            <Plus size={19} />
+          </button>
+        </div>
+        <div className="separador-formulario" />
+        <div className="paso-formulario"><span>2</span><div><strong>Motivo de visita</strong><small>Describe lo que reporta el cliente</small></div></div>
+        <div className="campo-descripcion-voz">
+          <label htmlFor="motivo-orden">Descripción</label>
+          <textarea
+            id="motivo-orden"
+            name="motivo"
+            rows={4}
+            required
+            value={motivo}
+            onChange={(evento) => setMotivo(evento.target.value)}
+            placeholder="Ej. Se escucha un ruido al frenar..."
+          />
+          <div className="controles-dictado">
+            <button
+              className={dictando ? "boton-dictado activo" : "boton-dictado"}
+              type="button"
+              onClick={alternarDictado}
+              disabled={dictadoCompatible === false}
+              aria-pressed={dictando}
+              aria-describedby="estado-dictado"
+            >
+              {dictando ? <Square size={17} fill="currentColor" /> : <Mic size={19} />}
+              {dictando ? "Detener dictado" : "Dictar descripción"}
+            </button>
+            <span id="estado-dictado" className={dictando ? "estado-dictado escuchando" : "estado-dictado"} role="status" aria-live="polite">
+              {mensajeDictado || (dictadoCompatible === false
+                ? "Dictado no disponible en este navegador."
+                : "También puedes escribir o corregir el texto.")}
+            </span>
+          </div>
+        </div>
+        <div className="opciones-prioridad"><label><input type="radio" name="prioridad" defaultChecked />Normal</label><label><input type="radio" name="prioridad" />Prioritaria</label></div>
+        <button className="boton-primario boton-ancho" type="submit" disabled={!formularioDisponible || guardando}>
+          {guardando ? <Cargador mensaje="Creando orden…" /> : <><Check size={20} />Crear orden de servicio</>}
+        </button>
+      </form>
+
+      {altaVisible && (
+        <div className="fondo-modal-alta">
+          <button
+            className="cerrador-modal-fondo"
+            type="button"
+            aria-label="Cerrar formulario de registro"
+            onClick={() => setAltaVisible(null)}
+          />
+          <section
+            className="modal-alta"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="titulo-modal-alta"
+          >
+            <div className="cabecera-modal-alta">
+              <div>
+                <span className="sobrelinea">Nueva orden</span>
+                <h2 id="titulo-modal-alta">{altaVisible === "cliente" ? "Nuevo cliente" : "Nuevo vehículo"}</h2>
+                <p>Al guardar quedará seleccionado automáticamente.</p>
+              </div>
+              <button className="boton-icono" type="button" onClick={() => setAltaVisible(null)} aria-label="Cerrar formulario de registro"><X size={20} /></button>
+            </div>
+            <div className="contenido-modal-alta">
+              {altaVisible === "cliente" ? (
+                <FormularioCliente cliente={null} guardando={guardandoCliente} alEnviar={registrarCliente} />
+              ) : (
+                <FormularioVehiculo
+                  key={clienteId}
+                  clientes={clientes}
+                  marcas={marcasVehiculo}
+                  modelos={modelosVehiculo}
+                  clienteInicialId={clienteId}
+                  vehiculo={null}
+                  guardando={guardandoVehiculo}
+                  alEnviar={registrarVehiculo}
+                  alCrearMarca={alCrearMarca}
+                  alCrearModelo={alCrearModelo}
+                />
+              )}
+            </div>
+          </section>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -1735,17 +2167,66 @@ function FormularioCliente({
 
 function FormularioVehiculo({
   clientes,
+  marcas,
+  modelos,
+  clienteInicialId,
   vehiculo,
   guardando,
   alEnviar,
+  alCrearMarca,
+  alCrearModelo,
 }: {
   clientes: ClienteTaller[];
+  marcas: MarcaVehiculoApi[];
+  modelos: ModeloVehiculoApi[];
+  clienteInicialId?: number;
   vehiculo: VehiculoTaller | null;
   guardando: boolean;
   alEnviar: (evento: FormEvent<HTMLFormElement>) => void;
+  alCrearMarca: (nombre: string) => Promise<MarcaVehiculoApi>;
+  alCrearModelo: (marcaVehiculoId: number, nombre: string) => Promise<ModeloVehiculoApi>;
 }) {
-  const formularioDisponible = clientes.length > 0;
+  const marcaInicialId = vehiculo?.marcaVehiculoId ?? marcas.find((marca) => marca.activa)?.id ?? 0;
+  const [marcaVehiculoId, setMarcaVehiculoId] = useState(marcaInicialId);
+  const [modeloVehiculoId, setModeloVehiculoId] = useState(
+    vehiculo?.modeloVehiculoId ??
+      modelos.find((modelo) => modelo.marcaVehiculoId === marcaInicialId && modelo.activo)?.id ??
+      0,
+  );
+  const [nombreNuevaMarca, setNombreNuevaMarca] = useState("");
+  const [nombreNuevoModelo, setNombreNuevoModelo] = useState("");
+  const [guardandoCatalogo, setGuardandoCatalogo] = useState(false);
+  const modelosMarca = modelos.filter(
+    (modelo) => modelo.marcaVehiculoId === marcaVehiculoId &&
+      (modelo.activo || modelo.id === vehiculo?.modeloVehiculoId),
+  );
+  const formularioDisponible = clientes.length > 0 && modeloVehiculoId > 0;
   const anioActual = new Date().getFullYear();
+
+  async function crearMarca() {
+    if (nombreNuevaMarca.trim().length < 2) return;
+    setGuardandoCatalogo(true);
+    try {
+      const marca = await alCrearMarca(nombreNuevaMarca.trim());
+      setMarcaVehiculoId(marca.id);
+      setModeloVehiculoId(0);
+      setNombreNuevaMarca("");
+    } finally {
+      setGuardandoCatalogo(false);
+    }
+  }
+
+  async function crearModelo() {
+    if (!marcaVehiculoId || !nombreNuevoModelo.trim()) return;
+    setGuardandoCatalogo(true);
+    try {
+      const modelo = await alCrearModelo(marcaVehiculoId, nombreNuevoModelo.trim());
+      setModeloVehiculoId(modelo.id);
+      setNombreNuevoModelo("");
+    } finally {
+      setGuardandoCatalogo(false);
+    }
+  }
 
   return (
     <form className="formulario" onSubmit={alEnviar}>
@@ -1755,7 +2236,7 @@ function FormularioVehiculo({
       </div>
       <label>
         Propietario
-        <select name="clienteId" required defaultValue={vehiculo?.clienteId ?? clientes[0]?.id ?? ""} disabled={!formularioDisponible}>
+        <select name="clienteId" required defaultValue={vehiculo?.clienteId ?? clienteInicialId ?? clientes[0]?.id ?? ""} disabled={!formularioDisponible}>
           {!formularioDisponible && <option value="">Primero registra un cliente</option>}
           {clientes.map((cliente) => <option key={cliente.id} value={cliente.id}>{cliente.nombre}</option>)}
         </select>
@@ -1775,12 +2256,44 @@ function FormularioVehiculo({
       </div>
       <label>
         Marca
-        <input name="marca" type="text" required minLength={2} maxLength={80} defaultValue={vehiculo?.marca ?? ""} autoComplete="off" placeholder="Ej. Toyota" />
+        <select
+          required
+          value={marcaVehiculoId || ""}
+          onChange={(evento) => {
+            const marcaId = Number(evento.target.value);
+            setMarcaVehiculoId(marcaId);
+            setModeloVehiculoId(
+              modelos.find((modelo) => modelo.marcaVehiculoId === marcaId && modelo.activo)?.id ?? 0,
+            );
+          }}
+        >
+          <option value="">Selecciona una marca</option>
+          {marcas
+            .filter((marca) => marca.activa || marca.id === vehiculo?.marcaVehiculoId)
+            .map((marca) => <option key={marca.id} value={marca.id}>{marca.nombre}</option>)}
+        </select>
       </label>
+      <details className="alta-catalogo">
+        <summary>Agregar una marca al catálogo</summary>
+        <div className="campo-con-accion">
+          <input aria-label="Nombre de la nueva marca" value={nombreNuevaMarca} onChange={(evento) => setNombreNuevaMarca(evento.target.value)} minLength={2} maxLength={80} placeholder="Ej. Toyota" />
+          <button type="button" className="boton-secundario" disabled={guardandoCatalogo || nombreNuevaMarca.trim().length < 2} onClick={crearMarca}><Plus size={18} />Agregar</button>
+        </div>
+      </details>
       <label>
         Modelo
-        <input name="modelo" type="text" required minLength={1} maxLength={80} defaultValue={vehiculo?.modelo ?? ""} autoComplete="off" placeholder="Ej. Hilux" />
+        <select name="modeloVehiculoId" required value={modeloVehiculoId || ""} onChange={(evento) => setModeloVehiculoId(Number(evento.target.value))} disabled={!marcaVehiculoId}>
+          <option value="">{marcaVehiculoId ? "Selecciona un modelo" : "Primero selecciona una marca"}</option>
+          {modelosMarca.map((modelo) => <option key={modelo.id} value={modelo.id}>{modelo.nombre}</option>)}
+        </select>
       </label>
+      <details className="alta-catalogo">
+        <summary>Agregar un modelo a esta marca</summary>
+        <div className="campo-con-accion">
+          <input aria-label="Nombre del nuevo modelo" value={nombreNuevoModelo} onChange={(evento) => setNombreNuevoModelo(evento.target.value)} maxLength={80} disabled={!marcaVehiculoId} placeholder="Ej. Hilux" />
+          <button type="button" className="boton-secundario" disabled={guardandoCatalogo || !marcaVehiculoId || !nombreNuevoModelo.trim()} onClick={crearModelo}><Plus size={18} />Agregar</button>
+        </div>
+      </details>
       <label>
         Año
         <input name="anio" type="number" required min={1900} max={2100} defaultValue={vehiculo?.anio ?? anioActual} inputMode="numeric" />
@@ -1848,13 +2361,27 @@ function FormularioRecepcion({
 }: {
   orden: OrdenTaller;
   inspeccionInicial?: InspeccionVisual;
-  alEnviar: (evento: FormEvent<HTMLFormElement>) => void;
+  alEnviar: (evento: FormEvent<HTMLFormElement>) => Promise<void>;
 }) {
   const [tipoDanio, setTipoDanio] = useState<TipoDanio>("Rayón");
   const [severidad, setSeveridad] = useState<SeveridadDanio>("Leve");
   const [danios, setDanios] = useState<DanioVisual[]>(inspeccionInicial?.danios || []);
   const [danioEditandoId, setDanioEditandoId] = useState<string | null>(null);
   const [cantidadFotos, setCantidadFotos] = useState(0);
+  const [fotografias, setFotografias] = useState<File[]>([]);
+  const [errorFotos, setErrorFotos] = useState("");
+  const [guardando, setGuardando] = useState(false);
+  const vistasPrevias = useMemo(
+    () => fotografias.map((fotografia) => ({
+      nombre: fotografia.name,
+      direccion: URL.createObjectURL(fotografia),
+    })),
+    [fotografias],
+  );
+  useEffect(
+    () => () => vistasPrevias.forEach((vista) => URL.revokeObjectURL(vista.direccion)),
+    [vistasPrevias],
+  );
   const danioEditando = danios.find((danio) => danio.id === danioEditandoId);
 
   function marcarZona(zona: ZonaVehiculo) {
@@ -1882,7 +2409,19 @@ function FormularioRecepcion({
   }
 
   return (
-    <form className="formulario formulario-recepcion-pagina" onSubmit={alEnviar}>
+    <form
+      className="formulario formulario-recepcion-pagina"
+      aria-busy={guardando}
+      onSubmit={async (evento) => {
+        if (guardando) return;
+        setGuardando(true);
+        try {
+          await alEnviar(evento);
+        } finally {
+          setGuardando(false);
+        }
+      }}
+    >
       <div className="resumen-recepcion"><span className="icono-auto-grande"><CarFront size={28} /></span><div><strong>{orden.vehiculo}</strong><small>{orden.placa} · {orden.cliente}</small></div></div>
       <div className="fila-formulario"><label>Kilometraje<input type="number" name="kilometraje" min="0" placeholder="85,240" defaultValue={inspeccionInicial?.kilometraje || ""} required /></label><label><span className="etiqueta-con-icono"><Fuel size={17} />Combustible</span><select name="combustible" defaultValue={String(inspeccionInicial?.porcentajeCombustible || 50)}><option value="25">¼ de tanque</option><option value="50">½ tanque</option><option value="75">¾ de tanque</option><option value="100">Tanque lleno</option></select></label></div>
       <section className="inspeccion-visual">
@@ -2029,13 +2568,29 @@ function FormularioRecepcion({
 
       <input type="hidden" name="danios" value={JSON.stringify(danios)} />
       <label>Observaciones generales<textarea name="estado" rows={4} required defaultValue={inspeccionInicial?.descripcionEstado || ""} placeholder="Describe el estado interior, accesorios o cualquier detalle adicional..." /></label>
+      <div className="bloque-carga-fotos">
       <label className="zona-fotos">
         <input
           type="file"
-          accept="image/*"
+          name="fotografias"
+          accept="image/jpeg,image/png,image/webp"
           capture="environment"
           multiple
-          onChange={(evento) => setCantidadFotos(evento.target.files?.length || 0)}
+          onChange={(evento) => {
+            const seleccionadas = Array.from(evento.target.files || []);
+            const disponibles = 12 - (inspeccionInicial?.evidencias.length || 0);
+            if (seleccionadas.length > disponibles) {
+              evento.target.value = "";
+              setFotografias([]);
+              setCantidadFotos(0);
+              setErrorFotos(`Puede agregar ${disponibles} fotografías más a esta inspección.`);
+              return;
+            }
+
+            setErrorFotos("");
+            setFotografias(seleccionadas);
+            setCantidadFotos(seleccionadas.length);
+          }}
         />
         {cantidadFotos > 0 ? <ImagePlus size={25} /> : <Camera size={25} />}
         <span>
@@ -2044,8 +2599,39 @@ function FormularioRecepcion({
         </span>
         <Plus size={20} />
       </label>
+      {errorFotos && <p className="error-fotografias" role="alert">{errorFotos}</p>}
+      {(inspeccionInicial?.evidencias.length || vistasPrevias.length > 0) && (
+        <div className="galeria-evidencias galeria-edicion">
+          {inspeccionInicial?.evidencias.map((evidencia) => (
+            <figure key={evidencia.id}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={direccionEvidencia(orden.id, evidencia.id)}
+                alt={`Evidencia ${evidencia.nombreArchivo}`}
+                loading="lazy"
+              />
+              <figcaption>Guardada</figcaption>
+            </figure>
+          ))}
+          {vistasPrevias.map((vista) => (
+            <figure key={vista.direccion}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={vista.direccion} alt={`Vista previa ${vista.nombre}`} />
+              <figcaption>Por guardar</figcaption>
+            </figure>
+          ))}
+        </div>
+      )}
+      </div>
       <div className="lista-comprobacion"><label><input type="checkbox" name="dejaLlaves" defaultChecked={inspeccionInicial?.dejaLlaves} />Deja llaves</label><label><input type="checkbox" name="dejaDocumentos" defaultChecked={inspeccionInicial?.dejaDocumentos} />Deja documentos</label><label><input type="checkbox" name="aceptaPruebaRuta" />Acepta prueba de ruta</label></div>
-      <button className="boton-primario boton-ancho" type="submit"><Sparkles size={20} />{inspeccionInicial ? "Guardar cambios de inspección" : "Guardar y pasar a diagnóstico"}</button>
+      <button className="boton-primario boton-ancho" type="submit" disabled={guardando}>
+        <Sparkles size={20} />
+        {guardando
+          ? "Guardando inspección..."
+          : inspeccionInicial
+            ? "Guardar cambios de inspección"
+            : "Guardar y pasar a diagnóstico"}
+      </button>
     </form>
   );
 }
@@ -2121,6 +2707,32 @@ function ResumenInspeccion({
         </div>
       )}
       <MapaInspeccion danios={danios} compacto />
+      {inspeccion && inspeccion.evidencias.length > 0 && (
+        <div className="bloque-evidencias">
+          <div>
+            <span className="sobrelinea">Evidencia fotográfica</span>
+            <strong>{inspeccion.evidencias.length} fotografías</strong>
+          </div>
+          <div className="galeria-evidencias">
+            {inspeccion.evidencias.map((evidencia) => (
+              <a
+                key={evidencia.id}
+                href={direccionEvidencia(orden.id, evidencia.id)}
+                target="_blank"
+                rel="noreferrer"
+                aria-label={`Abrir ${evidencia.nombreArchivo}`}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={direccionEvidencia(orden.id, evidencia.id)}
+                  alt={`Evidencia de inspección ${evidencia.nombreArchivo}`}
+                  loading="lazy"
+                />
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
       {danios.length > 0 && (
         <div className="leyenda-inspeccion">
           {danios.map((danio, indice) => (
@@ -2263,11 +2875,15 @@ async function cargarDatosApi(senal: AbortSignal): Promise<{
   ordenes: OrdenTaller[];
   clientes: ClienteTaller[];
   vehiculos: VehiculoTaller[];
+  marcasVehiculo: MarcaVehiculoApi[];
+  modelosVehiculo: ModeloVehiculoApi[];
 }> {
-  const [ordenes, clientesApi, vehiculosApi] = await Promise.all([
+  const [ordenes, clientesApi, vehiculosApi, marcasVehiculo, modelosVehiculo] = await Promise.all([
     cargarOrdenesApi(senal),
     cargarClientesApi(senal),
     cargarVehiculosApi(senal),
+    cargarMarcasVehiculoApi(senal),
+    cargarModelosVehiculoApi(senal),
   ]);
 
   const clientes = clientesApi.map((cliente) =>
@@ -2282,7 +2898,7 @@ async function cargarDatosApi(senal: AbortSignal): Promise<{
   );
   const vehiculos = vehiculosApi.map(convertirVehiculoTaller);
 
-  return { ordenes, clientes, vehiculos };
+  return { ordenes, clientes, vehiculos, marcasVehiculo, modelosVehiculo };
 }
 
 async function cargarOrdenesApi(senal: AbortSignal): Promise<OrdenTaller[]> {
@@ -2342,8 +2958,7 @@ async function guardarVehiculoApi(
   solicitud: {
     clienteId: number;
     placa: string;
-    marca: string;
-    modelo: string;
+    modeloVehiculoId: number;
     anio: number;
     color: string | null;
     numeroVin: string | null;
@@ -2366,6 +2981,53 @@ async function guardarVehiculoApi(
     throw new Error(await obtenerMensajeErrorApi(respuesta, "No fue posible guardar el vehículo."));
   }
   return (await respuesta.json()) as VehiculoApi;
+}
+
+async function cargarMarcasVehiculoApi(senal: AbortSignal): Promise<MarcaVehiculoApi[]> {
+  const respuesta = await fetch(
+    `${obtenerDireccionApi()}/api/catalogos-vehiculos/marcas?incluirInactivas=true`,
+    { credentials: "include", signal: senal },
+  );
+  if (!respuesta.ok) throw new Error("No fue posible consultar el catálogo de marcas.");
+  return (await respuesta.json()) as MarcaVehiculoApi[];
+}
+
+async function cargarModelosVehiculoApi(senal: AbortSignal): Promise<ModeloVehiculoApi[]> {
+  const respuesta = await fetch(
+    `${obtenerDireccionApi()}/api/catalogos-vehiculos/modelos?incluirInactivos=true`,
+    { credentials: "include", signal: senal },
+  );
+  if (!respuesta.ok) throw new Error("No fue posible consultar el catálogo de modelos.");
+  return (await respuesta.json()) as ModeloVehiculoApi[];
+}
+
+async function guardarMarcaVehiculoApi(nombre: string): Promise<MarcaVehiculoApi> {
+  const respuesta = await fetch(`${obtenerDireccionApi()}/api/catalogos-vehiculos/marcas`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ nombre, activa: true }),
+  });
+  if (!respuesta.ok) {
+    throw new Error(await obtenerMensajeErrorApi(respuesta, "No fue posible guardar la marca."));
+  }
+  return (await respuesta.json()) as MarcaVehiculoApi;
+}
+
+async function guardarModeloVehiculoApi(
+  marcaVehiculoId: number,
+  nombre: string,
+): Promise<ModeloVehiculoApi> {
+  const respuesta = await fetch(`${obtenerDireccionApi()}/api/catalogos-vehiculos/modelos`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ marcaVehiculoId, nombre, activo: true }),
+  });
+  if (!respuesta.ok) {
+    throw new Error(await obtenerMensajeErrorApi(respuesta, "No fue posible guardar el modelo."));
+  }
+  return (await respuesta.json()) as ModeloVehiculoApi;
 }
 
 async function crearOrdenApi(solicitud: {
@@ -2440,7 +3102,9 @@ function convertirVehiculoTaller(vehiculo: VehiculoApi): VehiculoTaller {
     id: vehiculo.id,
     clienteId: vehiculo.clienteId,
     placa: vehiculo.placa,
+    marcaVehiculoId: vehiculo.marcaVehiculoId,
     marca: vehiculo.marca,
+    modeloVehiculoId: vehiculo.modeloVehiculoId,
     modelo: vehiculo.modelo,
     anio: vehiculo.anio,
     color: vehiculo.color,
@@ -2475,7 +3139,8 @@ async function guardarRecepcionApi(
   ordenServicioId: number,
   inspeccion: InspeccionVisual,
   esActualizacion: boolean,
-) {
+  fotografias: File[],
+): Promise<{ inspeccion: InspeccionVisual; advertencia?: string }> {
   const direccionApi = obtenerDireccionApi();
 
   const respuesta = await fetch(
@@ -2502,7 +3167,42 @@ async function guardarRecepcionApi(
     },
   );
 
-  if (!respuesta.ok) throw new Error("No fue posible registrar la recepción.");
+  if (!respuesta.ok) {
+    throw new Error(await obtenerMensajeErrorApi(respuesta, "No fue posible registrar la recepción."));
+  }
+
+  const recepcion = (await respuesta.json()) as RecepcionVehiculoApi;
+  const inspeccionGuardada = convertirRecepcionApi(recepcion, ordenServicioId);
+  if (fotografias.length === 0) return { inspeccion: inspeccionGuardada };
+
+  const formulario = new FormData();
+  fotografias.forEach((fotografia) => formulario.append("fotografias", fotografia));
+  const respuestaEvidencias = await fetch(
+    `${direccionApi}/api/ordenes-servicio/${ordenServicioId}/recepcion/evidencias`,
+    {
+      method: "POST",
+      credentials: "include",
+      body: formulario,
+    },
+  );
+  if (!respuestaEvidencias.ok) {
+    const motivo = await obtenerMensajeErrorApi(
+      respuestaEvidencias,
+      "las fotografías no pudieron cargarse",
+    );
+    return {
+      inspeccion: inspeccionGuardada,
+      advertencia: `La inspección se guardó, pero ${motivo.toLocaleLowerCase("es")}. Puede volver a editarla para reintentar.`,
+    };
+  }
+
+  const evidencias = (await respuestaEvidencias.json()) as EvidenciaInspeccion[];
+  return {
+    inspeccion: {
+      ...inspeccionGuardada,
+      evidencias: [...inspeccionGuardada.evidencias, ...evidencias],
+    },
+  };
 }
 
 async function cargarInspeccionApi(
@@ -2521,6 +3221,13 @@ async function cargarInspeccionApi(
   if (!respuesta.ok) throw new Error("No fue posible consultar la inspección.");
 
   const recepcion = (await respuesta.json()) as RecepcionVehiculoApi;
+  return convertirRecepcionApi(recepcion, ordenServicioId);
+}
+
+function convertirRecepcionApi(
+  recepcion: RecepcionVehiculoApi,
+  ordenServicioId: number,
+): InspeccionVisual {
   return {
     kilometraje: recepcion.kilometraje,
     porcentajeCombustible: recepcion.porcentajeCombustible,
@@ -2534,7 +3241,12 @@ async function cargarInspeccionApi(
       severidad: danio.severidad as SeveridadDanio,
       observacion: danio.observacion || "",
     })),
+    evidencias: recepcion.evidencias || [],
   };
+}
+
+function direccionEvidencia(ordenServicioId: number, evidenciaId: number) {
+  return `${obtenerDireccionApi()}/api/ordenes-servicio/${ordenServicioId}/recepcion/evidencias/${evidenciaId}/contenido`;
 }
 
 function zonaParaApi(zona: ZonaVehiculo) {

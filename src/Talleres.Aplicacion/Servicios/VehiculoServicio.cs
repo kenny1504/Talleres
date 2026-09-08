@@ -35,13 +35,17 @@ public sealed class VehiculoServicio(
                 "Ya existe un vehículo con la placa indicada.");
         }
 
+        var modelo = await ObtenerModeloActivoAsync(
+            solicitud.ModeloVehiculoId,
+            null,
+            cancellationToken);
+
         var vehiculo = new Vehiculo
         {
             EmpresaId = empresaId,
             ClienteId = cliente.Id,
             Placa = placa,
-            Marca = solicitud.Marca.Trim(),
-            Modelo = solicitud.Modelo.Trim(),
+            ModeloVehiculoId = modelo.Id,
             Anio = solicitud.Anio,
             Color = LimpiarOpcional(solicitud.Color),
             NumeroVin = LimpiarOpcional(solicitud.NumeroVin)?.ToUpperInvariant(),
@@ -51,7 +55,7 @@ public sealed class VehiculoServicio(
         dbContext.Vehiculos.Add(vehiculo);
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        return ConvertirDto(vehiculo, cliente.Nombre);
+        return ConvertirDto(vehiculo, cliente.Nombre, modelo);
     }
 
     public async Task<VehiculoDto> ActualizarAsync(
@@ -82,17 +86,21 @@ public sealed class VehiculoServicio(
                 "Ya existe otro vehículo con la placa indicada.");
         }
 
+        var modelo = await ObtenerModeloActivoAsync(
+            solicitud.ModeloVehiculoId,
+            vehiculo.ModeloVehiculoId,
+            cancellationToken);
+
         vehiculo.ClienteId = cliente.Id;
         vehiculo.Placa = placa;
-        vehiculo.Marca = solicitud.Marca.Trim();
-        vehiculo.Modelo = solicitud.Modelo.Trim();
+        vehiculo.ModeloVehiculoId = modelo.Id;
         vehiculo.Anio = solicitud.Anio;
         vehiculo.Color = LimpiarOpcional(solicitud.Color);
         vehiculo.NumeroVin = LimpiarOpcional(solicitud.NumeroVin)?.ToUpperInvariant();
         vehiculo.Activo = solicitud.Activo;
 
         await dbContext.SaveChangesAsync(cancellationToken);
-        return ConvertirDto(vehiculo, cliente.Nombre);
+        return ConvertirDto(vehiculo, cliente.Nombre, modelo);
     }
 
     public async Task<VehiculoDto> ObtenerPorIdAsync(
@@ -142,26 +150,48 @@ public sealed class VehiculoServicio(
             vehiculo.ClienteId,
             vehiculo.Cliente.Nombre,
             vehiculo.Placa,
-            vehiculo.Marca,
-            vehiculo.Modelo,
+            vehiculo.Modelo.MarcaVehiculoId,
+            vehiculo.Modelo.Marca.Nombre,
+            vehiculo.ModeloVehiculoId,
+            vehiculo.Modelo.Nombre,
             vehiculo.Anio,
             vehiculo.Color,
             vehiculo.NumeroVin,
             vehiculo.Activo,
             vehiculo.FechaCreacion));
 
-    private static VehiculoDto ConvertirDto(Vehiculo vehiculo, string nombreCliente) => new(
+    private static VehiculoDto ConvertirDto(
+        Vehiculo vehiculo,
+        string nombreCliente,
+        ModeloVehiculo modelo) => new(
         vehiculo.Id,
         vehiculo.ClienteId,
         nombreCliente,
         vehiculo.Placa,
-        vehiculo.Marca,
-        vehiculo.Modelo,
+        modelo.MarcaVehiculoId,
+        modelo.Marca.Nombre,
+        modelo.Id,
+        modelo.Nombre,
         vehiculo.Anio,
         vehiculo.Color,
         vehiculo.NumeroVin,
         vehiculo.Activo,
         vehiculo.FechaCreacion);
+
+    private async Task<ModeloVehiculo> ObtenerModeloActivoAsync(
+        long modeloVehiculoId,
+        long? modeloActualId,
+        CancellationToken cancellationToken) =>
+        await dbContext.ModelosVehiculo
+            .AsNoTracking()
+            .Include(modelo => modelo.Marca)
+            .SingleOrDefaultAsync(
+                modelo => modelo.Id == modeloVehiculoId &&
+                          ((modelo.Activo && modelo.Marca.Activa) ||
+                           modelo.Id == modeloActualId),
+                cancellationToken)
+        ?? throw new RecursoNoEncontradoException(
+            "El modelo indicado no existe, está inactivo o su marca está inactiva.");
 
     private static string Normalizar(string valor) => valor.Trim().ToUpperInvariant();
 

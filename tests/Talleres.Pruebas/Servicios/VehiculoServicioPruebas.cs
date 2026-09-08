@@ -21,11 +21,12 @@ public sealed class VehiculoServicioPruebas
 
         await using (var contextoUno = CrearDbContext(empresaUno, nombreBaseDatos, raiz))
         {
+            var modeloId = await CrearCatalogoAsync(contextoUno, empresaUno.EmpresaId);
             var cliente = await new ClienteServicio(contextoUno, empresaUno).CrearAsync(
                 CrearCliente("DOC-EMPRESA-UNO"),
                 CancellationToken.None);
             await new VehiculoServicio(contextoUno, empresaUno).CrearAsync(
-                CrearVehiculo(cliente.Id, "M 100-001"),
+                CrearVehiculo(cliente.Id, modeloId, "M 100-001"),
                 CancellationToken.None);
         }
 
@@ -46,6 +47,7 @@ public sealed class VehiculoServicioPruebas
             new InMemoryDatabaseRoot());
         var clienteServicio = new ClienteServicio(contexto, empresa);
         var vehiculoServicio = new VehiculoServicio(contexto, empresa);
+        var modeloToyotaId = await CrearCatalogoAsync(contexto, empresa.EmpresaId);
         var propietarioOriginal = await clienteServicio.CrearAsync(
             CrearCliente("PROPIETARIO-ORIGINAL"),
             CancellationToken.None);
@@ -53,8 +55,13 @@ public sealed class VehiculoServicioPruebas
             CrearCliente("NUEVO-PROPIETARIO"),
             CancellationToken.None);
         var vehiculo = await vehiculoServicio.CrearAsync(
-            CrearVehiculo(propietarioOriginal.Id, "M 100-001"),
+            CrearVehiculo(propietarioOriginal.Id, modeloToyotaId, "M 100-001"),
             CancellationToken.None);
+        var modeloHondaId = await CrearCatalogoAsync(
+            contexto,
+            empresa.EmpresaId,
+            "Honda",
+            "Civic");
 
         var actualizado = await vehiculoServicio.ActualizarAsync(
             vehiculo.Id,
@@ -62,8 +69,7 @@ public sealed class VehiculoServicioPruebas
             {
                 ClienteId = nuevoPropietario.Id,
                 Placa = " m 200-002 ",
-                Marca = " Honda ",
-                Modelo = " Civic ",
+                ModeloVehiculoId = modeloHondaId,
                 Anio = 2025,
                 Color = " Azul ",
                 NumeroVin = " vin-actualizado ",
@@ -92,11 +98,12 @@ public sealed class VehiculoServicioPruebas
 
         await using (var contextoUno = CrearDbContext(empresaUno, nombreBaseDatos, raiz))
         {
+            var modeloId = await CrearCatalogoAsync(contextoUno, empresaUno.EmpresaId);
             var cliente = await new ClienteServicio(contextoUno, empresaUno).CrearAsync(
                 CrearCliente("CLIENTE-EMPRESA-UNO"),
                 CancellationToken.None);
             var vehiculo = await new VehiculoServicio(contextoUno, empresaUno).CrearAsync(
-                CrearVehiculo(cliente.Id, "M 300-003"),
+                CrearVehiculo(cliente.Id, modeloId, "M 300-003"),
                 CancellationToken.None);
             vehiculoEmpresaUnoId = vehiculo.Id;
         }
@@ -106,6 +113,7 @@ public sealed class VehiculoServicioPruebas
             CrearCliente("CLIENTE-EMPRESA-DOS"),
             CancellationToken.None);
         var servicioEmpresaDos = new VehiculoServicio(contextoDos, empresaDos);
+        var modeloEmpresaDosId = await CrearCatalogoAsync(contextoDos, empresaDos.EmpresaId);
 
         await Assert.ThrowsAsync<RecursoNoEncontradoException>(() =>
             servicioEmpresaDos.ActualizarAsync(
@@ -114,8 +122,7 @@ public sealed class VehiculoServicioPruebas
                 {
                     ClienteId = clienteEmpresaDos.Id,
                     Placa = "M 999-999",
-                    Marca = "Toyota",
-                    Modelo = "Corolla",
+                    ModeloVehiculoId = modeloEmpresaDosId,
                     Anio = 2024,
                     Activo = true
                 },
@@ -129,14 +136,40 @@ public sealed class VehiculoServicioPruebas
         Telefono = "8888-0000"
     };
 
-    private static CrearVehiculoSolicitud CrearVehiculo(long clienteId, string placa) => new()
+    private static CrearVehiculoSolicitud CrearVehiculo(
+        long clienteId,
+        long modeloVehiculoId,
+        string placa) => new()
     {
         ClienteId = clienteId,
         Placa = placa,
-        Marca = "Toyota",
-        Modelo = "Corolla",
+        ModeloVehiculoId = modeloVehiculoId,
         Anio = 2024
     };
+
+    private static async Task<long> CrearCatalogoAsync(
+        TallerDbContext contexto,
+        long empresaId,
+        string marcaNombre = "Toyota",
+        string modeloNombre = "Corolla")
+    {
+        var marca = new Talleres.Dominio.Entidades.MarcaVehiculo
+        {
+            EmpresaId = empresaId,
+            Nombre = marcaNombre,
+            FechaCreacion = DateTime.UtcNow
+        };
+        var modelo = new Talleres.Dominio.Entidades.ModeloVehiculo
+        {
+            EmpresaId = empresaId,
+            Marca = marca,
+            Nombre = modeloNombre,
+            FechaCreacion = DateTime.UtcNow
+        };
+        contexto.ModelosVehiculo.Add(modelo);
+        await contexto.SaveChangesAsync();
+        return modelo.Id;
+    }
 
     private static TallerDbContext CrearDbContext(
         ContextoEmpresaPrueba contextoEmpresa,

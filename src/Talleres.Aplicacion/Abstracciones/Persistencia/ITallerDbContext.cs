@@ -12,11 +12,17 @@ public interface ITallerDbContext
 
     DbSet<Vehiculo> Vehiculos { get; }
 
+    DbSet<MarcaVehiculo> MarcasVehiculo { get; }
+
+    DbSet<ModeloVehiculo> ModelosVehiculo { get; }
+
     DbSet<OrdenServicio> OrdenesServicio { get; }
 
     DbSet<RecepcionVehiculo> RecepcionesVehiculo { get; }
 
     DbSet<DanioVehiculo> DaniosVehiculo { get; }
+
+    DbSet<EvidenciaInspeccion> EvidenciasInspeccion { get; }
 
     DbSet<HistorialOrdenServicio> HistorialOrdenesServicio { get; }
 
