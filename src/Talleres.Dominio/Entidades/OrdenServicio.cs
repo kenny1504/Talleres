@@ -23,6 +23,14 @@ public sealed class OrdenServicio : IEntidadEmpresa
 
     public string? Observaciones { get; set; }
 
+    public string? Diagnostico { get; set; }
+
+    public DateTime? FechaDiagnosticoUtc { get; set; }
+
+    public string? TokenPublico { get; set; }
+
+    public DateTime? FechaAutorizacionClienteUtc { get; set; }
+
     public Cliente Cliente { get; set; } = null!;
 
     public Vehiculo Vehiculo { get; set; } = null!;
@@ -30,4 +38,8 @@ public sealed class OrdenServicio : IEntidadEmpresa
     public RecepcionVehiculo? Recepcion { get; set; }
 
     public ICollection<HistorialOrdenServicio> Historial { get; } = [];
+
+    public ICollection<DetalleOrdenServicio> Detalles { get; } = [];
+
+    public ICollection<EvidenciaDiagnostico> EvidenciasDiagnostico { get; } = [];
 }

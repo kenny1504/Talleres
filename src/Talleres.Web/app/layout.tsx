@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { ProveedorCargadorPantalla } from "./componentes/ProveedorCargadorPantalla";
 
 export const metadata: Metadata = {
   title: "Taller Uno | Operación del taller",
@@ -24,7 +25,7 @@ export const metadata: Metadata = {
 export default function DisposicionRaiz({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="es">
-      <body>{children}</body>
+      <body><ProveedorCargadorPantalla>{children}</ProveedorCargadorPantalla></body>
     </html>
   );
 }

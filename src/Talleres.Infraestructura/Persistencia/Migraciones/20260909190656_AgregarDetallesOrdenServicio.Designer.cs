@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Talleres.Infraestructura.Persistencia;
 
@@ -11,9 +12,11 @@ using Talleres.Infraestructura.Persistencia;
 namespace Talleres.Infraestructura.Persistencia.Migraciones
 {
     [DbContext(typeof(TallerDbContext))]
-    partial class TallerDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260909190656_AgregarDetallesOrdenServicio")]
+    partial class AgregarDetallesOrdenServicio
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -172,54 +175,6 @@ namespace Talleres.Infraestructura.Persistencia.Migraciones
                     b.HasIndex("EmpresaId", "SalidaInventarioId");
 
                     b.ToTable("DetallesOrdenesServicio", (string)null);
-                });
-
-            modelBuilder.Entity("Talleres.Dominio.Entidades.EvidenciaDiagnostico", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
-
-                    b.Property<string>("ClaveObjeto")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.Property<long>("EmpresaId")
-                        .HasColumnType("bigint");
-
-                    b.Property<DateTime>("FechaCargaUtc")
-                        .HasPrecision(0)
-                        .HasColumnType("datetime2(0)");
-
-                    b.Property<long>("Longitud")
-                        .HasColumnType("bigint");
-
-                    b.Property<string>("NombreArchivo")
-                        .IsRequired()
-                        .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
-
-                    b.Property<long>("OrdenServicioId")
-                        .HasColumnType("bigint");
-
-                    b.Property<string>("TipoContenido")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ClaveObjeto")
-                        .IsUnique();
-
-                    b.HasIndex("OrdenServicioId");
-
-                    b.HasIndex("EmpresaId", "OrdenServicioId");
-
-                    b.ToTable("EvidenciasDiagnostico", (string)null);
                 });
 
             modelBuilder.Entity("Talleres.Dominio.Entidades.EvidenciaInspeccion", b =>
@@ -384,23 +339,11 @@ namespace Talleres.Infraestructura.Persistencia.Migraciones
                     b.Property<long>("ClienteId")
                         .HasColumnType("bigint");
 
-                    b.Property<string>("Diagnostico")
-                        .HasMaxLength(4000)
-                        .HasColumnType("nvarchar(4000)");
-
                     b.Property<long>("EmpresaId")
                         .HasColumnType("bigint");
 
                     b.Property<int>("Estado")
                         .HasColumnType("int");
-
-                    b.Property<DateTime?>("FechaAutorizacionClienteUtc")
-                        .HasPrecision(0)
-                        .HasColumnType("datetime2(0)");
-
-                    b.Property<DateTime?>("FechaDiagnosticoUtc")
-                        .HasPrecision(0)
-                        .HasColumnType("datetime2(0)");
 
                     b.Property<DateTime>("FechaIngreso")
                         .HasPrecision(0)
@@ -415,20 +358,12 @@ namespace Talleres.Infraestructura.Persistencia.Migraciones
                         .HasMaxLength(1000)
                         .HasColumnType("nvarchar(1000)");
 
-                    b.Property<string>("TokenPublico")
-                        .HasMaxLength(64)
-                        .HasColumnType("nvarchar(64)");
-
                     b.Property<long>("VehiculoId")
                         .HasColumnType("bigint");
 
                     b.HasKey("Id");
 
                     b.HasIndex("ClienteId");
-
-                    b.HasIndex("TokenPublico")
-                        .IsUnique()
-                        .HasFilter("[TokenPublico] IS NOT NULL");
 
                     b.HasIndex("VehiculoId");
 
@@ -595,17 +530,6 @@ namespace Talleres.Infraestructura.Persistencia.Migraciones
                     b.Navigation("OrdenServicio");
                 });
 
-            modelBuilder.Entity("Talleres.Dominio.Entidades.EvidenciaDiagnostico", b =>
-                {
-                    b.HasOne("Talleres.Dominio.Entidades.OrdenServicio", "OrdenServicio")
-                        .WithMany("EvidenciasDiagnostico")
-                        .HasForeignKey("OrdenServicioId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("OrdenServicio");
-                });
-
             modelBuilder.Entity("Talleres.Dominio.Entidades.EvidenciaInspeccion", b =>
                 {
                     b.HasOne("Talleres.Dominio.Entidades.RecepcionVehiculo", "RecepcionVehiculo")
@@ -710,8 +634,6 @@ namespace Talleres.Infraestructura.Persistencia.Migraciones
             modelBuilder.Entity("Talleres.Dominio.Entidades.OrdenServicio", b =>
                 {
                     b.Navigation("Detalles");
-
-                    b.Navigation("EvidenciasDiagnostico");
 
                     b.Navigation("Historial");
 

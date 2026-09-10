@@ -1,7 +1,11 @@
 "use client";
 
-import type { FormEvent, ReactNode } from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import type { FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  CargadorPantalla,
+  useCargadorPantalla,
+} from "./componentes/ProveedorCargadorPantalla";
 import {
   ArrowLeft,
   Bell,
@@ -15,6 +19,7 @@ import {
   ClipboardCheck,
   ClipboardList,
   Clock3,
+  Copy,
   Fuel,
   LayoutDashboard,
   LogOut,
@@ -26,6 +31,7 @@ import {
   Plus,
   RotateCcw,
   Search,
+  Share2,
   Settings2,
   Square,
   Sparkles,
@@ -148,6 +154,42 @@ interface OrdenServicioApi {
   observaciones: string | null;
 }
 
+interface DetalleOrdenServicioApi {
+  id: number;
+  tipo: "Inventario" | "Manual";
+  productoInventarioId: number | null;
+  bodegaInventarioId: number | null;
+  codigoProducto: string | null;
+  descripcion: string;
+  unidadMedida: string | null;
+  cantidad: number;
+  precioUnitario: number;
+  subtotal: number;
+  existenciaDescontada: boolean;
+  fechaCreacion: string;
+}
+
+interface ResumenDetallesOrdenServicioApi {
+  detalles: DetalleOrdenServicioApi[];
+  total: number;
+}
+
+interface EvidenciaDiagnosticoApi {
+  id: number;
+  nombreArchivo: string;
+  tipoContenido: string;
+  longitud: number;
+  fechaCargaUtc: string;
+}
+
+interface DiagnosticoOrdenServicioApi {
+  diagnostico: string | null;
+  fechaDiagnosticoUtc: string | null;
+  tokenPublico: string | null;
+  fechaAutorizacionClienteUtc: string | null;
+  evidencias: EvidenciaDiagnosticoApi[];
+}
+
 interface ClienteApi {
   id: number;
   nombre: string;
@@ -261,7 +303,7 @@ interface TallerSesionApi {
   horaCierre: string;
 }
 interface BodegaInventarioApi { id: number; nombre: string; esPrincipal: boolean; }
-interface ArticuloInventarioApi { productoId: number; codigo: string; nombre: string; unidadMedida: string; existencia: number; costoUnitario?: number; }
+interface ArticuloInventarioApi { productoId: number; codigo: string; nombre: string; unidadMedida: string; existencia: number; precioUnitario?: number; }
 
 interface SesionTallerApi {
   usuarioId: string;
@@ -299,6 +341,7 @@ const zonasVehiculo: Array<{ id: ZonaVehiculo; etiqueta: string }> = [
 ];
 
 export default function PaginaPrincipal() {
+  const { iniciarCargaPantalla, finalizarCargaPantalla, ejecutarConCargadorPantalla } = useCargadorPantalla();
   const [sesion, setSesion] = useState<SesionTallerApi | null>();
   const [cargandoSesion, setCargandoSesion] = useState(true);
   const [cambiandoTaller, setCambiandoTaller] = useState(false);
@@ -347,6 +390,7 @@ export default function PaginaPrincipal() {
       return;
     }
     const controlador = new AbortController();
+    const cargaId = iniciarCargaPantalla("Consultando datos del taller…");
     cargarDatosApi(controlador.signal)
       .then((datos) => {
         setOrdenes(datos.ordenes);
@@ -366,14 +410,16 @@ export default function PaginaPrincipal() {
         setErrorDatos("No fue posible comunicarse con la API configurada.");
       })
       .finally(() => {
+        finalizarCargaPantalla(cargaId);
         if (!controlador.signal.aborted) setCargandoDatos(false);
       });
     return () => controlador.abort();
-  }, [sesion]);
+  }, [finalizarCargaPantalla, iniciarCargaPantalla, sesion]);
 
   useEffect(() => {
     if (!ordenDetalle || ordenDetalle.estado === "Recepción") return;
     const controlador = new AbortController();
+    const cargaId = iniciarCargaPantalla("Consultando la inspección de la orden…");
     cargarInspeccionApi(ordenDetalle.id, controlador.signal)
       .then((inspeccion) => {
         if (inspeccion) {
@@ -382,9 +428,10 @@ export default function PaginaPrincipal() {
       })
       .catch(() => {
         mostrarAviso("No fue posible consultar la inspección en la API");
-      });
+      })
+      .finally(() => finalizarCargaPantalla(cargaId));
     return () => controlador.abort();
-  }, [ordenDetalle]);
+  }, [finalizarCargaPantalla, iniciarCargaPantalla, ordenDetalle]);
 
   useEffect(() => {
     if (procesoActivo) window.scrollTo({ top: 0, behavior: "smooth" });
@@ -510,11 +557,14 @@ export default function PaginaPrincipal() {
     const datos = new FormData(evento.currentTarget);
     setGuardandoOrden(true);
     try {
-      const nuevaOrden = await crearOrdenApi({
-        clienteId: Number(datos.get("clienteId")),
-        vehiculoId: Number(datos.get("vehiculoId")),
-        observaciones: String(datos.get("motivo")),
-      });
+      const nuevaOrden = await ejecutarConCargadorPantalla(
+        "Creando la orden de servicio…",
+        () => crearOrdenApi({
+          clienteId: Number(datos.get("clienteId")),
+          vehiculoId: Number(datos.get("vehiculoId")),
+          observaciones: String(datos.get("motivo")),
+        }),
+      );
       setOrdenes((actuales) => [nuevaOrden, ...actuales]);
       setMostrarNuevaOrden(false);
       setVista("ordenes");
@@ -558,14 +608,17 @@ export default function PaginaPrincipal() {
   async function registrarClienteDesdeOrden(datos: FormData) {
     setGuardandoCliente(true);
     try {
-      const clienteApi = await guardarClienteApi({
-        nombre: String(datos.get("nombre")),
-        documentoIdentidad: String(datos.get("documentoIdentidad")),
-        telefono: String(datos.get("telefono")),
-        correo: valorOpcionalFormulario(datos.get("correo")),
-        direccion: valorOpcionalFormulario(datos.get("direccion")),
-        activo: true,
-      });
+      const clienteApi = await ejecutarConCargadorPantalla(
+        "Registrando el cliente…",
+        () => guardarClienteApi({
+          nombre: String(datos.get("nombre")),
+          documentoIdentidad: String(datos.get("documentoIdentidad")),
+          telefono: String(datos.get("telefono")),
+          correo: valorOpcionalFormulario(datos.get("correo")),
+          direccion: valorOpcionalFormulario(datos.get("direccion")),
+          activo: true,
+        }),
+      );
       const clienteGuardado = convertirClienteTaller(clienteApi, 0, null);
       incorporarClienteGuardado(clienteGuardado, null);
       mostrarAviso(`Cliente ${clienteGuardado.nombre} registrado y seleccionado`);
@@ -586,16 +639,19 @@ export default function PaginaPrincipal() {
     setGuardandoCliente(true);
 
     try {
-      const clienteApi = await guardarClienteApi(
-        {
-          nombre: String(datos.get("nombre")),
-          documentoIdentidad: String(datos.get("documentoIdentidad")),
-          telefono: String(datos.get("telefono")),
-          correo: valorOpcionalFormulario(datos.get("correo")),
-          direccion: valorOpcionalFormulario(datos.get("direccion")),
-          activo: clienteEditando ? datos.has("activo") : true,
-        },
-        clienteEditando?.id,
+      const clienteApi = await ejecutarConCargadorPantalla(
+        clienteEditando ? "Actualizando el cliente…" : "Registrando el cliente…",
+        () => guardarClienteApi(
+          {
+            nombre: String(datos.get("nombre")),
+            documentoIdentidad: String(datos.get("documentoIdentidad")),
+            telefono: String(datos.get("telefono")),
+            correo: valorOpcionalFormulario(datos.get("correo")),
+            direccion: valorOpcionalFormulario(datos.get("direccion")),
+            activo: clienteEditando ? datos.has("activo") : true,
+          },
+          clienteEditando?.id,
+        ),
       );
       const clienteGuardado = convertirClienteTaller(
         clienteApi,
@@ -664,7 +720,10 @@ export default function PaginaPrincipal() {
 
   async function crearMarcaVehiculo(nombre: string) {
     try {
-      const marca = await guardarMarcaVehiculoApi(nombre);
+      const marca = await ejecutarConCargadorPantalla(
+        "Agregando la marca del vehículo…",
+        () => guardarMarcaVehiculoApi(nombre),
+      );
       setMarcasVehiculo((actuales) =>
         [...actuales, marca].sort((a, b) => a.nombre.localeCompare(b.nombre, "es")),
       );
@@ -678,7 +737,10 @@ export default function PaginaPrincipal() {
 
   async function crearModeloVehiculo(marcaVehiculoId: number, nombre: string) {
     try {
-      const modelo = await guardarModeloVehiculoApi(marcaVehiculoId, nombre);
+      const modelo = await ejecutarConCargadorPantalla(
+        "Agregando el modelo del vehículo…",
+        () => guardarModeloVehiculoApi(marcaVehiculoId, nombre),
+      );
       setModelosVehiculo((actuales) =>
         [...actuales, modelo].sort((a, b) => a.nombre.localeCompare(b.nombre, "es")),
       );
@@ -693,15 +755,18 @@ export default function PaginaPrincipal() {
   async function registrarVehiculoDesdeOrden(datos: FormData) {
     setGuardandoVehiculo(true);
     try {
-      const vehiculoApi = await guardarVehiculoApi({
-        clienteId: Number(datos.get("clienteId")),
-        placa: String(datos.get("placa")),
-        modeloVehiculoId: Number(datos.get("modeloVehiculoId")),
-        anio: Number(datos.get("anio")),
-        color: valorOpcionalFormulario(datos.get("color")),
-        numeroVin: valorOpcionalFormulario(datos.get("numeroVin")),
-        activo: true,
-      });
+      const vehiculoApi = await ejecutarConCargadorPantalla(
+        "Registrando el vehículo…",
+        () => guardarVehiculoApi({
+          clienteId: Number(datos.get("clienteId")),
+          placa: String(datos.get("placa")),
+          modeloVehiculoId: Number(datos.get("modeloVehiculoId")),
+          anio: Number(datos.get("anio")),
+          color: valorOpcionalFormulario(datos.get("color")),
+          numeroVin: valorOpcionalFormulario(datos.get("numeroVin")),
+          activo: true,
+        }),
+      );
       const vehiculoGuardado = convertirVehiculoTaller(vehiculoApi);
       incorporarVehiculoGuardado(vehiculoGuardado, null);
       mostrarAviso(`Vehículo ${vehiculoGuardado.placa} registrado y seleccionado`);
@@ -722,17 +787,20 @@ export default function PaginaPrincipal() {
     setGuardandoVehiculo(true);
 
     try {
-      const vehiculoApi = await guardarVehiculoApi(
-        {
-          clienteId: Number(datos.get("clienteId")),
-          placa: String(datos.get("placa")),
-          modeloVehiculoId: Number(datos.get("modeloVehiculoId")),
-          anio: Number(datos.get("anio")),
-          color: valorOpcionalFormulario(datos.get("color")),
-          numeroVin: valorOpcionalFormulario(datos.get("numeroVin")),
-          activo: vehiculoEditando ? datos.has("activo") : true,
-        },
-        vehiculoEditando?.id,
+      const vehiculoApi = await ejecutarConCargadorPantalla(
+        vehiculoEditando ? "Actualizando el vehículo…" : "Registrando el vehículo…",
+        () => guardarVehiculoApi(
+          {
+            clienteId: Number(datos.get("clienteId")),
+            placa: String(datos.get("placa")),
+            modeloVehiculoId: Number(datos.get("modeloVehiculoId")),
+            anio: Number(datos.get("anio")),
+            color: valorOpcionalFormulario(datos.get("color")),
+            numeroVin: valorOpcionalFormulario(datos.get("numeroVin")),
+            activo: vehiculoEditando ? datos.has("activo") : true,
+          },
+          vehiculoEditando?.id,
+        ),
       );
       const vehiculoGuardado = convertirVehiculoTaller(vehiculoApi);
       incorporarVehiculoGuardado(vehiculoGuardado, vehiculoEditando);
@@ -774,11 +842,14 @@ export default function PaginaPrincipal() {
 
     let resultadoGuardado: { inspeccion: InspeccionVisual; advertencia?: string };
     try {
-      resultadoGuardado = await guardarRecepcionApi(
-        ordenDetalle.id,
-        inspeccion,
-        esActualizacion,
-        fotografias,
+      resultadoGuardado = await ejecutarConCargadorPantalla(
+        esActualizacion ? "Actualizando la inspección…" : "Guardando la recepción e inspección…",
+        () => guardarRecepcionApi(
+          ordenDetalle.id,
+          inspeccion,
+          esActualizacion,
+          fotografias,
+        ),
       );
     } catch (error) {
       mostrarAviso(error instanceof Error ? error.message : "No fue posible guardar la recepción en la API");
@@ -806,6 +877,36 @@ export default function PaginaPrincipal() {
     );
   }
 
+  async function eliminarEvidenciaOrden(evidenciaId: number) {
+    if (!ordenDetalle) return;
+    const ordenServicioId = ordenDetalle.id;
+    await ejecutarConCargadorPantalla(
+      "Eliminando la fotografía de la inspección…",
+      () => eliminarEvidenciaApi(ordenServicioId, evidenciaId),
+    );
+    setInspecciones((actuales) => {
+      const inspeccion = actuales[ordenServicioId];
+      if (!inspeccion) return actuales;
+      return {
+        ...actuales,
+        [ordenServicioId]: {
+          ...inspeccion,
+          evidencias: inspeccion.evidencias.filter(
+            (evidencia) => evidencia.id !== evidenciaId,
+          ),
+        },
+      };
+    });
+    mostrarAviso("Fotografía eliminada de la inspección");
+  }
+
+  function actualizarOrdenEnPantalla(ordenActualizada: OrdenTaller) {
+    setOrdenDetalle(ordenActualizada);
+    setOrdenes((actuales) => actuales.map((orden) =>
+      orden.id === ordenActualizada.id ? ordenActualizada : orden,
+    ));
+  }
+
   function mostrarAviso(mensaje: string) {
     setAviso(mensaje);
     window.setTimeout(() => setAviso(""), 3600);
@@ -815,7 +916,10 @@ export default function PaginaPrincipal() {
     if (!sesion || empresaNovaId === sesion.taller.id) return;
     setCambiandoTaller(true);
     try {
-      const nuevaSesion = await seleccionarTallerApi(empresaNovaId);
+      const nuevaSesion = await ejecutarConCargadorPantalla(
+        "Cambiando el taller activo…",
+        () => seleccionarTallerApi(empresaNovaId),
+      );
       navegar("inicio");
       setOrdenes([]);
       setClientes([]);
@@ -832,7 +936,7 @@ export default function PaginaPrincipal() {
   }
 
   async function cerrarSesion() {
-    await cerrarSesionApi();
+    await ejecutarConCargadorPantalla("Cerrando la sesión…", cerrarSesionApi);
     setSesion(null);
     setOrdenes([]);
     setClientes([]);
@@ -841,12 +945,7 @@ export default function PaginaPrincipal() {
   }
 
   if (cargandoSesion) {
-    return (
-      <main className="pantalla-acceso pantalla-cargando" role="status">
-        <span className="marca-simbolo">T</span>
-        <Cargador mensaje="Preparando Talleres…" />
-      </main>
-    );
+    return <CargadorPantalla mensaje="Preparando Talleres…" />;
   }
 
   if (!sesion) {
@@ -922,11 +1021,6 @@ export default function PaginaPrincipal() {
         </header>
 
         <main className={`contenido-principal ${procesoActivo ? "contenido-proceso" : ""}`}>
-          {!procesoActivo && cargandoDatos && (
-            <div className="estado-datos" role="status">
-              <Cargador mensaje="Consultando datos de la API…" icono={<Clock3 size={20} />} />
-            </div>
-          )}
           {!procesoActivo && errorDatos && (
             <div className="estado-datos estado-datos-error" role="alert">
               <TriangleAlert size={20} />
@@ -1019,12 +1113,16 @@ export default function PaginaPrincipal() {
                   orden={ordenDetalle}
                   inspeccionInicial={inspecciones[ordenDetalle.id]}
                   alEnviar={registrarRecepcion}
+                  alEliminarEvidencia={eliminarEvidenciaOrden}
                 />
               ) : (
                 <DetalleOrden
                   orden={ordenDetalle}
+                  cliente={clientes.find((cliente) => cliente.id === ordenDetalle.clienteId)}
                   inspeccion={inspecciones[ordenDetalle.id]}
                   alRecibir={() => setMostrarRecepcion(true)}
+                  alActualizarOrden={actualizarOrdenEnPantalla}
+                  alMostrarAviso={mostrarAviso}
                   alNotificar={() => mostrarAviso("Actualización enviada a WhatsApp")}
                 />
               )}
@@ -1085,15 +1183,12 @@ export default function PaginaPrincipal() {
   );
 }
 
-function Cargador({ mensaje, icono }: { mensaje: string; icono?: ReactNode }) {
-  return <span className="estado-carga"><span className="spinner-carga" aria-hidden="true" />{icono}{mensaje}</span>;
-}
-
 function PantallaInicioSesion({
   alIngresar,
 }: {
   alIngresar: (sesion: SesionTallerApi) => void;
 }) {
+  const { iniciarCargaPantalla, ejecutarConCargadorPantalla } = useCargadorPantalla();
   const [enviando, setEnviando] = useState(false);
   const [proveedorEnviando, setProveedorEnviando] = useState<string | null>(null);
   const [error, setError] = useState("");
@@ -1114,11 +1209,14 @@ function PantallaInicioSesion({
     setEnviando(true);
     setError("");
     try {
-      const sesion = await iniciarSesionApi({
-        usuario: String(datos.get("usuario")),
-        contrasena: String(datos.get("contrasena")),
-        recordarme: datos.has("recordarme"),
-      });
+      const sesion = await ejecutarConCargadorPantalla(
+        "Validando el acceso al taller…",
+        () => iniciarSesionApi({
+          usuario: String(datos.get("usuario")),
+          contrasena: String(datos.get("contrasena")),
+          recordarme: datos.has("recordarme"),
+        }),
+      );
       alIngresar(sesion);
     } catch (excepcion) {
       setError(
@@ -1181,25 +1279,33 @@ function PantallaInicioSesion({
             Mantener mi sesión iniciada
           </label>
           <button className="boton-primario boton-ancho" disabled={enviando}>
-            {enviando ? <Cargador mensaje="Validando acceso…" /> : "Ingresar al taller"}
+            Ingresar al taller
           </button>
           <div className="separador-login"><span>o continúa con</span></div>
           <div className="botones-proveedor-login">
             <button
               type="button"
-              className={`boton-proveedor-login ${proveedorEnviando ? "boton-cargando" : ""}`}
+              className="boton-proveedor-login"
               disabled={Boolean(proveedorEnviando)}
-              onClick={() => { setProveedorEnviando("google"); window.location.assign(`${obtenerDireccionApi()}/api/autenticacion/externo/google`); }}
+              onClick={() => {
+                setProveedorEnviando("google");
+                iniciarCargaPantalla("Conectando con Google…");
+                window.location.assign(`${obtenerDireccionApi()}/api/autenticacion/externo/google`);
+              }}
             >
-              {proveedorEnviando === "google" ? <Cargador mensaje="Conectando…" /> : "Continuar con Google"}
+              Continuar con Google
             </button>
             <button
               type="button"
-              className={`boton-proveedor-login ${proveedorEnviando ? "boton-cargando" : ""}`}
+              className="boton-proveedor-login"
               disabled={Boolean(proveedorEnviando)}
-              onClick={() => { setProveedorEnviando("microsoft"); window.location.assign(`${obtenerDireccionApi()}/api/autenticacion/externo/microsoft`); }}
+              onClick={() => {
+                setProveedorEnviando("microsoft");
+                iniciarCargaPantalla("Conectando con Microsoft…");
+                window.location.assign(`${obtenerDireccionApi()}/api/autenticacion/externo/microsoft`);
+              }}
             >
-              {proveedorEnviando === "microsoft" ? <Cargador mensaje="Conectando…" /> : "Continuar con Microsoft"}
+              Continuar con Microsoft
             </button>
           </div>
         </form>
@@ -1217,37 +1323,43 @@ function VistaAdministracion({
   alActualizarSesion: (sesion: SesionTallerApi) => void;
   alCerrar: () => void;
 }) {
+  const { ejecutarConCargadorPantalla } = useCargadorPantalla();
   const [talleres, setTalleres] = useState<TallerSincronizadoApi[]>([]);
   const [empresaNovaId, setEmpresaNovaId] = useState("");
   const [cargando, setCargando] = useState(true);
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");
 
-  async function cargar() {
+  const cargar = useCallback(async (mostrarCargador = true) => {
     setCargando(true);
     try {
-      setTalleres(await listarTalleresSincronizadosApi());
+      const consulta = () => listarTalleresSincronizadosApi();
+      setTalleres(mostrarCargador
+        ? await ejecutarConCargadorPantalla("Consultando los talleres sincronizados…", consulta)
+        : await consulta());
       setError("");
     } catch (excepcion) {
       setError(excepcion instanceof Error ? excepcion.message : "No fue posible consultar los talleres.");
     } finally {
       setCargando(false);
     }
-  }
+  }, [ejecutarConCargadorPantalla]);
 
   useEffect(() => {
     const identificador = window.setTimeout(() => { void cargar(); }, 0);
     return () => window.clearTimeout(identificador);
-  }, []);
+  }, [cargar]);
 
   async function agregar(evento: FormEvent<HTMLFormElement>) {
     evento.preventDefault();
     setGuardando(true);
     try {
-      await agregarTallerSincronizadoApi(Number(empresaNovaId));
-      setEmpresaNovaId("");
-      await cargar();
-      alActualizarSesion(await obtenerSesionApi(new AbortController().signal));
+      await ejecutarConCargadorPantalla("Agregando el taller a la sincronización…", async () => {
+        await agregarTallerSincronizadoApi(Number(empresaNovaId));
+        setEmpresaNovaId("");
+        await cargar(false);
+        alActualizarSesion(await obtenerSesionApi(new AbortController().signal));
+      });
     } catch (excepcion) {
       setError(excepcion instanceof Error ? excepcion.message : "No fue posible agregar el taller.");
     } finally {
@@ -1259,9 +1371,11 @@ function VistaAdministracion({
     if (!window.confirm("¿Retirar este taller de la sincronización?")) return;
     setGuardando(true);
     try {
-      await retirarTallerSincronizadoApi(id);
-      await cargar();
-      alActualizarSesion(await obtenerSesionApi(new AbortController().signal));
+      await ejecutarConCargadorPantalla("Retirando el taller de la sincronización…", async () => {
+        await retirarTallerSincronizadoApi(id);
+        await cargar(false);
+        alActualizarSesion(await obtenerSesionApi(new AbortController().signal));
+      });
     } catch (excepcion) {
       setError(excepcion instanceof Error ? excepcion.message : "No fue posible retirar el taller.");
     } finally {
@@ -1293,10 +1407,10 @@ function VistaAdministracion({
               placeholder="Ej. 3071"
             />
           </label>
-          <button className="boton-primario" disabled={guardando}>{guardando ? <Cargador mensaje="Agregando…" /> : "Agregar taller"}</button>
+          <button className="boton-primario" disabled={guardando}>Agregar taller</button>
         </form>
         {error && <div className="estado-datos estado-datos-error" role="alert"><TriangleAlert size={20} />{error}</div>}
-        {cargando ? <div className="estado-datos">Consultando empresas configuradas…</div> : (
+        {!cargando && (
           <div className="lista-talleres-admin">
             {talleres.map((taller) => (
               <article key={taller.empresaNovaId} className={!taller.activo ? "taller-retirado" : ""}>
@@ -1305,7 +1419,7 @@ function VistaAdministracion({
                   <strong>{taller.nombreComercial || taller.nombreLegal}</strong>
                   <small>{taller.activo ? "Disponible para iniciar sesión" : "Retirado de la sincronización"}</small>
                 </div>
-                {taller.activo && <button className="boton-secundario" disabled={guardando} onClick={() => retirar(taller.empresaNovaId)}>{guardando ? <Cargador mensaje="Retirando…" /> : "Retirar"}</button>}
+                {taller.activo && <button className="boton-secundario" disabled={guardando} onClick={() => retirar(taller.empresaNovaId)}>Retirar</button>}
               </article>
             ))}
           </div>
@@ -1722,6 +1836,7 @@ function VistaVehiculos({
 }
 
 function VistaInventario({ taller }: { taller: TallerSesionApi }) {
+  const { ejecutarConCargadorPantalla } = useCargadorPantalla();
   const [bodegas, setBodegas] = useState<BodegaInventarioApi[]>([]);
   const [bodegaId, setBodegaId] = useState<number | null>(null);
   const [articulos, setArticulos] = useState<ArticuloInventarioApi[]>([]);
@@ -1736,16 +1851,25 @@ function VistaInventario({ taller }: { taller: TallerSesionApi }) {
   const articulosPagina = articulosFiltrados.slice((paginaInventario - 1) * registrosPorPagina, paginaInventario * registrosPorPagina);
 
   useEffect(() => {
-    listarBodegasApi().then((resultado) => { setBodegas(resultado); setBodegaId(resultado.find((item) => item.esPrincipal)?.id ?? resultado[0]?.id ?? null); }).catch((excepcion) => setError(excepcion instanceof Error ? excepcion.message : "No fue posible consultar las bodegas.")).finally(() => setCargando(false));
-  }, [taller.id]);
+    ejecutarConCargadorPantalla("Consultando las bodegas del taller…", listarBodegasApi)
+      .then((resultado) => {
+        setBodegas(resultado);
+        setBodegaId(resultado.find((item) => item.esPrincipal)?.id ?? resultado[0]?.id ?? null);
+      })
+      .catch((excepcion) => setError(excepcion instanceof Error ? excepcion.message : "No fue posible consultar las bodegas."))
+      .finally(() => setCargando(false));
+  }, [ejecutarConCargadorPantalla, taller.id]);
   useEffect(() => {
     if (bodegaId === null) return;
     const identificador = window.setTimeout(() => {
       setCargandoExistencias(true); setError("");
-      listarExistenciasApi(bodegaId).then(setArticulos).catch((excepcion) => { setArticulos([]); setError(excepcion instanceof Error ? excepcion.message : "No fue posible consultar las existencias."); }).finally(() => setCargandoExistencias(false));
+      ejecutarConCargadorPantalla(
+        "Consultando las existencias de la bodega…",
+        () => listarExistenciasApi(bodegaId),
+      ).then(setArticulos).catch((excepcion) => { setArticulos([]); setError(excepcion instanceof Error ? excepcion.message : "No fue posible consultar las existencias."); }).finally(() => setCargandoExistencias(false));
     }, 0);
     return () => window.clearTimeout(identificador);
-  }, [bodegaId]);
+  }, [bodegaId, ejecutarConCargadorPantalla]);
 
   return (
     <>
@@ -1755,7 +1879,7 @@ function VistaInventario({ taller }: { taller: TallerSesionApi }) {
       </section>
       <section className="panel inventario">
         <div className="controles-inventario"><div className="selector-inventario"><label>Bodega<select value={bodegaId ?? ""} onChange={(evento) => { setBodegaId(Number(evento.target.value)); setPaginaInventario(1); }}>{bodegas.map((bodega) => <option key={bodega.id} value={bodega.id}>{bodega.nombre}{bodega.esPrincipal ? " · Principal" : ""}</option>)}</select></label></div><label className="busqueda-inventario">Buscar<input value={busquedaInventario} onChange={(evento) => { setBusquedaInventario(evento.target.value); setPaginaInventario(1); }} placeholder="Nombre o código" /></label></div>
-        {cargando || cargandoExistencias ? <Cargador mensaje="Consultando existencias…" /> : error ? <div className="estado-datos estado-datos-error" role="alert">{error}</div> : articulos.length === 0 ? <EstadoVacio icono={Boxes} titulo="Sin existencias" detalle="La bodega seleccionada no tiene artículos disponibles." /> : articulosFiltrados.length === 0 ? <EstadoVacio icono={Boxes} titulo="Sin coincidencias" detalle="No hay artículos que coincidan con la búsqueda." /> : <><div className="lista-inventario">{articulosPagina.map((articulo) => <article key={articulo.productoId}><div><strong>{articulo.nombre}</strong><small>{articulo.codigo} · {articulo.unidadMedida}</small></div><b>{articulo.existencia}</b></article>)}</div><div className="paginacion-inventario"><button type="button" disabled={paginaInventario <= 1} onClick={() => setPaginaInventario((pagina) => pagina - 1)}>Anterior</button><span>Página {paginaInventario} de {totalPaginas}</span><button type="button" disabled={paginaInventario >= totalPaginas} onClick={() => setPaginaInventario((pagina) => pagina + 1)}>Siguiente</button></div></>}
+        {cargando || cargandoExistencias ? null : error ? <div className="estado-datos estado-datos-error" role="alert">{error}</div> : articulos.length === 0 ? <EstadoVacio icono={Boxes} titulo="Sin existencias" detalle="La bodega seleccionada no tiene artículos disponibles." /> : articulosFiltrados.length === 0 ? <EstadoVacio icono={Boxes} titulo="Sin coincidencias" detalle="No hay artículos que coincidan con la búsqueda." /> : <><div className="lista-inventario">{articulosPagina.map((articulo) => <article key={articulo.productoId}><div><strong>{articulo.nombre}</strong><small>{articulo.codigo} · {articulo.unidadMedida}</small></div><b>{articulo.existencia}</b></article>)}</div><div className="paginacion-inventario"><button type="button" disabled={paginaInventario <= 1} onClick={() => setPaginaInventario((pagina) => pagina - 1)}>Anterior</button><span>Página {paginaInventario} de {totalPaginas}</span><button type="button" disabled={paginaInventario >= totalPaginas} onClick={() => setPaginaInventario((pagina) => pagina + 1)}>Siguiente</button></div></>}
       </section>
     </>
   );
@@ -2061,7 +2185,7 @@ function FormularioNuevaOrden({
         </div>
         <div className="opciones-prioridad"><label><input type="radio" name="prioridad" defaultChecked />Normal</label><label><input type="radio" name="prioridad" />Prioritaria</label></div>
         <button className="boton-primario boton-ancho" type="submit" disabled={!formularioDisponible || guardando}>
-          {guardando ? <Cargador mensaje="Creando orden…" /> : <><Check size={20} />Crear orden de servicio</>}
+          <Check size={20} />Crear orden de servicio
         </button>
       </form>
 
@@ -2159,7 +2283,7 @@ function FormularioCliente({
         </label>
       )}
       <button className="boton-primario boton-ancho" type="submit" disabled={guardando}>
-        {guardando ? <Cargador mensaje="Guardando cliente…" /> : <><Check size={20} />{cliente ? "Guardar cambios" : "Registrar cliente"}</>}
+        <Check size={20} />{cliente ? "Guardar cambios" : "Registrar cliente"}
       </button>
     </form>
   );
@@ -2309,7 +2433,7 @@ function FormularioVehiculo({
         </label>
       )}
       <button className="boton-primario boton-ancho" type="submit" disabled={!formularioDisponible || guardando}>
-        {guardando ? <Cargador mensaje="Guardando vehículo…" /> : <><Check size={20} />{vehiculo ? "Guardar cambios" : "Registrar vehículo"}</>}
+        <Check size={20} />{vehiculo ? "Guardar cambios" : "Registrar vehículo"}
       </button>
     </form>
   );
@@ -2317,15 +2441,261 @@ function FormularioVehiculo({
 
 function DetalleOrden({
   orden,
+  cliente,
   inspeccion,
   alRecibir,
+  alActualizarOrden,
+  alMostrarAviso,
   alNotificar,
 }: {
   orden: OrdenTaller;
+  cliente?: ClienteTaller;
   inspeccion?: InspeccionVisual;
   alRecibir: () => void;
+  alActualizarOrden: (orden: OrdenTaller) => void;
+  alMostrarAviso: (mensaje: string) => void;
   alNotificar: () => void;
 }) {
+  const { ejecutarConCargadorPantalla } = useCargadorPantalla();
+  const [resumen, setResumen] = useState<ResumenDetallesOrdenServicioApi>({ detalles: [], total: 0 });
+  const [diagnostico, setDiagnostico] = useState<DiagnosticoOrdenServicioApi | null>(null);
+  const [bodegas, setBodegas] = useState<BodegaInventarioApi[]>([]);
+  const [bodegaId, setBodegaId] = useState<number | null>(null);
+  const [articulos, setArticulos] = useState<ArticuloInventarioApi[]>([]);
+  const [productoId, setProductoId] = useState<number | null>(null);
+  const [busquedaProducto, setBusquedaProducto] = useState("");
+  const [cargandoProceso, setCargandoProceso] = useState(true);
+  const [guardandoProceso, setGuardandoProceso] = useState(false);
+  const [errorProceso, setErrorProceso] = useState("");
+  const etapas: EstadoOrden[] = [
+    "Recepción",
+    "Diagnóstico",
+    "Por aprobar",
+    "Reparación",
+    "Lista para entregar",
+  ];
+  const indiceActual = Math.max(0, etapas.indexOf(orden.estado));
+  const articuloSeleccionado = articulos.find((articulo) => articulo.productoId === productoId);
+  const articulosFiltrados = articulos.filter((articulo) => {
+    const filtro = busquedaProducto.trim().toLocaleLowerCase("es");
+    return !filtro || `${articulo.codigo} ${articulo.nombre}`.toLocaleLowerCase("es").includes(filtro);
+  });
+
+  useEffect(() => {
+    const controlador = new AbortController();
+    ejecutarConCargadorPantalla("Consultando la información de la orden…", async () => {
+      const [cargos, diagnosticoActual] = await Promise.all([
+        obtenerDetallesOrdenApi(orden.id, controlador.signal),
+        obtenerDiagnosticoOrdenApi(orden.id, controlador.signal),
+      ]);
+      return { cargos, diagnosticoActual };
+    })
+      .then((resultado) => {
+        setResumen(resultado.cargos);
+        setDiagnostico(resultado.diagnosticoActual);
+        setErrorProceso("");
+      })
+      .catch((error) => {
+        if (!controlador.signal.aborted) {
+          setErrorProceso(error instanceof Error ? error.message : "No fue posible consultar los cargos.");
+        }
+      })
+      .finally(() => {
+        if (!controlador.signal.aborted) setCargandoProceso(false);
+      });
+    return () => controlador.abort();
+  }, [ejecutarConCargadorPantalla, orden.id]);
+
+  useEffect(() => {
+    if (orden.estado !== "Reparación") return;
+    ejecutarConCargadorPantalla("Consultando las bodegas disponibles…", listarBodegasApi)
+      .then((resultado) => {
+        setBodegas(resultado);
+        setBodegaId(resultado.find((bodega) => bodega.esPrincipal)?.id ?? resultado[0]?.id ?? null);
+      })
+      .catch((error) => setErrorProceso(error instanceof Error ? error.message : "No fue posible consultar las bodegas."));
+  }, [ejecutarConCargadorPantalla, orden.estado]);
+
+  useEffect(() => {
+    if (orden.estado !== "Reparación" || bodegaId === null) return;
+    ejecutarConCargadorPantalla(
+      "Consultando los productos disponibles…",
+      () => listarExistenciasApi(bodegaId),
+    )
+      .then((resultado) => {
+        setArticulos(resultado);
+        setProductoId((actual) => resultado.some((articulo) => articulo.productoId === actual)
+          ? actual
+          : resultado[0]?.productoId ?? null);
+      })
+      .catch((error) => setErrorProceso(error instanceof Error ? error.message : "No fue posible consultar el inventario."));
+  }, [bodegaId, ejecutarConCargadorPantalla, orden.estado]);
+
+  async function avanzar(estado: "PendienteAprobacion" | "Reparacion" | "ListaParaEntrega", descripcion: string) {
+    setGuardandoProceso(true);
+    setErrorProceso("");
+    try {
+      const actualizada = await ejecutarConCargadorPantalla(
+        "Actualizando el estado de la orden…",
+        () => cambiarEstadoOrdenApi(orden.id, estado, descripcion),
+      );
+      alActualizarOrden(actualizada);
+      alMostrarAviso(`La orden pasó a ${actualizada.estado.toLocaleLowerCase("es")}`);
+      return actualizada;
+    } catch (error) {
+      setErrorProceso(error instanceof Error ? error.message : "No fue posible avanzar la orden.");
+      return null;
+    } finally {
+      setGuardandoProceso(false);
+    }
+  }
+
+  async function agregarProducto(evento: FormEvent<HTMLFormElement>) {
+    evento.preventDefault();
+    if (bodegaId === null || productoId === null) return;
+    const datos = new FormData(evento.currentTarget);
+    setGuardandoProceso(true);
+    setErrorProceso("");
+    try {
+      const resultado = await ejecutarConCargadorPantalla(
+        "Agregando el producto a la orden…",
+        () => agregarDetalleInventarioApi(orden.id, {
+          bodegaId,
+          productoId,
+          cantidad: Number(datos.get("cantidad")),
+        }),
+      );
+      setResumen(resultado);
+      const cantidad = Number(datos.get("cantidad"));
+      const descontado = articuloSeleccionado && articuloSeleccionado.existencia >= cantidad;
+      alMostrarAviso(descontado
+        ? "Producto agregado y existencia descontada"
+        : "Producto agregado sin descontar inventario por existencia insuficiente");
+      setArticulos(await ejecutarConCargadorPantalla(
+        "Actualizando las existencias…",
+        () => listarExistenciasApi(bodegaId),
+      ));
+      evento.currentTarget.reset();
+    } catch (error) {
+      setErrorProceso(error instanceof Error ? error.message : "No fue posible agregar el producto.");
+    } finally {
+      setGuardandoProceso(false);
+    }
+  }
+
+  async function agregarManual(evento: FormEvent<HTMLFormElement>) {
+    evento.preventDefault();
+    const formulario = evento.currentTarget;
+    const datos = new FormData(formulario);
+    setGuardandoProceso(true);
+    setErrorProceso("");
+    try {
+      const resultado = await ejecutarConCargadorPantalla(
+        "Agregando el cargo a la orden…",
+        () => agregarDetalleManualApi(orden.id, {
+          descripcion: String(datos.get("descripcion")),
+          unidadMedida: valorOpcionalFormulario(datos.get("unidadMedida")),
+          cantidad: Number(datos.get("cantidad")),
+          precioUnitario: Number(datos.get("precioUnitario")),
+        }),
+      );
+      setResumen(resultado);
+      formulario.reset();
+      alMostrarAviso("Cargo manual agregado a la orden");
+    } catch (error) {
+      setErrorProceso(error instanceof Error ? error.message : "No fue posible agregar el cargo.");
+    } finally {
+      setGuardandoProceso(false);
+    }
+  }
+
+  async function eliminarDetalle(detalleId: number) {
+    setGuardandoProceso(true);
+    try {
+      setResumen(await ejecutarConCargadorPantalla(
+        "Eliminando el cargo de la orden…",
+        () => eliminarDetalleOrdenApi(orden.id, detalleId),
+      ));
+      alMostrarAviso("Cargo eliminado de la orden");
+    } catch (error) {
+      setErrorProceso(error instanceof Error ? error.message : "No fue posible eliminar el cargo.");
+    } finally {
+      setGuardandoProceso(false);
+    }
+  }
+
+  async function guardarDiagnostico(texto: string, fotografias: File[]) {
+    setGuardandoProceso(true);
+    setErrorProceso("");
+    try {
+      const resultado = await ejecutarConCargadorPantalla("Guardando el diagnóstico…", async () => {
+        let actualizado = await guardarDiagnosticoOrdenApi(orden.id, texto);
+        if (fotografias.length > 0) actualizado = await cargarEvidenciasDiagnosticoApi(orden.id, fotografias);
+        return actualizado;
+      });
+      setDiagnostico(resultado);
+      alMostrarAviso("Diagnóstico guardado correctamente");
+    } catch (error) {
+      const mensaje = error instanceof Error ? error.message : "No fue posible guardar el diagnóstico.";
+      setErrorProceso(mensaje);
+      throw error;
+    } finally {
+      setGuardandoProceso(false);
+    }
+  }
+
+  async function eliminarEvidenciaDiagnostico(evidenciaId: number) {
+    setGuardandoProceso(true);
+    try {
+      await ejecutarConCargadorPantalla("Eliminando la evidencia del diagnóstico…", () => eliminarEvidenciaDiagnosticoApi(orden.id, evidenciaId));
+      setDiagnostico(await obtenerDiagnosticoOrdenApi(orden.id));
+      alMostrarAviso("Evidencia eliminada");
+    } finally {
+      setGuardandoProceso(false);
+    }
+  }
+
+  async function actualizarAutorizacion() {
+    setDiagnostico(await ejecutarConCargadorPantalla(
+      "Verificando la autorización del cliente…",
+      () => obtenerDiagnosticoOrdenApi(orden.id),
+    ));
+  }
+
+  async function solicitarAprobacion() {
+    if (!diagnostico?.tokenPublico) {
+      setErrorProceso("Guarda el diagnóstico antes de solicitar la aprobación.");
+      return;
+    }
+    if (!cliente?.telefono || !normalizarTelefonoWhatsapp(cliente.telefono)) {
+      setErrorProceso("El cliente no tiene un número de teléfono válido para abrir WhatsApp.");
+      return;
+    }
+
+    const ventanaWhatsapp = window.open("", "_blank");
+    const actualizada = await avanzar(
+      "PendienteAprobacion",
+      "Diagnóstico finalizado y preparado para aprobación del cliente.",
+    );
+    if (!actualizada) {
+      ventanaWhatsapp?.close();
+      return;
+    }
+
+    const direccionWhatsapp = crearDireccionWhatsappAprobacion({
+      telefono: cliente.telefono,
+      nombreCliente: cliente.nombre,
+      numeroOrden: orden.numero,
+      token: diagnostico.tokenPublico,
+    });
+    if (ventanaWhatsapp) {
+      ventanaWhatsapp.opener = null;
+      ventanaWhatsapp.location.href = direccionWhatsapp;
+    } else {
+      setErrorProceso("WhatsApp no pudo abrirse. Permite las ventanas emergentes e inténtalo nuevamente.");
+    }
+  }
+
   return (
     <div className="detalle-panel detalle-orden-pagina">
       <div className="columna-orden">
@@ -2333,17 +2703,108 @@ function DetalleOrden({
         <div className="bloque-detalle"><span className="sobrelinea">Motivo de ingreso</span><p>{orden.motivo}</p></div>
         <div className="datos-rapidos"><div><UserRound size={20} /><span><small>Responsable</small><strong>{orden.tecnico}</strong></span></div><div><Clock3 size={20} /><span><small>Ingreso</small><strong>{orden.hora} a. m.</strong></span></div></div>
         <div className="bloque-detalle"><span className="sobrelinea">Avance de la orden</span><div className="barra-avance"><span style={{ width: `${orden.progreso}%` }} /></div><strong>{orden.progreso}% completado</strong></div>
-        <div className="linea-tiempo"><div className="completo"><span><Check size={14} /></span><div><strong>Orden creada</strong><small>Datos del cliente y vehículo confirmados</small></div></div><div className={orden.estado !== "Recepción" ? "completo" : "actual"}><span>{orden.estado !== "Recepción" ? <Check size={14} /> : ""}</span><div><strong>Recepción del vehículo</strong><small>Inspección visual y evidencias</small></div></div><div><span /><div><strong>Diagnóstico técnico</strong><small>Pendiente de resultados</small></div></div></div>
+        <div className="linea-tiempo linea-tiempo-orden">
+          {etapas.map((etapa, indice) => (
+            <div key={etapa} className={indice < indiceActual ? "completo" : indice === indiceActual ? "actual" : ""}>
+              <span>{indice < indiceActual ? <Check size={14} /> : ""}</span>
+              <div><strong>{etapa}</strong><small>{indice < indiceActual ? "Completado" : indice === indiceActual ? "Etapa actual" : "Pendiente"}</small></div>
+            </div>
+          ))}
+        </div>
         <button className="boton-secundario boton-ancho" onClick={alNotificar}><MessageCircleMore size={20} />Enviar actualización al cliente</button>
       </div>
 
-      <div className="columna-inspeccion-orden">
+      <div className="columna-inspeccion-orden flujo-orden">
         {orden.estado !== "Recepción" ? (
-          <ResumenInspeccion
-            ordenServicioId={orden.id}
-            inspeccion={inspeccion}
-            alEditar={alRecibir}
-          />
+          <>
+            <ResumenInspeccion
+              ordenServicioId={orden.id}
+              inspeccion={inspeccion}
+              alEditar={alRecibir}
+            />
+            {errorProceso && <div className="estado-datos estado-datos-error" role="alert">{errorProceso}</div>}
+            {orden.estado === "Diagnóstico" && (
+              <FormularioDiagnostico
+                key={diagnostico?.fechaDiagnosticoUtc ?? "diagnostico-nuevo"}
+                ordenServicioId={orden.id}
+                diagnostico={diagnostico}
+                cliente={cliente}
+                numeroOrden={orden.numero}
+                guardando={guardandoProceso}
+                alGuardar={guardarDiagnostico}
+                alEliminarEvidencia={eliminarEvidenciaDiagnostico}
+                alEnviarAprobacion={solicitarAprobacion}
+              />
+            )}
+            {orden.estado === "Por aprobar" && !diagnostico?.diagnostico && (
+              <FormularioDiagnostico
+                key="diagnostico-pendiente-legacy"
+                ordenServicioId={orden.id}
+                diagnostico={diagnostico}
+                cliente={cliente}
+                numeroOrden={orden.numero}
+                guardando={guardandoProceso}
+                alGuardar={guardarDiagnostico}
+                alEliminarEvidencia={eliminarEvidenciaDiagnostico}
+              />
+            )}
+            {orden.estado === "Por aprobar" && (
+              <section className="paso-orden">
+                <span className="icono-llamada"><CircleCheck size={28} /></span>
+                <span className="sobrelinea">Aprobación del cliente</span>
+                <h2>Iniciar reparación</h2>
+                <p>{diagnostico?.fechaAutorizacionClienteUtc
+                  ? "El cliente autorizó continuar. Ya puedes iniciar la reparación y registrar sus cargos."
+                  : "Comparte el diagnóstico y espera la autorización del cliente antes de iniciar la reparación."}</p>
+                {diagnostico?.tokenPublico && (
+                  <AccionesEnlacePublico
+                    token={diagnostico.tokenPublico}
+                    telefono={cliente?.telefono ?? ""}
+                    nombreCliente={cliente?.nombre ?? orden.cliente}
+                    numeroOrden={orden.numero}
+                    alMostrarAviso={alMostrarAviso}
+                  />
+                )}
+                {!diagnostico?.fechaAutorizacionClienteUtc && <button className="boton-secundario boton-ancho" type="button" disabled={guardandoProceso} onClick={actualizarAutorizacion}><RotateCcw size={18} />Verificar autorización</button>}
+                <button className="boton-primario boton-ancho" disabled={guardandoProceso || !diagnostico?.fechaAutorizacionClienteUtc} onClick={() => avanzar("Reparacion", "Cliente autorizó continuar y la orden inició reparación.")}><Wrench size={20} />Iniciar reparación</button>
+              </section>
+            )}
+            {orden.estado === "Reparación" && (
+              <section className="trabajo-reparacion">
+                <div className="cabecera-trabajo-reparacion"><div><span className="sobrelinea">Reparación</span><h2>Productos y cargos</h2></div><strong>{formatearMoneda(resumen.total)}</strong></div>
+                <div className="formularios-cargos">
+                  <form className="formulario-cargo" onSubmit={agregarProducto}>
+                    <div><Boxes size={21} /><span><strong>Desde inventario</strong><small>El precio se obtiene de NOVA</small></span></div>
+                    <label>Bodega<select value={bodegaId ?? ""} required onChange={(evento) => setBodegaId(Number(evento.target.value))}>{bodegas.map((bodega) => <option key={bodega.id} value={bodega.id}>{bodega.nombre}{bodega.esPrincipal ? " · Principal" : ""}</option>)}</select></label>
+                    <label>Buscar producto<input value={busquedaProducto} onChange={(evento) => setBusquedaProducto(evento.target.value)} placeholder="Código o descripción" /></label>
+                    <label>Producto<select value={productoId ?? ""} required onChange={(evento) => setProductoId(Number(evento.target.value))}>{articulosFiltrados.map((articulo) => <option key={articulo.productoId} value={articulo.productoId}>{articulo.nombre} · {articulo.existencia} disponibles · {formatearMoneda(articulo.precioUnitario ?? 0)}</option>)}</select></label>
+                    {articuloSeleccionado && <p className={articuloSeleccionado.existencia > 0 ? "disponibilidad-producto" : "disponibilidad-producto sin-existencia"}>{articuloSeleccionado.existencia > 0 ? `${articuloSeleccionado.existencia} disponibles; se descontará si alcanza para la cantidad.` : "Sin existencia; se agregará sin descontar inventario."}</p>}
+                    <label>Cantidad<input name="cantidad" type="number" min="0.0001" step="0.0001" defaultValue="1" required inputMode="decimal" /></label>
+                    <button className="boton-secundario" type="submit" disabled={guardandoProceso || productoId === null}><Plus size={18} />Agregar producto</button>
+                  </form>
+                  <form className="formulario-cargo" onSubmit={agregarManual}>
+                    <div><Wrench size={21} /><span><strong>Cargo manual</strong><small>Mano de obra, compra externa u otro detalle</small></span></div>
+                    <label>Descripción<input name="descripcion" maxLength={300} minLength={2} required placeholder="Ej. Cambio de pastillas de freno" /></label>
+                    <div className="fila-cargo"><label>Cantidad<input name="cantidad" type="number" min="0.0001" step="0.0001" defaultValue="1" required inputMode="decimal" /></label><label>Unidad<input name="unidadMedida" maxLength={50} placeholder="Unidad, hora…" /></label></div>
+                    <label>Precio unitario<input name="precioUnitario" type="number" min="0" step="0.01" required inputMode="decimal" placeholder="0.00" /></label>
+                    <button className="boton-secundario" type="submit" disabled={guardandoProceso}><Plus size={18} />Agregar cargo</button>
+                  </form>
+                </div>
+                <ResumenCargosOrden resumen={resumen} cargando={cargandoProceso} guardando={guardandoProceso} alEliminar={eliminarDetalle} />
+                <button className="boton-primario boton-ancho" disabled={guardandoProceso} onClick={() => avanzar("ListaParaEntrega", "Reparación finalizada; vehículo listo para entregar.")}><CircleCheck size={20} />Marcar lista para entregar</button>
+              </section>
+            )}
+            {orden.estado === "Lista para entregar" && (
+              <section className="paso-orden orden-lista">
+                <span className="icono-llamada"><CircleCheck size={28} /></span>
+                <span className="sobrelinea">Trabajo finalizado</span>
+                <h2>Lista para entregar</h2>
+                <p>El vehículo completó el proceso del taller. Total a pagar por el cliente:</p>
+                <strong className="total-entrega">{formatearMoneda(resumen.total)}</strong>
+                <ResumenCargosOrden resumen={resumen} cargando={cargandoProceso} guardando={false} alEliminar={() => Promise.resolve()} soloLectura />
+              </section>
+            )}
+          </>
         ) : (
           <section className="llamada-recepcion">
             <span className="icono-llamada"><ClipboardCheck size={28} /></span>
@@ -2358,14 +2819,270 @@ function DetalleOrden({
   );
 }
 
+function FormularioDiagnostico({
+  ordenServicioId,
+  diagnostico,
+  cliente,
+  numeroOrden,
+  guardando,
+  alGuardar,
+  alEliminarEvidencia,
+  alEnviarAprobacion,
+}: {
+  ordenServicioId: number;
+  diagnostico: DiagnosticoOrdenServicioApi | null;
+  cliente?: ClienteTaller;
+  numeroOrden: string;
+  guardando: boolean;
+  alGuardar: (texto: string, fotografias: File[]) => Promise<void>;
+  alEliminarEvidencia: (evidenciaId: number) => Promise<void>;
+  alEnviarAprobacion?: () => Promise<void>;
+}) {
+  const [texto, setTexto] = useState(diagnostico?.diagnostico ?? "");
+  const [fotografias, setFotografias] = useState<File[]>([]);
+  const [errorFotos, setErrorFotos] = useState("");
+  const [dictando, setDictando] = useState(false);
+  const [mensajeDictado, setMensajeDictado] = useState("");
+  const [dictadoCompatible, setDictadoCompatible] = useState<boolean | null>(null);
+  const reconocimiento = useRef<ReconocimientoVoz | null>(null);
+  const entradaFotos = useRef<HTMLInputElement | null>(null);
+  const textoBaseDictado = useRef("");
+  const vistasPrevias = useMemo(
+    () => fotografias.map((fotografia) => ({
+      nombre: fotografia.name,
+      direccion: URL.createObjectURL(fotografia),
+    })),
+    [fotografias],
+  );
+
+  useEffect(() => {
+    return () => reconocimiento.current?.abort();
+  }, []);
+  useEffect(
+    () => () => vistasPrevias.forEach((vista) => URL.revokeObjectURL(vista.direccion)),
+    [vistasPrevias],
+  );
+
+  function alternarDictado() {
+    if (dictando) {
+      reconocimiento.current?.stop();
+      return;
+    }
+    const ventana = window as typeof window & {
+      SpeechRecognition?: ConstructorReconocimientoVoz;
+      webkitSpeechRecognition?: ConstructorReconocimientoVoz;
+    };
+    const Constructor = ventana.SpeechRecognition || ventana.webkitSpeechRecognition;
+    if (!Constructor) {
+      setDictadoCompatible(false);
+      setMensajeDictado("El dictado por voz no está disponible en este navegador. Puedes escribir el diagnóstico.");
+      return;
+    }
+    const instancia = new Constructor();
+    setDictadoCompatible(true);
+    reconocimiento.current = instancia;
+    textoBaseDictado.current = texto.trim();
+    instancia.lang = "es-NI";
+    instancia.continuous = true;
+    instancia.interimResults = true;
+    instancia.onresult = (evento) => {
+      let transcripcion = "";
+      for (let indice = 0; indice < evento.results.length; indice += 1) {
+        transcripcion += `${evento.results[indice][0].transcript} `;
+      }
+      setTexto(`${textoBaseDictado.current}${textoBaseDictado.current ? " " : ""}${transcripcion.trim()}`);
+      setMensajeDictado("Escuchando… revisa el texto antes de guardarlo.");
+    };
+    instancia.onerror = (evento) => {
+      const mensajes: Record<string, string> = {
+        "not-allowed": "Permite el acceso al micrófono para usar el dictado.",
+        "no-speech": "No se detectó voz. Toca el micrófono para intentarlo nuevamente.",
+      };
+      setMensajeDictado(mensajes[evento.error] ?? "El dictado se interrumpió. Puedes escribir o intentarlo nuevamente.");
+    };
+    instancia.onend = () => {
+      setDictando(false);
+      reconocimiento.current = null;
+    };
+    try {
+      instancia.start();
+      setDictando(true);
+      setMensajeDictado("Escuchando… habla con claridad.");
+    } catch {
+      setMensajeDictado("No fue posible iniciar el dictado. Inténtalo nuevamente.");
+    }
+  }
+
+  const tieneCambios = texto.trim() !== (diagnostico?.diagnostico ?? "").trim() || fotografias.length > 0;
+  const diagnosticoGuardado = Boolean(diagnostico?.diagnostico?.trim()) && !tieneCambios;
+
+  return (
+    <section className="formulario-diagnostico">
+      <div className="cabecera-diagnostico">
+        <span className="icono-llamada"><ClipboardList size={28} /></span>
+        <div><span className="sobrelinea">Diagnóstico</span><h2>¿Qué tiene el vehículo?</h2><p>Explica los hallazgos y qué se recomienda hacer. No necesitas agregar todavía productos ni precios.</p></div>
+      </div>
+      <label className="campo-diagnostico">
+        Diagnóstico del mecánico
+        <textarea value={texto} onChange={(evento) => setTexto(evento.target.value)} required minLength={5} maxLength={4000} rows={7} placeholder="Ej. Se detectó desgaste en las pastillas delanteras y vibración al frenar…" />
+        <small>{texto.length}/4000 caracteres</small>
+      </label>
+      <div className="controles-dictado">
+        <button type="button" className={`boton-dictado ${dictando ? "activo" : ""}`} disabled={dictadoCompatible === false || guardando} onClick={alternarDictado}>
+          {dictando ? <Square size={18} fill="currentColor" /> : <Mic size={20} />}
+          {dictando ? "Detener dictado" : "Dictar diagnóstico"}
+        </button>
+        <span className={dictando ? "estado-dictado escuchando" : "estado-dictado"} role="status" aria-live="polite">{mensajeDictado || (dictadoCompatible ? "Puedes hablar y luego corregir el texto." : "Dictado no disponible; escribe el diagnóstico.")}</span>
+      </div>
+      <div className="bloque-carga-fotos">
+        <label className="zona-fotos">
+          <input
+            ref={entradaFotos}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            capture="environment"
+            multiple
+            disabled={guardando}
+            onChange={(evento) => {
+              const seleccionadas = Array.from(evento.target.files ?? []);
+              const disponibles = 8 - (diagnostico?.evidencias.length ?? 0);
+              const acumuladas = [...fotografias, ...seleccionadas];
+              if (acumuladas.length > disponibles) {
+                sincronizarFotografiasEntrada(evento.target, fotografias);
+                const restantes = Math.max(0, disponibles - fotografias.length);
+                setErrorFotos(restantes > 0
+                  ? `Puede agregar ${restantes} fotografías más al diagnóstico.`
+                  : "El diagnóstico ya tiene el máximo de 8 fotografías.");
+                return;
+              }
+
+              setErrorFotos("");
+              setFotografias(acumuladas);
+              sincronizarFotografiasEntrada(evento.target, acumuladas);
+            }}
+          />
+          {fotografias.length > 0 ? <ImagePlus size={25} /> : <Camera size={25} />}
+          <span>
+            <strong>{fotografias.length > 0 ? `${fotografias.length} ${fotografias.length === 1 ? "fotografía seleccionada" : "fotografías seleccionadas"}` : "Agregar fotografías"}</strong>
+            <small>Hallazgos, piezas afectadas y evidencia del diagnóstico</small>
+          </span>
+          <Plus size={20} />
+        </label>
+        {errorFotos && <p className="error-fotografias" role="alert">{errorFotos}</p>}
+      </div>
+      {((diagnostico?.evidencias.length ?? 0) > 0 || vistasPrevias.length > 0) && (
+        <div className="galeria-evidencias galeria-edicion galeria-diagnostico">
+          {diagnostico?.evidencias.map((evidencia) => (
+            <figure key={evidencia.id}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={direccionEvidenciaDiagnostico(ordenServicioId, evidencia.id)} alt={`Evidencia del diagnóstico ${evidencia.nombreArchivo}`} loading="lazy" />
+              <figcaption>Guardada</figcaption>
+              <button className="boton-eliminar-evidencia" type="button" disabled={guardando} onClick={() => alEliminarEvidencia(evidencia.id)} aria-label={`Eliminar ${evidencia.nombreArchivo}`}><Trash2 size={18} /></button>
+            </figure>
+          ))}
+          {vistasPrevias.map((vista) => (
+            <figure key={vista.direccion}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={vista.direccion} alt={`Vista previa ${vista.nombre}`} />
+              <figcaption>Por guardar</figcaption>
+            </figure>
+          ))}
+        </div>
+      )}
+      <button type="button" className="boton-secundario boton-ancho" disabled={guardando || texto.trim().length < 5 || !tieneCambios} onClick={async () => { await alGuardar(texto.trim(), fotografias); setFotografias([]); setErrorFotos(""); if (entradaFotos.current) entradaFotos.current.value = ""; }}><Check size={20} />Guardar diagnóstico</button>
+      {diagnostico?.tokenPublico && (
+        <AccionesEnlacePublico
+          token={diagnostico.tokenPublico}
+          telefono={cliente?.telefono ?? ""}
+          nombreCliente={cliente?.nombre ?? "cliente"}
+          numeroOrden={numeroOrden}
+        />
+      )}
+      {alEnviarAprobacion && <button type="button" className="boton-primario boton-ancho" disabled={guardando || !diagnosticoGuardado} onClick={alEnviarAprobacion}><MessageCircleMore size={20} />Solicitar aprobación por WhatsApp</button>}
+      {alEnviarAprobacion && !diagnosticoGuardado && <small className="ayuda-envio-diagnostico">Guarda el diagnóstico antes de enviarlo al cliente.</small>}
+    </section>
+  );
+}
+
+function AccionesEnlacePublico({
+  token,
+  telefono,
+  nombreCliente,
+  numeroOrden,
+  alMostrarAviso,
+}: {
+  token: string;
+  telefono: string;
+  nombreCliente: string;
+  numeroOrden: string;
+  alMostrarAviso?: (mensaje: string) => void;
+}) {
+  const direccion = typeof window === "undefined" ? "" : `${window.location.origin}/orden/${token}`;
+  const telefonoWhatsapp = normalizarTelefonoWhatsapp(telefono);
+  const direccionWhatsapp = direccion && telefonoWhatsapp
+    ? crearDireccionWhatsappAprobacion({ telefono, nombreCliente, numeroOrden, token })
+    : "";
+  async function copiar() {
+    await navigator.clipboard.writeText(direccion);
+    alMostrarAviso?.("Enlace público copiado");
+  }
+  return (
+    <div className="acciones-enlace-publico">
+      <div><Share2 size={20} /><span><strong>Enlace para el cliente</strong><small>Permite consultar y autorizar el diagnóstico sin iniciar sesión.</small></span></div>
+      <div>
+        <button type="button" className="boton-secundario" onClick={copiar}><Copy size={17} />Copiar</button>
+        {direccionWhatsapp ? (
+          <a className="boton-whatsapp" href={direccionWhatsapp} target="_blank" rel="noreferrer"><MessageCircleMore size={18} />Abrir WhatsApp</a>
+        ) : (
+          <button type="button" className="boton-whatsapp" disabled title="El cliente no tiene un teléfono válido"><MessageCircleMore size={18} />Teléfono no disponible</button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ResumenCargosOrden({
+  resumen,
+  cargando,
+  guardando,
+  alEliminar,
+  soloLectura = false,
+}: {
+  resumen: ResumenDetallesOrdenServicioApi;
+  cargando: boolean;
+  guardando: boolean;
+  alEliminar: (detalleId: number) => Promise<void>;
+  soloLectura?: boolean;
+}) {
+  if (cargando) return null;
+  if (resumen.detalles.length === 0) return <div className="sin-cargos"><ClipboardList size={20} /><span>Aún no hay productos ni cargos en esta orden.</span></div>;
+  return (
+    <div className="resumen-cargos">
+      <div className="cabecera-cargos"><span>Descripción</span><span>Cantidad</span><span>Precio</span><span>Subtotal</span><span /></div>
+      {resumen.detalles.map((detalle) => (
+        <article key={detalle.id}>
+          <div><strong>{detalle.descripcion}</strong><small>{detalle.codigoProducto || "Detalle manual"}{detalle.existenciaDescontada ? " · Existencia descontada" : detalle.tipo === "Inventario" ? " · Sin descuento de existencia" : ""}</small></div>
+          <span>{detalle.cantidad} {detalle.unidadMedida || ""}</span>
+          <span>{formatearMoneda(detalle.precioUnitario)}</span>
+          <strong>{formatearMoneda(detalle.subtotal)}</strong>
+          {!soloLectura && !detalle.existenciaDescontada ? <button type="button" disabled={guardando} onClick={() => alEliminar(detalle.id)} aria-label={`Eliminar ${detalle.descripcion}`}><Trash2 size={17} /></button> : <span />}
+        </article>
+      ))}
+      <div className="total-cargos"><span>Total de la orden</span><strong>{formatearMoneda(resumen.total)}</strong></div>
+    </div>
+  );
+}
+
 function FormularioRecepcion({
   orden,
   inspeccionInicial,
   alEnviar,
+  alEliminarEvidencia,
 }: {
   orden: OrdenTaller;
   inspeccionInicial?: InspeccionVisual;
   alEnviar: (evento: FormEvent<HTMLFormElement>) => Promise<void>;
+  alEliminarEvidencia: (evidenciaId: number) => Promise<void>;
 }) {
   const [tipoDanio, setTipoDanio] = useState<TipoDanio>("Rayón");
   const [severidad, setSeveridad] = useState<SeveridadDanio>("Leve");
@@ -2374,6 +3091,8 @@ function FormularioRecepcion({
   const [cantidadFotos, setCantidadFotos] = useState(0);
   const [fotografias, setFotografias] = useState<File[]>([]);
   const [errorFotos, setErrorFotos] = useState("");
+  const [evidenciaConfirmandoId, setEvidenciaConfirmandoId] = useState<number | null>(null);
+  const [evidenciaEliminandoId, setEvidenciaEliminandoId] = useState<number | null>(null);
   const [guardando, setGuardando] = useState(false);
   const vistasPrevias = useMemo(
     () => fotografias.map((fotografia) => ({
@@ -2583,22 +3302,25 @@ function FormularioRecepcion({
           onChange={(evento) => {
             const seleccionadas = Array.from(evento.target.files || []);
             const disponibles = 12 - (inspeccionInicial?.evidencias.length || 0);
-            if (seleccionadas.length > disponibles) {
-              evento.target.value = "";
-              setFotografias([]);
-              setCantidadFotos(0);
-              setErrorFotos(`Puede agregar ${disponibles} fotografías más a esta inspección.`);
+            const acumuladas = [...fotografias, ...seleccionadas];
+            if (acumuladas.length > disponibles) {
+              sincronizarFotografiasEntrada(evento.target, fotografias);
+              const restantes = Math.max(0, disponibles - fotografias.length);
+              setErrorFotos(restantes > 0
+                ? `Puede agregar ${restantes} fotografías más a esta inspección.`
+                : "La inspección ya tiene el máximo de 12 fotografías.");
               return;
             }
 
             setErrorFotos("");
-            setFotografias(seleccionadas);
-            setCantidadFotos(seleccionadas.length);
+            setFotografias(acumuladas);
+            setCantidadFotos(acumuladas.length);
+            sincronizarFotografiasEntrada(evento.target, acumuladas);
           }}
         />
         {cantidadFotos > 0 ? <ImagePlus size={25} /> : <Camera size={25} />}
         <span>
-          <strong>{cantidadFotos > 0 ? `${cantidadFotos} fotografías seleccionadas` : "Agregar fotografías"}</strong>
+          <strong>{cantidadFotos > 0 ? `${cantidadFotos} ${cantidadFotos === 1 ? "fotografía seleccionada" : "fotografías seleccionadas"}` : "Agregar fotografías"}</strong>
           <small>Frente, laterales y evidencia de cada daño</small>
         </span>
         <Plus size={20} />
@@ -2615,6 +3337,39 @@ function FormularioRecepcion({
                 loading="lazy"
               />
               <figcaption>Guardada</figcaption>
+              <button
+                className={`boton-eliminar-evidencia ${evidenciaConfirmandoId === evidencia.id ? "confirmando" : ""}`}
+                type="button"
+                disabled={evidenciaEliminandoId !== null}
+                aria-label={evidenciaConfirmandoId === evidencia.id
+                  ? `Confirmar eliminación de ${evidencia.nombreArchivo}`
+                  : `Eliminar ${evidencia.nombreArchivo}`}
+                onClick={async () => {
+                  if (evidenciaConfirmandoId !== evidencia.id) {
+                    setEvidenciaConfirmandoId(evidencia.id);
+                    setErrorFotos("");
+                    return;
+                  }
+
+                  setEvidenciaEliminandoId(evidencia.id);
+                  try {
+                    await alEliminarEvidencia(evidencia.id);
+                    setEvidenciaConfirmandoId(null);
+                  } catch (error) {
+                    setErrorFotos(
+                      error instanceof Error
+                        ? error.message
+                        : "No fue posible eliminar la fotografía.",
+                    );
+                  } finally {
+                    setEvidenciaEliminandoId(null);
+                  }
+                }}
+              >
+                {evidenciaConfirmandoId === evidencia.id
+                  ? "Confirmar"
+                  : <Trash2 size={18} />}
+              </button>
             </figure>
           ))}
           {vistasPrevias.map((vista) => (
@@ -2630,11 +3385,9 @@ function FormularioRecepcion({
       <div className="lista-comprobacion"><label><input type="checkbox" name="dejaLlaves" defaultChecked={inspeccionInicial?.dejaLlaves} />Deja llaves</label><label><input type="checkbox" name="dejaDocumentos" defaultChecked={inspeccionInicial?.dejaDocumentos} />Deja documentos</label><label><input type="checkbox" name="aceptaPruebaRuta" />Acepta prueba de ruta</label></div>
       <button className="boton-primario boton-ancho" type="submit" disabled={guardando}>
         <Sparkles size={20} />
-        {guardando
-          ? "Guardando inspección..."
-          : inspeccionInicial
-            ? "Guardar cambios de inspección"
-            : "Guardar y pasar a diagnóstico"}
+        {inspeccionInicial
+          ? "Guardar cambios de inspección"
+          : "Guardar y pasar a diagnóstico"}
       </button>
     </form>
   );
@@ -2876,6 +3629,136 @@ async function retirarTallerSincronizadoApi(empresaNovaId: number) {
 
 async function listarBodegasApi(): Promise<BodegaInventarioApi[]> { const respuesta = await fetch(`${obtenerDireccionApi()}/api/inventario/bodegas`, { credentials: "include" }); if (!respuesta.ok) throw new Error("No fue posible consultar las bodegas."); return await respuesta.json() as BodegaInventarioApi[]; }
 async function listarExistenciasApi(bodegaId: number): Promise<ArticuloInventarioApi[]> { const respuesta = await fetch(`${obtenerDireccionApi()}/api/inventario/existencias?bodegaId=${bodegaId}`, { credentials: "include" }); if (!respuesta.ok) throw new Error("No fue posible consultar las existencias."); return await respuesta.json() as ArticuloInventarioApi[]; }
+
+async function obtenerDetallesOrdenApi(
+  ordenServicioId: number,
+  senal?: AbortSignal,
+): Promise<ResumenDetallesOrdenServicioApi> {
+  const respuesta = await fetch(
+    `${obtenerDireccionApi()}/api/ordenes-servicio/${ordenServicioId}/detalles`,
+    { credentials: "include", signal: senal },
+  );
+  if (!respuesta.ok) throw new Error(await obtenerMensajeErrorApi(respuesta, "No fue posible consultar los cargos."));
+  return await respuesta.json() as ResumenDetallesOrdenServicioApi;
+}
+
+async function obtenerDiagnosticoOrdenApi(
+  ordenServicioId: number,
+  senal?: AbortSignal,
+): Promise<DiagnosticoOrdenServicioApi> {
+  const respuesta = await fetch(`${obtenerDireccionApi()}/api/ordenes-servicio/${ordenServicioId}/diagnostico`, {
+    credentials: "include",
+    signal: senal,
+  });
+  if (!respuesta.ok) throw new Error(await obtenerMensajeErrorApi(respuesta, "No fue posible consultar el diagnóstico."));
+  return await respuesta.json() as DiagnosticoOrdenServicioApi;
+}
+
+async function guardarDiagnosticoOrdenApi(
+  ordenServicioId: number,
+  diagnostico: string,
+): Promise<DiagnosticoOrdenServicioApi> {
+  const respuesta = await fetch(`${obtenerDireccionApi()}/api/ordenes-servicio/${ordenServicioId}/diagnostico`, {
+    method: "PUT",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ diagnostico }),
+  });
+  if (!respuesta.ok) throw new Error(await obtenerMensajeErrorApi(respuesta, "No fue posible guardar el diagnóstico."));
+  return await respuesta.json() as DiagnosticoOrdenServicioApi;
+}
+
+async function cargarEvidenciasDiagnosticoApi(
+  ordenServicioId: number,
+  fotografias: File[],
+): Promise<DiagnosticoOrdenServicioApi> {
+  const datos = new FormData();
+  fotografias.forEach((fotografia) => datos.append("fotografias", fotografia));
+  const respuesta = await fetch(`${obtenerDireccionApi()}/api/ordenes-servicio/${ordenServicioId}/diagnostico/evidencias`, {
+    method: "POST",
+    credentials: "include",
+    body: datos,
+  });
+  if (!respuesta.ok) throw new Error(await obtenerMensajeErrorApi(respuesta, "No fue posible guardar la evidencia del diagnóstico."));
+  return await respuesta.json() as DiagnosticoOrdenServicioApi;
+}
+
+async function eliminarEvidenciaDiagnosticoApi(ordenServicioId: number, evidenciaId: number) {
+  const respuesta = await fetch(`${obtenerDireccionApi()}/api/ordenes-servicio/${ordenServicioId}/diagnostico/evidencias/${evidenciaId}`, {
+    method: "DELETE",
+    credentials: "include",
+  });
+  if (!respuesta.ok) throw new Error(await obtenerMensajeErrorApi(respuesta, "No fue posible eliminar la evidencia."));
+}
+
+function direccionEvidenciaDiagnostico(ordenServicioId: number, evidenciaId: number) {
+  return `${obtenerDireccionApi()}/api/ordenes-servicio/${ordenServicioId}/diagnostico/evidencias/${evidenciaId}/contenido`;
+}
+
+async function agregarDetalleInventarioApi(
+  ordenServicioId: number,
+  solicitud: { bodegaId: number; productoId: number; cantidad: number },
+): Promise<ResumenDetallesOrdenServicioApi> {
+  return solicitarResumenDetalles(
+    `${obtenerDireccionApi()}/api/ordenes-servicio/${ordenServicioId}/detalles/inventario`,
+    "POST",
+    solicitud,
+  );
+}
+
+async function agregarDetalleManualApi(
+  ordenServicioId: number,
+  solicitud: { descripcion: string; unidadMedida: string | null; cantidad: number; precioUnitario: number },
+): Promise<ResumenDetallesOrdenServicioApi> {
+  return solicitarResumenDetalles(
+    `${obtenerDireccionApi()}/api/ordenes-servicio/${ordenServicioId}/detalles/manual`,
+    "POST",
+    solicitud,
+  );
+}
+
+async function eliminarDetalleOrdenApi(
+  ordenServicioId: number,
+  detalleId: number,
+): Promise<ResumenDetallesOrdenServicioApi> {
+  return solicitarResumenDetalles(
+    `${obtenerDireccionApi()}/api/ordenes-servicio/${ordenServicioId}/detalles/${detalleId}`,
+    "DELETE",
+  );
+}
+
+async function solicitarResumenDetalles(
+  direccion: string,
+  metodo: "POST" | "DELETE",
+  solicitud?: object,
+): Promise<ResumenDetallesOrdenServicioApi> {
+  const respuesta = await fetch(direccion, {
+    method: metodo,
+    credentials: "include",
+    headers: solicitud ? { "Content-Type": "application/json" } : undefined,
+    body: solicitud ? JSON.stringify(solicitud) : undefined,
+  });
+  if (!respuesta.ok) throw new Error(await obtenerMensajeErrorApi(respuesta, "No fue posible actualizar los cargos."));
+  return await respuesta.json() as ResumenDetallesOrdenServicioApi;
+}
+
+async function cambiarEstadoOrdenApi(
+  ordenServicioId: number,
+  estado: "PendienteAprobacion" | "Reparacion" | "ListaParaEntrega",
+  descripcion: string,
+): Promise<OrdenTaller> {
+  const respuesta = await fetch(
+    `${obtenerDireccionApi()}/api/ordenes-servicio/${ordenServicioId}/estado`,
+    {
+      method: "PUT",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ estado, descripcion }),
+    },
+  );
+  if (!respuesta.ok) throw new Error(await obtenerMensajeErrorApi(respuesta, "No fue posible avanzar la orden."));
+  return convertirOrdenApi(await respuesta.json() as OrdenServicioApi);
+}
 
 async function cargarDatosApi(senal: AbortSignal): Promise<{
   ordenes: OrdenTaller[];
@@ -3255,6 +4138,55 @@ function direccionEvidencia(ordenServicioId: number, evidenciaId: number) {
   return `${obtenerDireccionApi()}/api/ordenes-servicio/${ordenServicioId}/recepcion/evidencias/${evidenciaId}/contenido`;
 }
 
+function sincronizarFotografiasEntrada(entrada: HTMLInputElement, fotografias: File[]) {
+  const transferencia = new DataTransfer();
+  fotografias.forEach((fotografia) => transferencia.items.add(fotografia));
+  entrada.files = transferencia.files;
+}
+
+function normalizarTelefonoWhatsapp(telefono: string) {
+  let digitos = telefono.replace(/\D/g, "");
+  if (digitos.startsWith("00")) digitos = digitos.slice(2);
+  if (digitos.length === 8) digitos = `505${digitos}`;
+  return digitos.length >= 10 && digitos.length <= 15 ? digitos : "";
+}
+
+function crearDireccionWhatsappAprobacion({
+  telefono,
+  nombreCliente,
+  numeroOrden,
+  token,
+}: {
+  telefono: string;
+  nombreCliente: string;
+  numeroOrden: string;
+  token: string;
+}) {
+  const telefonoWhatsapp = normalizarTelefonoWhatsapp(telefono);
+  const direccionPublica = `${window.location.origin}/orden/${token}`;
+  const mensaje = `Hola ${nombreCliente}, compartimos el diagnóstico de su vehículo correspondiente a la orden ${numeroOrden}. Puede revisarlo y autorizar el trabajo en el siguiente enlace: ${direccionPublica}`;
+  return `https://wa.me/${telefonoWhatsapp}?text=${encodeURIComponent(mensaje)}`;
+}
+
+async function eliminarEvidenciaApi(
+  ordenServicioId: number,
+  evidenciaId: number,
+) {
+  const respuesta = await fetch(
+    `${obtenerDireccionApi()}/api/ordenes-servicio/${ordenServicioId}/recepcion/evidencias/${evidenciaId}`,
+    {
+      method: "DELETE",
+      credentials: "include",
+    },
+  );
+  if (!respuesta.ok) {
+    throw new Error(await obtenerMensajeErrorApi(
+      respuesta,
+      "No fue posible eliminar la fotografía.",
+    ));
+  }
+}
+
 function zonaParaApi(zona: ZonaVehiculo) {
   const zonas: Record<ZonaVehiculo, string> = {
     frente: "Frente",
@@ -3287,16 +4219,24 @@ function convertirEstadoApi(estado: string): EstadoOrden {
   const equivalencias: Record<string, EstadoOrden> = {
     Recepcion: "Recepción",
     Diagnostico: "Diagnóstico",
-    Cotizacion: "Cotización",
+    Cotizacion: "Por aprobar",
     PendienteAprobacion: "Por aprobar",
     PreparacionReparacion: "Reparación",
     Reparacion: "Reparación",
-    ControlCalidad: "Control de calidad",
+    ControlCalidad: "Reparación",
     ListaParaEntrega: "Lista para entregar",
     Entregada: "Lista para entregar",
     Cerrada: "Lista para entregar",
   };
   return equivalencias[estado] || "Recepción";
+}
+
+function formatearMoneda(valor: number) {
+  return new Intl.NumberFormat("es-NI", {
+    style: "currency",
+    currency: "NIO",
+    minimumFractionDigits: 2,
+  }).format(valor);
 }
 
 function progresoPorEstado(estado: EstadoOrden) {

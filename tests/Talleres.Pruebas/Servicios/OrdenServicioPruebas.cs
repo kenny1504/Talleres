@@ -163,7 +163,90 @@ public sealed class OrdenServicioPruebas
                 Estado = EstadoOrdenServicio.Entregada,
                 Descripcion = "TransiciÃ³n invÃ¡lida para la prueba"
             },
-            CancellationToken.None));
+                CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task CambiarEstadoAsync_FlujoOperativo_AvanzaHastaListaParaEntrega()
+    {
+        var empresa = new ContextoEmpresaPrueba(1);
+        await using var dbContext = CrearDbContext(empresa);
+        var clienteServicio = new ClienteServicio(dbContext, empresa);
+        var vehiculoServicio = new VehiculoServicio(dbContext, empresa);
+        var ordenServicio = new OrdenServicioServicio(dbContext, empresa);
+        var modeloId = await CrearCatalogoAsync(dbContext, empresa.EmpresaId);
+        var cliente = await clienteServicio.CrearAsync(
+            CrearCliente("CLIENTE-FLUJO"),
+            CancellationToken.None);
+        var vehiculo = await vehiculoServicio.CrearAsync(
+            CrearVehiculo(cliente.Id, modeloId, "M000002"),
+            CancellationToken.None);
+        var orden = await ordenServicio.CrearAsync(
+            new CrearOrdenServicioSolicitud
+            {
+                ClienteId = cliente.Id,
+                VehiculoId = vehiculo.Id
+            },
+            CancellationToken.None);
+        var entidad = await dbContext.OrdenesServicio.SingleAsync();
+        entidad.Estado = EstadoOrdenServicio.Diagnostico;
+        entidad.Diagnostico = "Se detectó desgaste en el sistema de frenos delantero.";
+        entidad.FechaDiagnosticoUtc = DateTime.UtcNow;
+        await dbContext.SaveChangesAsync();
+
+        foreach (var estado in new[]
+                 {
+                     EstadoOrdenServicio.PendienteAprobacion,
+                     EstadoOrdenServicio.Reparacion,
+                     EstadoOrdenServicio.ListaParaEntrega
+                 })
+        {
+            if (estado == EstadoOrdenServicio.Reparacion)
+            {
+                entidad.FechaAutorizacionClienteUtc = DateTime.UtcNow;
+                await dbContext.SaveChangesAsync();
+            }
+            orden = await ordenServicio.CambiarEstadoAsync(
+                orden.Id,
+                new CambiarEstadoOrdenServicioSolicitud
+                {
+                    Estado = estado,
+                    Descripcion = $"Avance de prueba a {estado}."
+                },
+                CancellationToken.None);
+        }
+
+        Assert.Equal(EstadoOrdenServicio.ListaParaEntrega, orden.Estado);
+    }
+
+    [Fact]
+    public async Task CambiarEstadoAsync_SinDiagnostico_NoPermiteEnviarAprobacion()
+    {
+        var empresa = new ContextoEmpresaPrueba(1);
+        await using var dbContext = CrearDbContext(empresa);
+        var ordenServicio = new OrdenServicioServicio(dbContext, empresa);
+        var modeloId = await CrearCatalogoAsync(dbContext, empresa.EmpresaId);
+        var clienteServicio = new ClienteServicio(dbContext, empresa);
+        var vehiculoServicio = new VehiculoServicio(dbContext, empresa);
+        var cliente = await clienteServicio.CrearAsync(CrearCliente("CLIENTE-DIAGNOSTICO"));
+        var vehiculo = await vehiculoServicio.CrearAsync(CrearVehiculo(cliente.Id, modeloId, "M000003"));
+        var orden = await ordenServicio.CrearAsync(new CrearOrdenServicioSolicitud
+        {
+            ClienteId = cliente.Id,
+            VehiculoId = vehiculo.Id
+        });
+        var entidad = await dbContext.OrdenesServicio.SingleAsync();
+        entidad.Estado = EstadoOrdenServicio.Diagnostico;
+        await dbContext.SaveChangesAsync();
+
+        var excepcion = await Assert.ThrowsAsync<ReglaNegocioException>(() =>
+            ordenServicio.CambiarEstadoAsync(orden.Id, new CambiarEstadoOrdenServicioSolicitud
+            {
+                Estado = EstadoOrdenServicio.PendienteAprobacion,
+                Descripcion = "Enviar diagnóstico para autorización."
+            }));
+
+        Assert.Contains("diagnóstico", excepcion.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     private static TallerDbContext CrearDbContext(ContextoEmpresaPrueba empresa)

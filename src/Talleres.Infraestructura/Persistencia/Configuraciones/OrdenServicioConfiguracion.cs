@@ -17,9 +17,16 @@ public sealed class OrdenServicioConfiguracion : IEntityTypeConfiguration<OrdenS
         builder.Property(orden => orden.Estado).HasConversion<int>();
         builder.Property(orden => orden.FechaIngreso).HasPrecision(0);
         builder.Property(orden => orden.Observaciones).HasMaxLength(1000);
+        builder.Property(orden => orden.Diagnostico).HasMaxLength(4000);
+        builder.Property(orden => orden.FechaDiagnosticoUtc).HasPrecision(0);
+        builder.Property(orden => orden.TokenPublico).HasMaxLength(64);
+        builder.Property(orden => orden.FechaAutorizacionClienteUtc).HasPrecision(0);
 
         builder.HasIndex(orden => new { orden.EmpresaId, orden.Numero }).IsUnique();
         builder.HasIndex(orden => new { orden.EmpresaId, orden.FechaIngreso });
+        builder.HasIndex(orden => orden.TokenPublico)
+            .IsUnique()
+            .HasFilter("[TokenPublico] IS NOT NULL");
 
         builder.HasOne(orden => orden.Cliente)
             .WithMany(cliente => cliente.OrdenesServicio)

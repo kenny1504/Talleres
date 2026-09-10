@@ -24,7 +24,11 @@ public interface ITallerDbContext
 
     DbSet<EvidenciaInspeccion> EvidenciasInspeccion { get; }
 
+    DbSet<EvidenciaDiagnostico> EvidenciasDiagnostico { get; }
+
     DbSet<HistorialOrdenServicio> HistorialOrdenesServicio { get; }
+
+    DbSet<DetalleOrdenServicio> DetallesOrdenesServicio { get; }
 
     DbSet<TallerSincronizado> TalleresSincronizados { get; }
 

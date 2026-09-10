@@ -135,6 +135,20 @@ public sealed class RecepcionesVehiculoController(
         return Redirect(direccion.AbsoluteUri);
     }
 
+    [HttpDelete("evidencias/{evidenciaId:long}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    public async Task<IActionResult> EliminarEvidencia(
+        long ordenServicioId,
+        long evidenciaId,
+        CancellationToken cancellationToken)
+    {
+        await evidenciaInspeccionServicio.EliminarAsync(
+            ordenServicioId,
+            evidenciaId,
+            cancellationToken);
+        return NoContent();
+    }
+
     private static async Task<string?> ValidarFotografiaAsync(
         IFormFile fotografia,
         CancellationToken cancellationToken)

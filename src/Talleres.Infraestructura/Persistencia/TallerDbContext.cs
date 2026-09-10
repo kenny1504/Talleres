@@ -26,8 +26,13 @@ public sealed class TallerDbContext(
 
     public DbSet<EvidenciaInspeccion> EvidenciasInspeccion => Set<EvidenciaInspeccion>();
 
+    public DbSet<EvidenciaDiagnostico> EvidenciasDiagnostico => Set<EvidenciaDiagnostico>();
+
     public DbSet<HistorialOrdenServicio> HistorialOrdenesServicio =>
         Set<HistorialOrdenServicio>();
+
+    public DbSet<DetalleOrdenServicio> DetallesOrdenesServicio =>
+        Set<DetalleOrdenServicio>();
 
     public DbSet<TallerSincronizado> TalleresSincronizados =>
         Set<TallerSincronizado>();
@@ -63,7 +68,11 @@ public sealed class TallerDbContext(
             .HasQueryFilter(entidad => entidad.EmpresaId == contextoEmpresa.EmpresaId);
         modelBuilder.Entity<EvidenciaInspeccion>()
             .HasQueryFilter(entidad => entidad.EmpresaId == contextoEmpresa.EmpresaId);
+        modelBuilder.Entity<EvidenciaDiagnostico>()
+            .HasQueryFilter(entidad => entidad.EmpresaId == contextoEmpresa.EmpresaId);
         modelBuilder.Entity<HistorialOrdenServicio>()
+            .HasQueryFilter(entidad => entidad.EmpresaId == contextoEmpresa.EmpresaId);
+        modelBuilder.Entity<DetalleOrdenServicio>()
             .HasQueryFilter(entidad => entidad.EmpresaId == contextoEmpresa.EmpresaId);
 
         base.OnModelCreating(modelBuilder);

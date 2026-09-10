@@ -30,4 +30,15 @@ public interface IEvidenciaInspeccionServicio
         long ordenServicioId,
         long evidenciaId,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Elimina de almacenamiento y de la inspección una evidencia existente.
+    /// </summary>
+    /// <param name="ordenServicioId">Orden propietaria de la recepción.</param>
+    /// <param name="evidenciaId">Evidencia que se eliminará.</param>
+    /// <param name="cancellationToken">Token para cancelar la operación.</param>
+    Task EliminarAsync(
+        long ordenServicioId,
+        long evidenciaId,
+        CancellationToken cancellationToken = default);
 }

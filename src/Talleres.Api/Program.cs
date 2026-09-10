@@ -158,6 +158,8 @@ builder.Services.AddScoped<IClienteServicio, ClienteServicio>();
 builder.Services.AddScoped<IVehiculoServicio, VehiculoServicio>();
 builder.Services.AddScoped<ICatalogoVehiculoServicio, CatalogoVehiculoServicio>();
 builder.Services.AddScoped<IOrdenServicioServicio, OrdenServicioServicio>();
+builder.Services.AddScoped<IDetalleOrdenServicio, DetalleOrdenServicio>();
+builder.Services.AddScoped<IDiagnosticoOrdenServicioServicio, DiagnosticoOrdenServicioServicio>();
 builder.Services.AddScoped<IRecepcionVehiculoServicio, RecepcionVehiculoServicio>();
 builder.Services.AddScoped<IEvidenciaInspeccionServicio, EvidenciaInspeccionServicio>();
 builder.Services.AddSingleton<IAlmacenamientoEvidencias>(_ =>

@@ -275,3 +275,114 @@ test("la inspección carga y muestra evidencias públicas de Amazon S3", async (
   assert.match(estilos, /\.galeria-evidencias\s*\{/);
   assert.match(estilos, /\.galeria-evidencias img\s*\{[^}]*object-fit:\s*cover/s);
 });
+
+test("permite confirmar y eliminar fotografías guardadas de una orden", async () => {
+  const pagina = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+  const estilos = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
+
+  assert.match(pagina, /method:\s*"DELETE"/);
+  assert.match(pagina, /Confirmar eliminación de/);
+  assert.match(pagina, /alEliminarEvidencia/);
+  assert.match(estilos, /\.boton-eliminar-evidencia/);
+  assert.match(estilos, /min-height:\s*44px/);
+});
+
+test("lleva la orden hasta entrega y registra productos y cargos durante reparación", async () => {
+  const [pagina, estilos] = await Promise.all([
+    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(pagina, /Solicitar aprobación por WhatsApp/);
+  assert.match(pagina, /Iniciar reparación/);
+  assert.match(pagina, /Marcar lista para entregar/);
+  assert.match(pagina, /Desde inventario/);
+  assert.match(pagina, /Cargo manual/);
+  assert.match(pagina, /Total de la orden/);
+  assert.match(pagina, /existencia insuficiente/);
+  assert.match(pagina, /api\/ordenes-servicio\/\$\{ordenServicioId\}\/detalles\/inventario/);
+  assert.match(estilos, /\.formularios-cargos\s*\{[^}]*grid-template-columns:\s*repeat\(2/s);
+  assert.match(estilos, /\.formulario-cargo input,[\s\S]*min-height:\s*46px/s);
+  assert.match(estilos, /@media \(max-width:\s*680px\)[\s\S]*\.formularios-cargos\s*\{\s*grid-template-columns:\s*1fr/s);
+});
+
+test("registra, dicta y comparte el diagnóstico mediante un enlace público", async () => {
+  const [pagina, paginaPublica, estilos] = await Promise.all([
+    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/orden/[token]/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(pagina, /Dictar diagnóstico/);
+  assert.match(pagina, /Evidencia fotográfica/);
+  assert.match(pagina, /Hallazgos, piezas afectadas y evidencia del diagnóstico/);
+  assert.match(pagina, /8 - \(diagnostico\?\.evidencias\.length \?\? 0\)/);
+  assert.match(pagina, /const acumuladas = \[\.\.\.fotografias, \.\.\.seleccionadas\]/);
+  assert.match(pagina, /sincronizarFotografiasEntrada\(evento\.target, acumuladas\)/);
+  assert.match(pagina, /vistasPrevias\.map/);
+  assert.match(pagina, /wa\.me/);
+  assert.match(pagina, /normalizarTelefonoWhatsapp/);
+  assert.match(pagina, /telefono\.replace\(\/\\D\/g, ""\)/);
+  assert.match(pagina, /digitos\.length === 8/);
+  assert.match(pagina, /Abrir WhatsApp/);
+  assert.match(pagina, /Puede revisarlo y autorizar el trabajo/);
+  assert.match(pagina, /Diagnóstico finalizado y preparado para aprobación del cliente/);
+  assert.match(pagina, /cliente=\{clientes\.find\(\(cliente\) => cliente\.id === ordenDetalle\.clienteId\)\}/);
+  assert.doesNotMatch(pagina, /https:\/\/wa\.me\/\?text=/);
+  assert.match(pagina, /guardarDiagnosticoOrdenApi/);
+  assert.match(paginaPublica, /Autorizar continuar/);
+  assert.match(paginaPublica, /api\/publico\/ordenes-servicio/);
+  assert.match(paginaPublica, /Inspección del vehículo/);
+  assert.match(paginaPublica, /Fotografías de la inspección/);
+  assert.match(paginaPublica, /const daniosInspeccion = orden\.daniosInspeccion \?\? \[\]/);
+  assert.match(paginaPublica, /daniosInspeccion\.map/);
+  assert.match(paginaPublica, /direccionEvidenciaInspeccion/);
+  assert.match(paginaPublica, /const taller = orden\.taller \?\?/);
+  assert.match(paginaPublica, /Logo de \$\{taller\.nombre\}/);
+  assert.match(paginaPublica, /taller\.direccion/);
+  assert.match(paginaPublica, /taller\.telefono/);
+  assert.match(paginaPublica, /Sistema desarrollado por/);
+  assert.match(paginaPublica, /https:\/\/www\.ksoftech\.com\//);
+  assert.match(estilos, /\.formulario-diagnostico/);
+  assert.match(estilos, /\.campo-diagnostico textarea\s*\{[^}]*background:\s*var\(--panel\)/s);
+  assert.match(estilos, /\.campo-diagnostico textarea:focus/);
+  assert.match(estilos, /\.pagina-publica-orden/);
+  assert.match(estilos, /\.vehiculo-publico[^}]*background:\s*var\(--verde-profundo\)/s);
+  assert.match(estilos, /\.tarjeta-publica[^}]*background:\s*var\(--panel\)/s);
+  assert.match(estilos, /\.identidad-taller-publica[^}]*grid-template-columns:/s);
+});
+
+test("acumula selecciones consecutivas de fotografías en diagnóstico e inspección", async () => {
+  const pagina = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+
+  assert.equal(
+    pagina.match(/const acumuladas = \[\.\.\.fotografias, \.\.\.seleccionadas\]/g)?.length,
+    2,
+  );
+  assert.equal(
+    pagina.match(/sincronizarFotografiasEntrada\(evento\.target, acumuladas\)/g)?.length,
+    2,
+  );
+  assert.match(pagina, /function sincronizarFotografiasEntrada\(entrada: HTMLInputElement, fotografias: File\[\]\)/);
+  assert.match(pagina, /entrada\.files = transferencia\.files/);
+});
+
+test("usa un cargador global accesible para las operaciones críticas", async () => {
+  const [pagina, disposicion, cargador, estilos] = await Promise.all([
+    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/componentes/ProveedorCargadorPantalla.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(disposicion, /<ProveedorCargadorPantalla>\{children\}<\/ProveedorCargadorPantalla>/);
+  assert.match(cargador, /role="status"/);
+  assert.match(cargador, /aria-live="assertive"/);
+  assert.match(cargador, /inert=\{cargando \? true : undefined\}/);
+  assert.match(cargador, /finally\s*\{\s*finalizarCargaPantalla\(id\)/s);
+  assert.match(estilos, /\.cargador-pantalla\s*\{[^}]*position:\s*fixed[^}]*inset:\s*0[^}]*z-index:\s*1000/s);
+  assert.match(estilos, /env\(safe-area-inset-bottom\)/);
+  assert.match(pagina, /ejecutarConCargadorPantalla\(\s*"Creando la orden de servicio…"/s);
+  assert.match(pagina, /"Guardando la recepción e inspección…"/);
+  assert.doesNotMatch(pagina, /<Cargador\b/);
+});

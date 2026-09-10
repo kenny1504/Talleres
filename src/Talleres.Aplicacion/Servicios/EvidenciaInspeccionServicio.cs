@@ -114,6 +114,27 @@ public sealed class EvidenciaInspeccionServicio(
             cancellationToken);
     }
 
+    public async Task EliminarAsync(
+        long ordenServicioId,
+        long evidenciaId,
+        CancellationToken cancellationToken = default)
+    {
+        var empresaId = contextoEmpresa.ObtenerEmpresaIdRequerido();
+        var evidencia = await dbContext.EvidenciasInspeccion
+                            .Where(item => item.Id == evidenciaId)
+                            .Where(item => item.EmpresaId == empresaId)
+                            .Where(item => item.RecepcionVehiculo.OrdenServicioId == ordenServicioId)
+                            .SingleOrDefaultAsync(cancellationToken)
+                        ?? throw new RecursoNoEncontradoException(
+                            "La evidencia que intenta eliminar no existe en esta orden.");
+
+        await almacenamientoEvidencias.EliminarAsync(
+            evidencia.ClaveObjeto,
+            cancellationToken);
+        dbContext.EvidenciasInspeccion.Remove(evidencia);
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
     private static EvidenciaInspeccionDto ConvertirDto(EvidenciaInspeccion evidencia) => new(
         evidencia.Id,
         evidencia.NombreArchivo,

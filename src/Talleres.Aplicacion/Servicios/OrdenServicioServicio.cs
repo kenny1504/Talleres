@@ -110,6 +110,22 @@ public sealed class OrdenServicioServicio(
                 $"No se permite cambiar la orden de {orden.Estado} a {solicitud.Estado}.");
         }
 
+        if (orden.Estado == EstadoOrdenServicio.Diagnostico &&
+            solicitud.Estado == EstadoOrdenServicio.PendienteAprobacion &&
+            string.IsNullOrWhiteSpace(orden.Diagnostico))
+        {
+            throw new ReglaNegocioException(
+                "Debe guardar el diagnóstico antes de enviarlo para autorización.");
+        }
+
+        if (orden.Estado == EstadoOrdenServicio.PendienteAprobacion &&
+            solicitud.Estado == EstadoOrdenServicio.Reparacion &&
+            orden.FechaAutorizacionClienteUtc is null)
+        {
+            throw new ReglaNegocioException(
+                "El cliente todavía no ha autorizado continuar con la reparación.");
+        }
+
         var estadoAnterior = orden.Estado;
         orden.Estado = solicitud.Estado;
         orden.Historial.Add(new HistorialOrdenServicio
@@ -183,10 +199,13 @@ public sealed class OrdenServicioServicio(
         return (estadoActual, nuevoEstado) switch
         {
             (EstadoOrdenServicio.Recepcion, EstadoOrdenServicio.Diagnostico) => true,
+            (EstadoOrdenServicio.Diagnostico, EstadoOrdenServicio.PendienteAprobacion) => true,
             (EstadoOrdenServicio.Diagnostico, EstadoOrdenServicio.Cotizacion) => true,
             (EstadoOrdenServicio.Cotizacion, EstadoOrdenServicio.PendienteAprobacion) => true,
+            (EstadoOrdenServicio.PendienteAprobacion, EstadoOrdenServicio.Reparacion) => true,
             (EstadoOrdenServicio.PendienteAprobacion, EstadoOrdenServicio.PreparacionReparacion) => true,
             (EstadoOrdenServicio.PreparacionReparacion, EstadoOrdenServicio.Reparacion) => true,
+            (EstadoOrdenServicio.Reparacion, EstadoOrdenServicio.ListaParaEntrega) => true,
             (EstadoOrdenServicio.Reparacion, EstadoOrdenServicio.ControlCalidad) => true,
             (EstadoOrdenServicio.ControlCalidad, EstadoOrdenServicio.Reparacion) => true,
             (EstadoOrdenServicio.ControlCalidad, EstadoOrdenServicio.ListaParaEntrega) => true,

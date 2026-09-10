@@ -49,6 +49,44 @@ public sealed class EvidenciaInspeccionServicioPruebas
             (await dbContext.EvidenciasInspeccion.SingleAsync()).ClaveObjeto);
     }
 
+    [Fact]
+    public async Task EliminarAsync_EvidenciaDeLaOrden_EliminaObjetoYMetadatos()
+    {
+        var empresa = new ContextoEmpresaPrueba(17);
+        await using var dbContext = CrearDbContext(empresa);
+        var recepcion = new RecepcionVehiculo
+        {
+            EmpresaId = empresa.EmpresaId,
+            OrdenServicioId = 81,
+            Kilometraje = 10,
+            PorcentajeCombustible = 50,
+            DescripcionEstado = "Sin novedades",
+            FechaRecepcion = DateTime.UtcNow
+        };
+        var evidencia = new EvidenciaInspeccion
+        {
+            EmpresaId = empresa.EmpresaId,
+            RecepcionVehiculo = recepcion,
+            ClaveObjeto = "empresas/17/recepciones/1/frente.jpg",
+            NombreArchivo = "frente.jpg",
+            TipoContenido = "image/jpeg",
+            Longitud = 4,
+            FechaCargaUtc = DateTime.UtcNow
+        };
+        dbContext.AddRange(recepcion, evidencia);
+        await dbContext.SaveChangesAsync();
+        var almacenamiento = new AlmacenamientoEvidenciasPrueba();
+        var servicio = new EvidenciaInspeccionServicio(dbContext, empresa, almacenamiento);
+
+        await servicio.EliminarAsync(
+            recepcion.OrdenServicioId,
+            evidencia.Id,
+            CancellationToken.None);
+
+        Assert.Equal(evidencia.ClaveObjeto, almacenamiento.ClaveEliminada);
+        Assert.Empty(await dbContext.EvidenciasInspeccion.ToListAsync());
+    }
+
     private static TallerDbContext CrearDbContext(ContextoEmpresaPrueba empresa)
     {
         var opciones = new DbContextOptionsBuilder<TallerDbContext>()
@@ -60,6 +98,8 @@ public sealed class EvidenciaInspeccionServicioPruebas
     private sealed class AlmacenamientoEvidenciasPrueba : IAlmacenamientoEvidencias
     {
         public string? ClaveGuardada { get; private set; }
+
+        public string? ClaveEliminada { get; private set; }
 
         public Task<string> GuardarAsync(
             long empresaId,
@@ -81,6 +121,10 @@ public sealed class EvidenciaInspeccionServicioPruebas
 
         public Task EliminarAsync(
             string claveObjeto,
-            CancellationToken cancellationToken = default) => Task.CompletedTask;
+            CancellationToken cancellationToken = default)
+        {
+            ClaveEliminada = claveObjeto;
+            return Task.CompletedTask;
+        }
     }
 }
