@@ -260,7 +260,6 @@ public sealed class OrdenServicioPruebas
     private static CrearClienteSolicitud CrearCliente(string documento) => new()
     {
         Nombre = $"Cliente {documento}",
-        DocumentoIdentidad = documento,
         Telefono = "8888-0000"
     };
 

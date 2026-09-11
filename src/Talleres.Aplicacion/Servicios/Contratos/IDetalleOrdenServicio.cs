@@ -18,7 +18,7 @@ public interface IDetalleOrdenServicio
     /// <summary>
     /// Agrega un producto con el precio del inventario y descuenta stock cuando la cantidad disponible es suficiente.
     /// </summary>
-    /// <param name="ordenServicioId">Orden en reparación.</param>
+    /// <param name="ordenServicioId">Orden en reparación o lista para entregar.</param>
     /// <param name="solicitud">Producto, bodega y cantidad solicitada.</param>
     /// <param name="empresaNovaId">Empresa autenticada en NOVA.</param>
     /// <param name="usuarioId">Usuario autenticado que origina la salida.</param>
@@ -32,7 +32,7 @@ public interface IDetalleOrdenServicio
         CancellationToken cancellationToken = default);
 
     /// <summary>Agrega un producto comprado, mano de obra u otro concepto capturado manualmente.</summary>
-    /// <param name="ordenServicioId">Orden en reparación.</param>
+    /// <param name="ordenServicioId">Orden en reparación o lista para entregar.</param>
     /// <param name="solicitud">Descripción, cantidad, unidad y precio.</param>
     /// <param name="cancellationToken">Token para cancelar la operación.</param>
     /// <returns>Resumen actualizado de la orden.</returns>

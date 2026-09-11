@@ -1325,54 +1325,53 @@ textarea:focus-visible {
   color: #8b3527;
 }
 
-.rejilla-clientes > .estado-vacio,
+.lista-clientes > .estado-vacio,
 .lista-vehiculos > .estado-vacio,
 .rejilla-decisiones > .estado-vacio {
   grid-column: 1 / -1;
   width: 100%;
 }
 
-.rejilla-clientes {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 15px;
-}
-
-.tarjeta-cliente {
-  min-height: 260px;
-  padding: 20px;
-  border: 1px solid var(--borde);
-  border-radius: 19px;
-  background: white;
-  box-shadow: 0 7px 24px rgba(25, 35, 31, 0.04);
-}
-
-.cliente-superior {
+.buscador-listado {
+  min-height: 46px;
+  margin: 0 0 14px;
+  padding: 0 13px;
   display: flex;
-  justify-content: space-between;
+  align-items: center;
+  gap: 9px;
+  border: 1px solid var(--borde);
+  border-radius: 12px;
+  background: white;
+  color: var(--tinta-suave);
 }
 
-.avatar-grande {
-  width: 52px;
-  height: 52px;
-  flex-basis: 52px;
-  border-radius: 15px;
+.buscador-listado:focus-within { border-color: #89ad9f; box-shadow: 0 0 0 3px rgba(23, 107, 82, .08); }
+.buscador-listado input { min-width: 0; flex: 1; border: 0; outline: 0; background: transparent; color: var(--tinta); font: inherit; }
+
+.lista-clientes { overflow: hidden; }
+
+.fila-cliente {
+  min-height: 82px;
+  padding: 11px 16px;
+  display: grid;
+  grid-template-columns: 46px minmax(150px, 1.1fr) minmax(180px, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  border-bottom: 1px solid #ecece7;
+  background: white;
 }
 
-.cliente-superior .boton-icono {
-  border-color: transparent;
-  background: transparent;
-}
-
-.tarjeta-cliente h3 { margin: 17px 0 4px; font-size: 16px; }
-.tarjeta-cliente > p { margin: 0; color: var(--tinta-suave); font-size: 12px; }
-
-.tarjeta-cliente.cliente-inactivo {
+.fila-cliente:last-child { border-bottom: 0; }
+.fila-cliente.cliente-inactivo {
   background: #f8f8f5;
 }
 
+.avatar-cliente { width: 46px; height: 46px; flex-basis: 46px; border-radius: 14px; }
+.resumen-cliente strong, .resumen-cliente small { display: block; }
+.resumen-cliente strong { font-size: 14px; }
+.resumen-cliente small { margin-top: 4px; color: var(--tinta-suave); font-size: 12px; }
+
 .estado-cliente-inactivo {
-  margin-top: 9px;
   padding: 4px 8px;
   display: inline-flex;
   border-radius: 999px;
@@ -1383,13 +1382,9 @@ textarea:focus-visible {
 }
 
 .datos-cliente {
-  min-height: 59px;
-  margin: 17px 0;
-  padding: 10px 0;
   display: flex;
-  gap: 15px;
-  border-top: 1px solid #ededE8;
-  border-bottom: 1px solid #ededE8;
+  flex-wrap: wrap;
+  gap: 8px 14px;
 }
 
 .datos-cliente span {
@@ -1401,14 +1396,14 @@ textarea:focus-visible {
 }
 
 .acciones-cliente {
-  display: grid;
-  grid-template-columns: minmax(96px, 0.75fr) minmax(120px, 1.25fr);
-  gap: 9px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .acciones-cliente button {
-  min-height: 46px;
-  padding-inline: 12px;
+  min-height: 44px;
+  padding-inline: 13px;
 }
 
 .lista-vehiculos > button {
@@ -1994,7 +1989,7 @@ textarea:focus-visible {
 .formularios-cargos {
   margin-top: 20px;
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1.25fr) minmax(280px, .75fr);
   gap: 12px;
 }
 
@@ -2025,6 +2020,31 @@ textarea:focus-visible {
 .formulario-cargo > div:first-child strong { color: var(--tinta); font-size: 14px; }
 .formulario-cargo > div:first-child small { margin-top: 2px; color: var(--tinta-suave); font-size: 12px; }
 
+.accion-cargo-manual {
+  min-width: 0;
+  padding: 16px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-content: start;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--borde);
+  border-radius: 15px;
+  background: var(--superficie);
+}
+
+.accion-cargo-manual > span { width: 44px; height: 44px; display: grid; place-items: center; border-radius: 11px; background: var(--verde-claro); color: var(--verde); }
+.accion-cargo-manual strong,
+.accion-cargo-manual small { display: block; }
+.accion-cargo-manual strong { font-size: 14px; }
+.accion-cargo-manual small { margin-top: 3px; color: var(--tinta-suave); font-size: 12px; }
+.accion-cargo-manual .boton-secundario { grid-column: 1 / -1; }
+
+.modal-cargo-manual { width: min(540px, 100%); }
+.formulario-cargo-modal { padding: 0; border: 0; background: transparent; }
+.acciones-modal-cargo { display: grid; grid-template-columns: 1fr 1.25fr; gap: 9px; }
+.acciones-modal-cargo button { min-height: 46px; }
+
 .formulario-cargo label {
   display: grid;
   gap: 6px;
@@ -2045,10 +2065,94 @@ textarea:focus-visible {
   font: inherit;
 }
 
-.fila-cargo {
+.controles-productos-inventario {
   display: grid;
-  grid-template-columns: 0.85fr 1.15fr;
+  grid-template-columns: minmax(150px, .7fr) minmax(210px, 1.3fr);
   gap: 9px;
+}
+
+.campo-busqueda-producto { position: relative; }
+.campo-busqueda-producto > svg { position: absolute; left: 12px; bottom: 14px; color: var(--tinta-suave); pointer-events: none; }
+.formulario-cargo .campo-busqueda-producto input { padding-left: 39px; }
+
+.selector-productos-inventario {
+  max-height: 250px;
+  display: grid;
+  gap: 7px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.producto-inventario {
+  width: 100%;
+  min-height: 62px;
+  padding: 9px 10px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--borde);
+  border-radius: 11px;
+  background: white;
+  color: var(--tinta);
+  text-align: left;
+}
+
+.producto-inventario > span:first-child { min-width: 0; }
+.producto-inventario strong,
+.producto-inventario small { display: block; }
+.producto-inventario > span:first-child strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
+.producto-inventario small { margin-top: 3px; color: var(--tinta-suave); font-size: 12px; }
+.datos-producto-inventario { text-align: right; white-space: nowrap; }
+.datos-producto-inventario strong { color: var(--verde-profundo); font-size: 14px; }
+
+.sin-productos-inventario {
+  margin: 0;
+  padding: 18px 12px;
+  border: 1px dashed var(--borde);
+  border-radius: 11px;
+  color: var(--tinta-suave);
+  text-align: center;
+  font-size: 14px;
+}
+
+.accion-producto-inventario {
+  display: grid;
+  grid-template-columns: minmax(110px, .4fr) minmax(190px, 1fr);
+  align-items: end;
+  gap: 9px;
+}
+
+.accion-producto-inventario .boton-secundario { min-height: 46px; }
+
+.ayuda-busqueda-producto { margin: 0; color: var(--tinta-suave); font-size: 14px; }
+
+.producto-seleccionado-inventario {
+  padding: 13px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 11px;
+  border: 1px solid var(--verde);
+  border-radius: 11px;
+  background: var(--verde-claro);
+}
+
+.producto-seleccionado-inventario > div:first-child strong,
+.producto-seleccionado-inventario > div:first-child small { display: block; }
+.producto-seleccionado-inventario > div:first-child small { margin-top: 3px; color: var(--tinta-suave); font-size: 12px; }
+.producto-seleccionado-inventario .accion-producto-inventario,
+.producto-seleccionado-inventario .disponibilidad-producto { grid-column: 1 / -1; }
+.producto-seleccionado-inventario .boton-texto { min-height: 44px; padding: 0 8px; text-decoration: underline; }
+
+.texto-solo-lectores {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .disponibilidad-producto {
@@ -2988,7 +3092,7 @@ textarea:focus-visible {
   .tarjeta-bahia .etiqueta-estado { display: none; }
   .metricas { grid-template-columns: repeat(2, 1fr); }
   .tarjeta-metrica { min-height: 108px; }
-  .rejilla-clientes { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .fila-cliente { grid-template-columns: 46px minmax(150px, 1fr) minmax(150px, .9fr) auto; }
 }
 
 @media (max-width: 900px) {
@@ -3109,7 +3213,11 @@ textarea:focus-visible {
   .panel-agenda { display: block; }
   .panel-agenda .agenda-destacada { margin-top: 15px; }
   .panel-agenda .lista-agenda { margin: 12px 0; }
-  .rejilla-clientes { grid-template-columns: 1fr; }
+  .fila-cliente { grid-template-columns: 44px minmax(0, 1fr) auto; padding-inline: 13px; gap: 10px; }
+  .fila-cliente .datos-cliente { grid-column: 2 / -1; }
+  .fila-cliente .estado-cliente-inactivo { display: none; }
+  .acciones-cliente .boton-icono { width: 44px; padding: 0; }
+  .acciones-cliente .boton-primario { min-width: 0; }
   .fila-tabla { grid-template-columns: 1fr auto 18px; padding-inline: 13px; }
   .fila-tabla > span:nth-child(4) { display: none; }
   .lista-vehiculos > button { grid-template-columns: 44px 1fr auto 18px; padding-inline: 13px; }
@@ -3193,6 +3301,7 @@ textarea:focus-visible {
 .autorizacion-publica > span { width: 54px; height: 54px; display: grid; place-items: center; border-radius: 15px; background: white; color: #9b6a10; }
 .autorizacion-publica h2 { margin: 3px 0; }
 .autorizacion-publica p { margin: 0; color: var(--tinta-suave); }
+.autorizacion-publica .estado-autorizacion-publica { margin-top: 8px; color: var(--tinta); }
 .autorizacion-publica.autorizada { border-color: #acd4c3; background: var(--verde-claro); }
 .autorizacion-publica.autorizada > span { color: var(--verde); }
 .pie-publico { padding: 8px; display: grid; gap: 6px; color: var(--tinta-suave); text-align: center; font-size: 13px; }
@@ -3238,6 +3347,7 @@ textarea:focus-visible {
 @media (max-width: 680px) {
   .cabecera-trabajo-reparacion { align-items: flex-start; flex-direction: column; gap: 8px; }
   .formularios-cargos { grid-template-columns: 1fr; }
+  .controles-productos-inventario { grid-template-columns: 1fr; }
   .cabecera-cargos { display: none; }
   .resumen-cargos article {
     grid-template-columns: minmax(0, 1fr) auto 44px;
@@ -3257,16 +3367,8 @@ textarea:focus-visible {
   margin-top: -6px;
 }
 
-.alta-catalogo summary {
-  min-height: 44px;
-  display: flex;
-  align-items: center;
-  cursor: pointer;
-  font-size: 14px;
-}
-
 .alta-catalogo .campo-con-accion {
-  margin-top: 8px;
+  margin-top: 2px;
 }
 
 .formulario-diagnostico {

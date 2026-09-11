@@ -3,6 +3,7 @@ using Talleres.Aplicacion.Abstracciones.Integraciones;
 using Talleres.Aplicacion.DTOs.Recepciones;
 using Talleres.Aplicacion.Servicios;
 using Talleres.Dominio.Entidades;
+using Talleres.Dominio.Excepciones;
 using Talleres.Infraestructura.Persistencia;
 using Talleres.Pruebas.Soporte;
 
@@ -87,6 +88,41 @@ public sealed class EvidenciaInspeccionServicioPruebas
         Assert.Empty(await dbContext.EvidenciasInspeccion.ToListAsync());
     }
 
+    [Fact]
+    public async Task EliminarAsync_S3NoDisponible_EliminaMetadatosDeLaInspeccion()
+    {
+        var empresa = new ContextoEmpresaPrueba(17);
+        await using var dbContext = CrearDbContext(empresa);
+        var recepcion = new RecepcionVehiculo
+        {
+            EmpresaId = empresa.EmpresaId,
+            OrdenServicioId = 81,
+            Kilometraje = 10,
+            PorcentajeCombustible = 50,
+            DescripcionEstado = "Sin novedades",
+            FechaRecepcion = DateTime.UtcNow
+        };
+        var evidencia = new EvidenciaInspeccion
+        {
+            EmpresaId = empresa.EmpresaId,
+            RecepcionVehiculo = recepcion,
+            ClaveObjeto = "empresas/17/recepciones/1/incorrecta.jpg",
+            NombreArchivo = "incorrecta.jpg",
+            TipoContenido = "image/jpeg",
+            Longitud = 4,
+            FechaCargaUtc = DateTime.UtcNow
+        };
+        dbContext.AddRange(recepcion, evidencia);
+        await dbContext.SaveChangesAsync();
+        var almacenamiento = new AlmacenamientoEvidenciasPrueba { FallarAlEliminar = true };
+        var servicio = new EvidenciaInspeccionServicio(dbContext, empresa, almacenamiento);
+
+        await servicio.EliminarAsync(recepcion.OrdenServicioId, evidencia.Id, CancellationToken.None);
+
+        Assert.Equal(evidencia.ClaveObjeto, almacenamiento.ClaveEliminada);
+        Assert.Empty(await dbContext.EvidenciasInspeccion.ToListAsync());
+    }
+
     private static TallerDbContext CrearDbContext(ContextoEmpresaPrueba empresa)
     {
         var opciones = new DbContextOptionsBuilder<TallerDbContext>()
@@ -100,6 +136,8 @@ public sealed class EvidenciaInspeccionServicioPruebas
         public string? ClaveGuardada { get; private set; }
 
         public string? ClaveEliminada { get; private set; }
+
+        public bool FallarAlEliminar { get; init; }
 
         public Task<string> GuardarAsync(
             long empresaId,
@@ -124,6 +162,11 @@ public sealed class EvidenciaInspeccionServicioPruebas
             CancellationToken cancellationToken = default)
         {
             ClaveEliminada = claveObjeto;
+            if (FallarAlEliminar)
+            {
+                throw new IntegracionNoDisponibleException("Amazon S3 no está disponible.");
+            }
+
             return Task.CompletedTask;
         }
     }

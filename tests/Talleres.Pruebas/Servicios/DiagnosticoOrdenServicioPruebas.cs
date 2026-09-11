@@ -45,6 +45,40 @@ public sealed class DiagnosticoOrdenServicioPruebas
     }
 
     [Fact]
+    public async Task GuardarAsync_ListaParaEntregaAutorizada_PermiteCorregirDiagnostico()
+    {
+        var empresa = new ContextoEmpresaPrueba(7);
+        var opciones = new DbContextOptionsBuilder<TallerDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+        await using var contexto = new TallerDbContext(opciones, empresa);
+        var orden = new OrdenServicio
+        {
+            EmpresaId = empresa.EmpresaId,
+            Numero = "OS-LISTA-1",
+            ClienteId = 1,
+            VehiculoId = 1,
+            Estado = EstadoOrdenServicio.ListaParaEntrega,
+            FechaIngreso = DateTime.UtcNow,
+            Diagnostico = "Diagnóstico inicial",
+            FechaAutorizacionClienteUtc = DateTime.UtcNow,
+            TokenPublico = new string('b', 48)
+        };
+        contexto.OrdenesServicio.Add(orden);
+        await contexto.SaveChangesAsync();
+        var servicio = new DiagnosticoOrdenServicioServicio(
+            contexto, empresa, new AlmacenamientoEvidenciasPrueba(), new IdentidadNovaPrueba());
+
+        var resultado = await servicio.GuardarAsync(orden.Id, new GuardarDiagnosticoOrdenServicioSolicitud
+        {
+            Diagnostico = "Diagnóstico corregido antes de la entrega"
+        });
+
+        Assert.Equal("Diagnóstico corregido antes de la entrega", resultado.Diagnostico);
+        Assert.NotNull(resultado.FechaAutorizacionClienteUtc);
+    }
+
+    [Fact]
     public async Task ObtenerPublicaAsync_IncluyeLaInspeccionCompleta()
     {
         var empresa = new ContextoEmpresaPrueba(7);
@@ -52,7 +86,7 @@ public sealed class DiagnosticoOrdenServicioPruebas
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .Options;
         await using var contexto = new TallerDbContext(opciones, empresa);
-        var cliente = new Cliente { EmpresaId = 7, Nombre = "Cliente", DocumentoIdentidad = "001", Telefono = "88880000" };
+        var cliente = new Cliente { EmpresaId = 7, Nombre = "Cliente", Telefono = "88880000" };
         var marca = new MarcaVehiculo { EmpresaId = 7, Nombre = "Toyota" };
         var modelo = new ModeloVehiculo { EmpresaId = 7, Nombre = "Hilux", Marca = marca };
         var vehiculo = new Vehiculo { EmpresaId = 7, Cliente = cliente, Modelo = modelo, Placa = "M123456", Anio = 2024 };

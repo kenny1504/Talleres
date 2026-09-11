@@ -93,6 +93,29 @@ public sealed class DetalleOrdenServicioPruebas
             CancellationToken.None));
     }
 
+    [Fact]
+    public async Task AgregarManualAsync_ListaParaEntrega_PermiteCorregirCargos()
+    {
+        var empresa = new ContextoEmpresaPrueba(1);
+        await using var dbContext = CrearDbContext(empresa);
+        var orden = await CrearOrdenAsync(dbContext, empresa.EmpresaId, EstadoOrdenServicio.ListaParaEntrega);
+        var servicio = new Talleres.Aplicacion.Servicios.DetalleOrdenServicio(
+            dbContext, empresa, new InventarioPrueba(null));
+
+        var resumen = await servicio.AgregarManualAsync(
+            orden.Id,
+            new AgregarDetalleManualSolicitud
+            {
+                Descripcion = "Ajuste final de mano de obra",
+                Cantidad = 1,
+                PrecioUnitario = 75m
+            },
+            CancellationToken.None);
+
+        Assert.Equal(75m, resumen.Total);
+        Assert.Equal("Ajuste final de mano de obra", Assert.Single(resumen.Detalles).Descripcion);
+    }
+
     private static TallerDbContext CrearDbContext(ContextoEmpresaPrueba empresa)
     {
         var opciones = new DbContextOptionsBuilder<TallerDbContext>()
@@ -110,7 +133,6 @@ public sealed class DetalleOrdenServicioPruebas
         {
             EmpresaId = empresaId,
             Nombre = "Cliente prueba",
-            DocumentoIdentidad = Guid.NewGuid().ToString("N"),
             Telefono = "8888-0000",
             Activo = true,
             FechaCreacion = DateTime.UtcNow

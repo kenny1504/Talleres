@@ -14,18 +14,12 @@ public sealed class ClienteConfiguracion : IEntityTypeConfiguration<Cliente>
         builder.Property(cliente => cliente.Nombre)
             .HasMaxLength(150)
             .IsRequired();
-        builder.Property(cliente => cliente.DocumentoIdentidad)
-            .HasMaxLength(30)
-            .IsRequired();
         builder.Property(cliente => cliente.Telefono)
             .HasMaxLength(30)
             .IsRequired();
-        builder.Property(cliente => cliente.Correo).HasMaxLength(150);
         builder.Property(cliente => cliente.Direccion).HasMaxLength(300);
         builder.Property(cliente => cliente.FechaCreacion).HasPrecision(0);
 
-        builder.HasIndex(cliente => new { cliente.EmpresaId, cliente.DocumentoIdentidad })
-            .IsUnique();
         builder.HasIndex(cliente => new { cliente.EmpresaId, cliente.Nombre });
     }
 }

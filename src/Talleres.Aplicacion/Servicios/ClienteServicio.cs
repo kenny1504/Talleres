@@ -18,23 +18,11 @@ public sealed class ClienteServicio(
         CancellationToken cancellationToken = default)
     {
         var empresaId = contextoEmpresa.ObtenerEmpresaIdRequerido();
-        var documento = Normalizar(solicitud.DocumentoIdentidad);
-
-        if (await dbContext.Clientes.AnyAsync(
-                cliente => cliente.DocumentoIdentidad == documento,
-                cancellationToken))
-        {
-            throw new ReglaNegocioException(
-                "Ya existe un cliente con el documento indicado.");
-        }
-
         var cliente = new Cliente
         {
             EmpresaId = empresaId,
             Nombre = solicitud.Nombre.Trim(),
-            DocumentoIdentidad = documento,
             Telefono = solicitud.Telefono.Trim(),
-            Correo = LimpiarOpcional(solicitud.Correo),
             Direccion = LimpiarOpcional(solicitud.Direccion),
             FechaCreacion = DateTime.UtcNow
         };
@@ -56,19 +44,8 @@ public sealed class ClienteServicio(
                 cancellationToken)
             ?? throw new RecursoNoEncontradoException("El cliente solicitado no existe.");
 
-        var documento = Normalizar(solicitud.DocumentoIdentidad);
-        if (await dbContext.Clientes.AnyAsync(
-                item => item.Id != clienteId && item.DocumentoIdentidad == documento,
-                cancellationToken))
-        {
-            throw new ReglaNegocioException(
-                "Ya existe otro cliente con el documento indicado.");
-        }
-
         cliente.Nombre = solicitud.Nombre.Trim();
-        cliente.DocumentoIdentidad = documento;
         cliente.Telefono = solicitud.Telefono.Trim();
-        cliente.Correo = LimpiarOpcional(solicitud.Correo);
         cliente.Direccion = LimpiarOpcional(solicitud.Direccion);
         cliente.Activo = solicitud.Activo;
 
@@ -87,9 +64,7 @@ public sealed class ClienteServicio(
                    .Select(cliente => new ClienteDto(
                        cliente.Id,
                        cliente.Nombre,
-                       cliente.DocumentoIdentidad,
                        cliente.Telefono,
-                       cliente.Correo,
                        cliente.Direccion,
                        cliente.Activo,
                        cliente.FechaCreacion))
@@ -107,9 +82,7 @@ public sealed class ClienteServicio(
             .Select(cliente => new ClienteDto(
                 cliente.Id,
                 cliente.Nombre,
-                cliente.DocumentoIdentidad,
                 cliente.Telefono,
-                cliente.Correo,
                 cliente.Direccion,
                 cliente.Activo,
                 cliente.FechaCreacion))
@@ -119,14 +92,10 @@ public sealed class ClienteServicio(
     private static ClienteDto ConvertirDto(Cliente cliente) => new(
         cliente.Id,
         cliente.Nombre,
-        cliente.DocumentoIdentidad,
         cliente.Telefono,
-        cliente.Correo,
         cliente.Direccion,
         cliente.Activo,
         cliente.FechaCreacion);
-
-    private static string Normalizar(string valor) => valor.Trim().ToUpperInvariant();
 
     private static string? LimpiarOpcional(string? valor) =>
         string.IsNullOrWhiteSpace(valor) ? null : valor.Trim();

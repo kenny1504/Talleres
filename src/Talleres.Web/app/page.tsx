@@ -193,9 +193,7 @@ interface DiagnosticoOrdenServicioApi {
 interface ClienteApi {
   id: number;
   nombre: string;
-  documentoIdentidad: string;
   telefono: string;
-  correo: string | null;
   direccion: string | null;
   activo: boolean;
   fechaCreacion: string;
@@ -221,9 +219,7 @@ interface ClienteTaller {
   id: number;
   iniciales: string;
   nombre: string;
-  documentoIdentidad: string;
   telefono: string;
-  correo: string | null;
   direccion: string | null;
   activo: boolean;
   cantidadVehiculos: number;
@@ -612,9 +608,7 @@ export default function PaginaPrincipal() {
         "Registrando el cliente…",
         () => guardarClienteApi({
           nombre: String(datos.get("nombre")),
-          documentoIdentidad: String(datos.get("documentoIdentidad")),
           telefono: String(datos.get("telefono")),
-          correo: valorOpcionalFormulario(datos.get("correo")),
           direccion: valorOpcionalFormulario(datos.get("direccion")),
           activo: true,
         }),
@@ -644,9 +638,7 @@ export default function PaginaPrincipal() {
         () => guardarClienteApi(
           {
             nombre: String(datos.get("nombre")),
-            documentoIdentidad: String(datos.get("documentoIdentidad")),
             telefono: String(datos.get("telefono")),
-            correo: valorOpcionalFormulario(datos.get("correo")),
             direccion: valorOpcionalFormulario(datos.get("direccion")),
             activo: clienteEditando ? datos.has("activo") : true,
           },
@@ -1707,6 +1699,17 @@ function VistaOrdenes({
   alAbrirOrden: (orden: OrdenTaller) => void;
 }) {
   const filtros = ["Todas", "Recepción", "Diagnóstico", "Por aprobar", "Reparación", "Lista para entregar"];
+  const [busquedaOrdenes, setBusquedaOrdenes] = useState("");
+  const ordenesVisibles = useMemo(() => {
+    const termino = busquedaOrdenes.trim().toLocaleLowerCase("es");
+    if (!termino) return ordenes;
+    return ordenes.filter((orden) =>
+      [orden.numero, orden.cliente, orden.vehiculo, orden.placa]
+        .join(" ")
+        .toLocaleLowerCase("es")
+        .includes(termino),
+    );
+  }, [busquedaOrdenes, ordenes]);
   return (
     <>
       <section className="encabezado-pagina">
@@ -1716,9 +1719,10 @@ function VistaOrdenes({
       <div className="filtros" role="group" aria-label="Filtrar órdenes por estado">
         {filtros.map((item) => <button key={item} className={filtro === item ? "activo" : ""} onClick={() => alFiltrar(item)}>{item}</button>)}
       </div>
+      <BuscadorListado valor={busquedaOrdenes} alCambiar={setBusquedaOrdenes} etiqueta="Buscar órdenes" marcador="Número, cliente, vehículo o placa" />
       <section className="panel tabla-ordenes">
         <div className="cabecera-tabla"><span>Orden y vehículo</span><span>Cliente</span><span>Estado</span><span>Responsable</span><span /></div>
-        {ordenes.map((orden) => (
+        {ordenesVisibles.map((orden) => (
           <button className="fila-tabla" key={orden.id} onClick={() => alAbrirOrden(orden)}>
             <span className="celda-vehiculo"><span className="mini-auto"><CarFront size={21} /></span><span><strong>{orden.vehiculo}</strong><small>{orden.numero} · {orden.placa}</small></span></span>
             <span className="cliente-tabla"><strong>{orden.cliente}</strong><small>{orden.motivo}</small></span>
@@ -1735,6 +1739,9 @@ function VistaOrdenes({
               ? "La API no devolvió registros o ningún registro coincide con el filtro."
               : "No fue posible consultar las órdenes en la API."}
           />
+        )}
+        {!cargando && ordenes.length > 0 && ordenesVisibles.length === 0 && (
+          <EstadoVacio icono={Search} titulo="Sin coincidencias" detalle="Prueba con otro número, cliente, vehículo o placa." />
         )}
       </section>
     </>
@@ -1756,26 +1763,35 @@ function VistaClientes({
   alEditarCliente: (cliente: ClienteTaller) => void;
   alCrearOrden: (clienteId: number) => void;
 }) {
+  const [busquedaClientes, setBusquedaClientes] = useState("");
+  const clientesVisibles = useMemo(() => {
+    const termino = busquedaClientes.trim().toLocaleLowerCase("es");
+    if (!termino) return clientes;
+    return clientes.filter((cliente) =>
+      [cliente.nombre, cliente.telefono]
+        .join(" ")
+        .toLocaleLowerCase("es")
+        .includes(termino),
+    );
+  }, [busquedaClientes, clientes]);
   return (
     <>
       <section className="encabezado-pagina">
         <div><span className="sobrelinea">Relaciones</span><h1>Clientes</h1><p>Información de contacto y vehículos en un solo lugar.</p></div>
         <button className="boton-primario" onClick={alCrearCliente}><Plus size={21} />Nuevo cliente</button>
       </section>
-      <section className="rejilla-clientes">
-        {clientes.map((cliente) => (
-          <article className={`tarjeta-cliente ${cliente.activo ? "" : "cliente-inactivo"}`} key={cliente.id}>
-            <div className="cliente-superior">
-              <span className="avatar avatar-grande">{cliente.iniciales}</span>
-              <button className="boton-icono" type="button" onClick={() => alEditarCliente(cliente)} aria-label={`Editar cliente ${cliente.nombre}`}><Pencil size={19} /></button>
-            </div>
-            <h3>{cliente.nombre}</h3><p>{cliente.telefono}</p>
+      <BuscadorListado valor={busquedaClientes} alCambiar={setBusquedaClientes} etiqueta="Buscar clientes" marcador="Nombre o teléfono" />
+      <section className="panel lista-clientes">
+        {clientesVisibles.map((cliente) => (
+          <article className={`fila-cliente ${cliente.activo ? "" : "cliente-inactivo"}`} key={cliente.id}>
+            <span className="avatar avatar-cliente">{cliente.iniciales}</span>
+            <span className="resumen-cliente"><strong>{cliente.nombre}</strong><small>{cliente.telefono}</small></span>
+            <span className="datos-cliente"><span><CarFront size={16} />{cliente.cantidadVehiculos} vehículos</span><span><ClipboardList size={16} />{cliente.ordenActiva || "Sin orden activa"}</span></span>
             {!cliente.activo && <span className="estado-cliente-inactivo">Inactivo</span>}
-            <div className="datos-cliente"><span><CarFront size={17} />{cliente.cantidadVehiculos} vehículos</span><span><ClipboardList size={17} />{cliente.ordenActiva || "Sin orden activa"}</span></div>
-            <div className="acciones-cliente">
-              <button className="boton-secundario" type="button" onClick={() => alEditarCliente(cliente)}><Pencil size={17} />Editar</button>
+            <span className="acciones-cliente">
+              <button className="boton-icono" type="button" onClick={() => alEditarCliente(cliente)} aria-label={`Editar cliente ${cliente.nombre}`}><Pencil size={18} /></button>
               <button className="boton-primario" type="button" disabled={!cliente.activo} onClick={() => alCrearOrden(cliente.id)}>Crear orden</button>
-            </div>
+            </span>
           </article>
         ))}
         {!cargando && clientes.length === 0 && (
@@ -1786,6 +1802,9 @@ function VistaClientes({
               ? "La API respondió sin clientes para la empresa activa."
               : "No fue posible consultar los clientes en la API."}
           />
+        )}
+        {!cargando && clientes.length > 0 && clientesVisibles.length === 0 && (
+          <EstadoVacio icono={Users} titulo="Sin coincidencias" detalle="Prueba con otro nombre o teléfono." />
         )}
       </section>
     </>
@@ -1805,14 +1824,26 @@ function VistaVehiculos({
   alCrear: () => void;
   alEditar: (vehiculo: VehiculoTaller) => void;
 }) {
+  const [busquedaVehiculos, setBusquedaVehiculos] = useState("");
+  const vehiculosVisibles = useMemo(() => {
+    const termino = busquedaVehiculos.trim().toLocaleLowerCase("es");
+    if (!termino) return vehiculos;
+    return vehiculos.filter((vehiculo) =>
+      [vehiculo.nombre, vehiculo.detalle, vehiculo.placa, vehiculo.cliente]
+        .join(" ")
+        .toLocaleLowerCase("es")
+        .includes(termino),
+    );
+  }, [busquedaVehiculos, vehiculos]);
   return (
     <>
       <section className="encabezado-pagina">
         <div><span className="sobrelinea">Parque vehicular</span><h1>Vehículos</h1><p>Historial y situación actual de cada unidad.</p></div>
         <button className="boton-primario" onClick={alCrear}><Plus size={21} />Nuevo vehículo</button>
       </section>
+      <BuscadorListado valor={busquedaVehiculos} alCambiar={setBusquedaVehiculos} etiqueta="Buscar vehículos" marcador="Placa, marca, modelo o cliente" />
       <section className="panel lista-vehiculos">
-        {vehiculos.map((vehiculo) => (
+        {vehiculosVisibles.map((vehiculo) => (
           <button key={vehiculo.id} onClick={() => alEditar(vehiculo)} aria-label={`Editar vehículo ${vehiculo.placa}`}>
             <span className="icono-vehiculo"><CarFront size={25} /></span>
             <span><strong>{vehiculo.nombre}</strong><small>{vehiculo.detalle}</small></span>
@@ -1830,8 +1861,31 @@ function VistaVehiculos({
               : "No fue posible consultar los vehículos en la API."}
           />
         )}
+        {!cargando && vehiculos.length > 0 && vehiculosVisibles.length === 0 && (
+          <EstadoVacio icono={CarFront} titulo="Sin coincidencias" detalle="Prueba con otra placa, marca, modelo o cliente." />
+        )}
       </section>
     </>
+  );
+}
+
+function BuscadorListado({
+  valor,
+  alCambiar,
+  etiqueta,
+  marcador,
+}: {
+  valor: string;
+  alCambiar: (valor: string) => void;
+  etiqueta: string;
+  marcador: string;
+}) {
+  return (
+    <label className="buscador-listado">
+      <Search size={19} aria-hidden="true" />
+      <span className="solo-lectores">{etiqueta}</span>
+      <input value={valor} onChange={(evento) => alCambiar(evento.target.value)} placeholder={marcador} />
+    </label>
   );
 }
 
@@ -2249,15 +2303,11 @@ function FormularioCliente({
     <form className="formulario" onSubmit={alEnviar}>
       <div className="paso-formulario">
         <span>1</span>
-        <div><strong>Identificación</strong><small>Datos necesarios para reconocer al cliente</small></div>
+        <div><strong>Datos básicos</strong><small>Los campos con * son obligatorios</small></div>
       </div>
       <label>
-        Nombre completo
+        Nombre completo <span aria-hidden="true">*</span>
         <input name="nombre" type="text" required minLength={2} maxLength={150} defaultValue={cliente?.nombre ?? ""} autoComplete="name" placeholder="Ej. María Fernández López" />
-      </label>
-      <label>
-        Documento de identidad
-        <input name="documentoIdentidad" type="text" required minLength={3} maxLength={30} defaultValue={cliente?.documentoIdentidad ?? ""} autoComplete="off" placeholder="Cédula, RUC o pasaporte" />
       </label>
       <div className="separador-formulario" />
       <div className="paso-formulario">
@@ -2265,12 +2315,8 @@ function FormularioCliente({
         <div><strong>Contacto</strong><small>Información para avisos y seguimiento de órdenes</small></div>
       </div>
       <label>
-        Teléfono
+        Teléfono <span aria-hidden="true">*</span>
         <input name="telefono" type="tel" required minLength={7} maxLength={30} defaultValue={cliente?.telefono ?? ""} autoComplete="tel" inputMode="tel" placeholder="Ej. 8888-0000" />
-      </label>
-      <label>
-        Correo electrónico <small>(opcional)</small>
-        <input name="correo" type="email" maxLength={150} defaultValue={cliente?.correo ?? ""} autoComplete="email" placeholder="cliente@correo.com" />
       </label>
       <label>
         Dirección <small>(opcional)</small>
@@ -2319,6 +2365,8 @@ function FormularioVehiculo({
   );
   const [nombreNuevaMarca, setNombreNuevaMarca] = useState("");
   const [nombreNuevoModelo, setNombreNuevoModelo] = useState("");
+  const [mostrandoAltaMarca, setMostrandoAltaMarca] = useState(false);
+  const [mostrandoAltaModelo, setMostrandoAltaModelo] = useState(false);
   const [guardandoCatalogo, setGuardandoCatalogo] = useState(false);
   const modelosMarca = modelos.filter(
     (modelo) => modelo.marcaVehiculoId === marcaVehiculoId &&
@@ -2335,6 +2383,7 @@ function FormularioVehiculo({
       setMarcaVehiculoId(marca.id);
       setModeloVehiculoId(0);
       setNombreNuevaMarca("");
+      setMostrandoAltaMarca(false);
     } finally {
       setGuardandoCatalogo(false);
     }
@@ -2347,6 +2396,7 @@ function FormularioVehiculo({
       const modelo = await alCrearModelo(marcaVehiculoId, nombreNuevoModelo.trim());
       setModeloVehiculoId(modelo.id);
       setNombreNuevoModelo("");
+      setMostrandoAltaModelo(false);
     } finally {
       setGuardandoCatalogo(false);
     }
@@ -2378,46 +2428,58 @@ function FormularioVehiculo({
         <span>2</span>
         <div><strong>Características</strong><small>Datos básicos para reconocer la unidad</small></div>
       </div>
-      <label>
-        Marca
-        <select
-          required
-          value={marcaVehiculoId || ""}
-          onChange={(evento) => {
-            const marcaId = Number(evento.target.value);
-            setMarcaVehiculoId(marcaId);
-            setModeloVehiculoId(
-              modelos.find((modelo) => modelo.marcaVehiculoId === marcaId && modelo.activo)?.id ?? 0,
-            );
-          }}
-        >
-          <option value="">Selecciona una marca</option>
-          {marcas
-            .filter((marca) => marca.activa || marca.id === vehiculo?.marcaVehiculoId)
-            .map((marca) => <option key={marca.id} value={marca.id}>{marca.nombre}</option>)}
-        </select>
-      </label>
-      <details className="alta-catalogo">
-        <summary>Agregar una marca al catálogo</summary>
+      <div className="campo-con-accion">
+        <label>
+          Marca
+          <select
+            required
+            value={marcaVehiculoId || ""}
+            onChange={(evento) => {
+              const marcaId = Number(evento.target.value);
+              setMarcaVehiculoId(marcaId);
+              setModeloVehiculoId(
+                modelos.find((modelo) => modelo.marcaVehiculoId === marcaId && modelo.activo)?.id ?? 0,
+              );
+            }}
+          >
+            <option value="">Selecciona una marca</option>
+            {marcas
+              .filter((marca) => marca.activa || marca.id === vehiculo?.marcaVehiculoId)
+              .map((marca) => <option key={marca.id} value={marca.id}>{marca.nombre}</option>)}
+          </select>
+        </label>
+        <button className="boton-alta-rapida" type="button" aria-label="Agregar una marca al catálogo" aria-controls="alta-marca" aria-expanded={mostrandoAltaMarca} onClick={() => setMostrandoAltaMarca((visible) => !visible)}>
+          <Plus size={19} />
+        </button>
+      </div>
+      {mostrandoAltaMarca && (
+        <div className="alta-catalogo" id="alta-marca">
         <div className="campo-con-accion">
           <input aria-label="Nombre de la nueva marca" value={nombreNuevaMarca} onChange={(evento) => setNombreNuevaMarca(evento.target.value)} minLength={2} maxLength={80} placeholder="Ej. Toyota" />
           <button type="button" className="boton-secundario" disabled={guardandoCatalogo || nombreNuevaMarca.trim().length < 2} onClick={crearMarca}><Plus size={18} />Agregar</button>
         </div>
-      </details>
-      <label>
-        Modelo
-        <select name="modeloVehiculoId" required value={modeloVehiculoId || ""} onChange={(evento) => setModeloVehiculoId(Number(evento.target.value))} disabled={!marcaVehiculoId}>
-          <option value="">{marcaVehiculoId ? "Selecciona un modelo" : "Primero selecciona una marca"}</option>
-          {modelosMarca.map((modelo) => <option key={modelo.id} value={modelo.id}>{modelo.nombre}</option>)}
-        </select>
-      </label>
-      <details className="alta-catalogo">
-        <summary>Agregar un modelo a esta marca</summary>
+        </div>
+      )}
+      <div className="campo-con-accion">
+        <label>
+          Modelo
+          <select name="modeloVehiculoId" required value={modeloVehiculoId || ""} onChange={(evento) => setModeloVehiculoId(Number(evento.target.value))} disabled={!marcaVehiculoId}>
+            <option value="">{marcaVehiculoId ? "Selecciona un modelo" : "Primero selecciona una marca"}</option>
+            {modelosMarca.map((modelo) => <option key={modelo.id} value={modelo.id}>{modelo.nombre}</option>)}
+          </select>
+        </label>
+        <button className="boton-alta-rapida" type="button" aria-label="Agregar un modelo a esta marca" aria-controls="alta-modelo" aria-expanded={mostrandoAltaModelo} disabled={!marcaVehiculoId} onClick={() => setMostrandoAltaModelo((visible) => !visible)}>
+          <Plus size={19} />
+        </button>
+      </div>
+      {mostrandoAltaModelo && (
+        <div className="alta-catalogo" id="alta-modelo">
         <div className="campo-con-accion">
           <input aria-label="Nombre del nuevo modelo" value={nombreNuevoModelo} onChange={(evento) => setNombreNuevoModelo(evento.target.value)} maxLength={80} disabled={!marcaVehiculoId} placeholder="Ej. Hilux" />
           <button type="button" className="boton-secundario" disabled={guardandoCatalogo || !marcaVehiculoId || !nombreNuevoModelo.trim()} onClick={crearModelo}><Plus size={18} />Agregar</button>
         </div>
-      </details>
+        </div>
+      )}
       <label>
         Año
         <input name="anio" type="number" required min={1900} max={2100} defaultValue={vehiculo?.anio ?? anioActual} inputMode="numeric" />
@@ -2464,6 +2526,10 @@ function DetalleOrden({
   const [articulos, setArticulos] = useState<ArticuloInventarioApi[]>([]);
   const [productoId, setProductoId] = useState<number | null>(null);
   const [busquedaProducto, setBusquedaProducto] = useState("");
+  const [cantidadProducto, setCantidadProducto] = useState("1");
+  const [buscandoProductos, setBuscandoProductos] = useState(false);
+  const [mostrarCargoManual, setMostrarCargoManual] = useState(false);
+  const [mensajeCargoManual, setMensajeCargoManual] = useState<{ texto: string; esError: boolean } | null>(null);
   const [cargandoProceso, setCargandoProceso] = useState(true);
   const [guardandoProceso, setGuardandoProceso] = useState(false);
   const [errorProceso, setErrorProceso] = useState("");
@@ -2475,11 +2541,10 @@ function DetalleOrden({
     "Lista para entregar",
   ];
   const indiceActual = Math.max(0, etapas.indexOf(orden.estado));
+  const detallesEditables = orden.estado === "Reparación" || orden.estado === "Lista para entregar";
   const articuloSeleccionado = articulos.find((articulo) => articulo.productoId === productoId);
-  const articulosFiltrados = articulos.filter((articulo) => {
-    const filtro = busquedaProducto.trim().toLocaleLowerCase("es");
-    return !filtro || `${articulo.codigo} ${articulo.nombre}`.toLocaleLowerCase("es").includes(filtro);
-  });
+  const terminoBusquedaProducto = busquedaProducto.trim();
+  const productosCoincidentes = articulos.slice(0, 6);
 
   useEffect(() => {
     const controlador = new AbortController();
@@ -2507,29 +2572,40 @@ function DetalleOrden({
   }, [ejecutarConCargadorPantalla, orden.id]);
 
   useEffect(() => {
-    if (orden.estado !== "Reparación") return;
+    if (!detallesEditables) return;
     ejecutarConCargadorPantalla("Consultando las bodegas disponibles…", listarBodegasApi)
       .then((resultado) => {
         setBodegas(resultado);
         setBodegaId(resultado.find((bodega) => bodega.esPrincipal)?.id ?? resultado[0]?.id ?? null);
       })
       .catch((error) => setErrorProceso(error instanceof Error ? error.message : "No fue posible consultar las bodegas."));
-  }, [ejecutarConCargadorPantalla, orden.estado]);
+  }, [detallesEditables, ejecutarConCargadorPantalla]);
 
   useEffect(() => {
-    if (orden.estado !== "Reparación" || bodegaId === null) return;
-    ejecutarConCargadorPantalla(
-      "Consultando los productos disponibles…",
-      () => listarExistenciasApi(bodegaId),
-    )
-      .then((resultado) => {
-        setArticulos(resultado);
-        setProductoId((actual) => resultado.some((articulo) => articulo.productoId === actual)
-          ? actual
-          : resultado[0]?.productoId ?? null);
-      })
-      .catch((error) => setErrorProceso(error instanceof Error ? error.message : "No fue posible consultar el inventario."));
-  }, [bodegaId, ejecutarConCargadorPantalla, orden.estado]);
+    if (!detallesEditables || bodegaId === null || terminoBusquedaProducto.length < 2) {
+      return;
+    }
+
+    const controlador = new AbortController();
+    const espera = window.setTimeout(() => {
+      setBuscandoProductos(true);
+      listarExistenciasApi(bodegaId, terminoBusquedaProducto, controlador.signal)
+        .then((resultado) => {
+          if (!controlador.signal.aborted) setArticulos(resultado);
+        })
+        .catch((error) => {
+          if (!controlador.signal.aborted) setErrorProceso(error instanceof Error ? error.message : "No fue posible buscar productos.");
+        })
+        .finally(() => {
+          if (!controlador.signal.aborted) setBuscandoProductos(false);
+        });
+    }, 300);
+
+    return () => {
+      window.clearTimeout(espera);
+      controlador.abort();
+    };
+  }, [bodegaId, detallesEditables, terminoBusquedaProducto]);
 
   async function avanzar(estado: "PendienteAprobacion" | "Reparacion" | "ListaParaEntrega", descripcion: string) {
     setGuardandoProceso(true);
@@ -2553,7 +2629,7 @@ function DetalleOrden({
   async function agregarProducto(evento: FormEvent<HTMLFormElement>) {
     evento.preventDefault();
     if (bodegaId === null || productoId === null) return;
-    const datos = new FormData(evento.currentTarget);
+    const formulario = evento.currentTarget;
     setGuardandoProceso(true);
     setErrorProceso("");
     try {
@@ -2562,20 +2638,19 @@ function DetalleOrden({
         () => agregarDetalleInventarioApi(orden.id, {
           bodegaId,
           productoId,
-          cantidad: Number(datos.get("cantidad")),
+          cantidad: Number(cantidadProducto),
         }),
       );
       setResumen(resultado);
-      const cantidad = Number(datos.get("cantidad"));
+      const cantidad = Number(cantidadProducto);
       const descontado = articuloSeleccionado && articuloSeleccionado.existencia >= cantidad;
       alMostrarAviso(descontado
         ? "Producto agregado y existencia descontada"
         : "Producto agregado sin descontar inventario por existencia insuficiente");
-      setArticulos(await ejecutarConCargadorPantalla(
-        "Actualizando las existencias…",
-        () => listarExistenciasApi(bodegaId),
-      ));
-      evento.currentTarget.reset();
+      formulario.reset();
+      setProductoId(null);
+      setBusquedaProducto("");
+      setCantidadProducto("1");
     } catch (error) {
       setErrorProceso(error instanceof Error ? error.message : "No fue posible agregar el producto.");
     } finally {
@@ -2589,21 +2664,22 @@ function DetalleOrden({
     const datos = new FormData(formulario);
     setGuardandoProceso(true);
     setErrorProceso("");
+    setMensajeCargoManual(null);
     try {
       const resultado = await ejecutarConCargadorPantalla(
         "Agregando el cargo a la orden…",
         () => agregarDetalleManualApi(orden.id, {
           descripcion: String(datos.get("descripcion")),
-          unidadMedida: valorOpcionalFormulario(datos.get("unidadMedida")),
+          unidadMedida: null,
           cantidad: Number(datos.get("cantidad")),
           precioUnitario: Number(datos.get("precioUnitario")),
         }),
       );
       setResumen(resultado);
       formulario.reset();
-      alMostrarAviso("Cargo manual agregado a la orden");
+      setMensajeCargoManual({ texto: "Cargo manual agregado a la orden.", esError: false });
     } catch (error) {
-      setErrorProceso(error instanceof Error ? error.message : "No fue posible agregar el cargo.");
+      setMensajeCargoManual({ texto: error instanceof Error ? error.message : "No fue posible agregar el cargo.", esError: true });
     } finally {
       setGuardandoProceso(false);
     }
@@ -2723,7 +2799,16 @@ function DetalleOrden({
               alEditar={alRecibir}
             />
             {errorProceso && <div className="estado-datos estado-datos-error" role="alert">{errorProceso}</div>}
-            {orden.estado === "Diagnóstico" && (
+            {orden.estado === "Lista para entregar" && (
+              <section className="paso-orden orden-lista">
+                <span className="icono-llamada"><CircleCheck size={28} /></span>
+                <span className="sobrelinea">Trabajo finalizado</span>
+                <h2>Lista para entregar</h2>
+                <p>El vehículo completó el proceso del taller. Puedes corregir el diagnóstico, las evidencias, los productos y los cargos antes de entregarlo.</p>
+                <strong className="total-entrega">{formatearMoneda(resumen.total)}</strong>
+              </section>
+            )}
+            {(orden.estado === "Diagnóstico" || orden.estado === "Reparación" || orden.estado === "Lista para entregar") && (
               <FormularioDiagnostico
                 key={diagnostico?.fechaDiagnosticoUtc ?? "diagnostico-nuevo"}
                 ordenServicioId={orden.id}
@@ -2733,7 +2818,7 @@ function DetalleOrden({
                 guardando={guardandoProceso}
                 alGuardar={guardarDiagnostico}
                 alEliminarEvidencia={eliminarEvidenciaDiagnostico}
-                alEnviarAprobacion={solicitarAprobacion}
+                alEnviarAprobacion={orden.estado === "Diagnóstico" ? solicitarAprobacion : undefined}
               />
             )}
             {orden.estado === "Por aprobar" && !diagnostico?.diagnostico && (
@@ -2769,39 +2854,45 @@ function DetalleOrden({
                 <button className="boton-primario boton-ancho" disabled={guardandoProceso || !diagnostico?.fechaAutorizacionClienteUtc} onClick={() => avanzar("Reparacion", "Cliente autorizó continuar y la orden inició reparación.")}><Wrench size={20} />Iniciar reparación</button>
               </section>
             )}
-            {orden.estado === "Reparación" && (
+            {detallesEditables && (
               <section className="trabajo-reparacion">
                 <div className="cabecera-trabajo-reparacion"><div><span className="sobrelinea">Reparación</span><h2>Productos y cargos</h2></div><strong>{formatearMoneda(resumen.total)}</strong></div>
                 <div className="formularios-cargos">
                   <form className="formulario-cargo" onSubmit={agregarProducto}>
-                    <div><Boxes size={21} /><span><strong>Desde inventario</strong><small>El precio se obtiene de NOVA</small></span></div>
-                    <label>Bodega<select value={bodegaId ?? ""} required onChange={(evento) => setBodegaId(Number(evento.target.value))}>{bodegas.map((bodega) => <option key={bodega.id} value={bodega.id}>{bodega.nombre}{bodega.esPrincipal ? " · Principal" : ""}</option>)}</select></label>
-                    <label>Buscar producto<input value={busquedaProducto} onChange={(evento) => setBusquedaProducto(evento.target.value)} placeholder="Código o descripción" /></label>
-                    <label>Producto<select value={productoId ?? ""} required onChange={(evento) => setProductoId(Number(evento.target.value))}>{articulosFiltrados.map((articulo) => <option key={articulo.productoId} value={articulo.productoId}>{articulo.nombre} · {articulo.existencia} disponibles · {formatearMoneda(articulo.precioUnitario ?? 0)}</option>)}</select></label>
-                    {articuloSeleccionado && <p className={articuloSeleccionado.existencia > 0 ? "disponibilidad-producto" : "disponibilidad-producto sin-existencia"}>{articuloSeleccionado.existencia > 0 ? `${articuloSeleccionado.existencia} disponibles; se descontará si alcanza para la cantidad.` : "Sin existencia; se agregará sin descontar inventario."}</p>}
-                    <label>Cantidad<input name="cantidad" type="number" min="0.0001" step="0.0001" defaultValue="1" required inputMode="decimal" /></label>
-                    <button className="boton-secundario" type="submit" disabled={guardandoProceso || productoId === null}><Plus size={18} />Agregar producto</button>
+                    <div><Boxes size={21} /><span><strong>Agregar desde inventario</strong><small>Busca el producto y luego indica la cantidad</small></span></div>
+                    <div className="controles-productos-inventario">
+                      <label>Bodega<select value={bodegaId ?? ""} required onChange={(evento) => { setBodegaId(Number(evento.target.value)); setProductoId(null); setBusquedaProducto(""); setArticulos([]); setBuscandoProductos(false); }}>{bodegas.map((bodega) => <option key={bodega.id} value={bodega.id}>{bodega.nombre}{bodega.esPrincipal ? " · Principal" : ""}</option>)}</select></label>
+                      <label className="campo-busqueda-producto"><Search size={18} aria-hidden="true" /><span className="texto-solo-lectores">Buscar producto</span><input value={busquedaProducto} onChange={(evento) => { const siguienteBusqueda = evento.target.value; setBusquedaProducto(siguienteBusqueda); setProductoId(null); setArticulos([]); setBuscandoProductos(siguienteBusqueda.trim().length >= 2); }} placeholder="Busca por nombre o código" /></label>
+                    </div>
+                    {!articuloSeleccionado && terminoBusquedaProducto.length < 2 && <p className="ayuda-busqueda-producto">Escribe al menos 2 caracteres para buscar un producto.</p>}
+                    {!articuloSeleccionado && terminoBusquedaProducto.length >= 2 && <div className="selector-productos-inventario" role="group" aria-label="Resultados de productos">
+                      {buscandoProductos ? <p className="sin-productos-inventario" role="status">Buscando productos…</p> : productosCoincidentes.length === 0 ? (
+                        <p className="sin-productos-inventario">No encontramos productos con esa búsqueda.</p>
+                      ) : productosCoincidentes.map((articulo) => (
+                        <button key={articulo.productoId} className="producto-inventario" type="button" onClick={() => { setProductoId(articulo.productoId); setCantidadProducto("1"); }}>
+                          <span><strong>{articulo.nombre}</strong><small>{articulo.codigo}</small></span>
+                          <span className="datos-producto-inventario"><strong>{formatearMoneda(articulo.precioUnitario ?? 0)}</strong><small>{articulo.existencia} disponibles</small></span>
+                        </button>
+                      ))}
+                    </div>}
+                    {articuloSeleccionado && <div className="producto-seleccionado-inventario">
+                      <div><strong>{articuloSeleccionado.nombre}</strong><small>{articuloSeleccionado.codigo} · {formatearMoneda(articuloSeleccionado.precioUnitario ?? 0)}</small></div>
+                      <button type="button" className="boton-texto" onClick={() => setProductoId(null)}>Cambiar</button>
+                      <div className="accion-producto-inventario">
+                        <label>Cantidad para {articuloSeleccionado.nombre}<input name="cantidad" type="number" min="0.0001" step="0.0001" value={cantidadProducto} onChange={(evento) => setCantidadProducto(evento.target.value)} required inputMode="decimal" /></label>
+                        <button className="boton-secundario" type="submit" disabled={guardandoProceso}><Plus size={18} />Agregar a la orden</button>
+                      </div>
+                      <p className={articuloSeleccionado.existencia > 0 ? "disponibilidad-producto" : "disponibilidad-producto sin-existencia"}>{articuloSeleccionado.existencia > 0 ? `${articuloSeleccionado.existencia} disponibles.` : "Sin existencia; se agregará sin descontar inventario."}</p>
+                    </div>}
                   </form>
-                  <form className="formulario-cargo" onSubmit={agregarManual}>
-                    <div><Wrench size={21} /><span><strong>Cargo manual</strong><small>Mano de obra, compra externa u otro detalle</small></span></div>
-                    <label>Descripción<input name="descripcion" maxLength={300} minLength={2} required placeholder="Ej. Cambio de pastillas de freno" /></label>
-                    <div className="fila-cargo"><label>Cantidad<input name="cantidad" type="number" min="0.0001" step="0.0001" defaultValue="1" required inputMode="decimal" /></label><label>Unidad<input name="unidadMedida" maxLength={50} placeholder="Unidad, hora…" /></label></div>
-                    <label>Precio unitario<input name="precioUnitario" type="number" min="0" step="0.01" required inputMode="decimal" placeholder="0.00" /></label>
-                    <button className="boton-secundario" type="submit" disabled={guardandoProceso}><Plus size={18} />Agregar cargo</button>
-                  </form>
+                  <section className="accion-cargo-manual">
+                    <span><Wrench size={21} /></span>
+                    <div><strong>Cargo manual</strong><small>Mano de obra, compra externa u otro detalle</small></div>
+                    <button className="boton-secundario" type="button" disabled={guardandoProceso} onClick={() => { setMensajeCargoManual(null); setMostrarCargoManual(true); }}><Plus size={18} />Añadir cargo manual</button>
+                  </section>
                 </div>
                 <ResumenCargosOrden resumen={resumen} cargando={cargandoProceso} guardando={guardandoProceso} alEliminar={eliminarDetalle} />
-                <button className="boton-primario boton-ancho" disabled={guardandoProceso} onClick={() => avanzar("ListaParaEntrega", "Reparación finalizada; vehículo listo para entregar.")}><CircleCheck size={20} />Marcar lista para entregar</button>
-              </section>
-            )}
-            {orden.estado === "Lista para entregar" && (
-              <section className="paso-orden orden-lista">
-                <span className="icono-llamada"><CircleCheck size={28} /></span>
-                <span className="sobrelinea">Trabajo finalizado</span>
-                <h2>Lista para entregar</h2>
-                <p>El vehículo completó el proceso del taller. Total a pagar por el cliente:</p>
-                <strong className="total-entrega">{formatearMoneda(resumen.total)}</strong>
-                <ResumenCargosOrden resumen={resumen} cargando={cargandoProceso} guardando={false} alEliminar={() => Promise.resolve()} soloLectura />
+                {orden.estado === "Reparación" && <button className="boton-primario boton-ancho" disabled={guardandoProceso} onClick={() => avanzar("ListaParaEntrega", "Reparación finalizada; vehículo listo para entregar.")}><CircleCheck size={20} />Marcar lista para entregar</button>}
               </section>
             )}
           </>
@@ -2815,6 +2906,28 @@ function DetalleOrden({
           </section>
         )}
       </div>
+      {mostrarCargoManual && (
+        <div className="fondo-modal-alta">
+          <section className="modal-alta modal-cargo-manual" role="dialog" aria-modal="true" aria-labelledby="titulo-modal-cargo-manual">
+            <div className="cabecera-modal-alta">
+              <div><span className="sobrelinea">Orden de servicio</span><h2 id="titulo-modal-cargo-manual">Añadir cargo manual</h2><p>Guarda cada cargo para añadir otro sin cerrar esta ventana.</p></div>
+              <button className="boton-icono" type="button" onClick={() => { setMensajeCargoManual(null); setMostrarCargoManual(false); }} aria-label="Cerrar cargos manuales"><X size={20} /></button>
+            </div>
+            <div className="contenido-modal-alta">
+              {mensajeCargoManual && <div className={mensajeCargoManual.esError ? "estado-datos estado-datos-error" : "estado-datos"} role={mensajeCargoManual.esError ? "alert" : "status"}>{mensajeCargoManual.texto}</div>}
+              <form className="formulario-cargo formulario-cargo-modal" onSubmit={agregarManual}>
+                <label>Descripción<input name="descripcion" maxLength={300} minLength={2} required placeholder="Ej. Cambio de pastillas de freno" /></label>
+                <label>Cantidad<input name="cantidad" type="number" min="0.0001" step="0.0001" defaultValue="1" required inputMode="decimal" /></label>
+                <label>Precio unitario<input name="precioUnitario" type="number" min="0" step="0.01" required inputMode="decimal" placeholder="0.00" /></label>
+                <div className="acciones-modal-cargo">
+                  <button className="boton-secundario" type="button" onClick={() => { setMensajeCargoManual(null); setMostrarCargoManual(false); }}>Cerrar</button>
+                  <button className="boton-primario" type="submit" disabled={guardandoProceso}><Plus size={18} />Guardar cargo</button>
+                </div>
+              </form>
+            </div>
+          </section>
+        </div>
+      )}
     </div>
   );
 }
@@ -2980,11 +3093,25 @@ function FormularioDiagnostico({
               <button className="boton-eliminar-evidencia" type="button" disabled={guardando} onClick={() => alEliminarEvidencia(evidencia.id)} aria-label={`Eliminar ${evidencia.nombreArchivo}`}><Trash2 size={18} /></button>
             </figure>
           ))}
-          {vistasPrevias.map((vista) => (
+          {vistasPrevias.map((vista, indice) => (
             <figure key={vista.direccion}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={vista.direccion} alt={`Vista previa ${vista.nombre}`} />
               <figcaption>Por guardar</figcaption>
+              <button
+                className="boton-eliminar-evidencia"
+                type="button"
+                disabled={guardando}
+                aria-label={`Quitar ${vista.nombre}`}
+                onClick={() => {
+                  const actualizadas = fotografias.filter((_, posicion) => posicion !== indice);
+                  setFotografias(actualizadas);
+                  setErrorFotos("");
+                  if (entradaFotos.current) sincronizarFotografiasEntrada(entradaFotos.current, actualizadas);
+                }}
+              >
+                <Trash2 size={18} />
+              </button>
             </figure>
           ))}
         </div>
@@ -3090,6 +3217,7 @@ function FormularioRecepcion({
   const [danioEditandoId, setDanioEditandoId] = useState<string | null>(null);
   const [cantidadFotos, setCantidadFotos] = useState(0);
   const [fotografias, setFotografias] = useState<File[]>([]);
+  const entradaFotografias = useRef<HTMLInputElement | null>(null);
   const [errorFotos, setErrorFotos] = useState("");
   const [evidenciaConfirmandoId, setEvidenciaConfirmandoId] = useState<number | null>(null);
   const [evidenciaEliminandoId, setEvidenciaEliminandoId] = useState<number | null>(null);
@@ -3294,6 +3422,7 @@ function FormularioRecepcion({
       <div className="bloque-carga-fotos">
       <label className="zona-fotos">
         <input
+          ref={entradaFotografias}
           type="file"
           name="fotografias"
           accept="image/jpeg,image/png,image/webp"
@@ -3372,11 +3501,28 @@ function FormularioRecepcion({
               </button>
             </figure>
           ))}
-          {vistasPrevias.map((vista) => (
+          {vistasPrevias.map((vista, indice) => (
             <figure key={vista.direccion}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={vista.direccion} alt={`Vista previa ${vista.nombre}`} />
               <figcaption>Por guardar</figcaption>
+              <button
+                className="boton-eliminar-evidencia"
+                type="button"
+                disabled={guardando}
+                aria-label={`Quitar ${vista.nombre}`}
+                onClick={() => {
+                  const actualizadas = fotografias.filter((_, posicion) => posicion !== indice);
+                  setFotografias(actualizadas);
+                  setCantidadFotos(actualizadas.length);
+                  setErrorFotos("");
+                  if (entradaFotografias.current) {
+                    sincronizarFotografiasEntrada(entradaFotografias.current, actualizadas);
+                  }
+                }}
+              >
+                <Trash2 size={18} />
+              </button>
             </figure>
           ))}
         </div>
@@ -3628,7 +3774,7 @@ async function retirarTallerSincronizadoApi(empresaNovaId: number) {
 }
 
 async function listarBodegasApi(): Promise<BodegaInventarioApi[]> { const respuesta = await fetch(`${obtenerDireccionApi()}/api/inventario/bodegas`, { credentials: "include" }); if (!respuesta.ok) throw new Error("No fue posible consultar las bodegas."); return await respuesta.json() as BodegaInventarioApi[]; }
-async function listarExistenciasApi(bodegaId: number): Promise<ArticuloInventarioApi[]> { const respuesta = await fetch(`${obtenerDireccionApi()}/api/inventario/existencias?bodegaId=${bodegaId}`, { credentials: "include" }); if (!respuesta.ok) throw new Error("No fue posible consultar las existencias."); return await respuesta.json() as ArticuloInventarioApi[]; }
+async function listarExistenciasApi(bodegaId: number, criterio?: string, senal?: AbortSignal): Promise<ArticuloInventarioApi[]> { const parametros = new URLSearchParams({ bodegaId: String(bodegaId) }); if (criterio) parametros.set("criterio", criterio); const respuesta = await fetch(`${obtenerDireccionApi()}/api/inventario/existencias?${parametros}`, { credentials: "include", signal: senal }); if (!respuesta.ok) throw new Error("No fue posible consultar las existencias."); return await respuesta.json() as ArticuloInventarioApi[]; }
 
 async function obtenerDetallesOrdenApi(
   ordenServicioId: number,
@@ -3814,9 +3960,7 @@ async function cargarClientesApi(senal: AbortSignal): Promise<ClienteApi[]> {
 
 async function guardarClienteApi(solicitud: {
   nombre: string;
-  documentoIdentidad: string;
   telefono: string;
-  correo: string | null;
   direccion: string | null;
   activo: boolean;
 }, clienteId?: number): Promise<ClienteApi> {
@@ -3976,9 +4120,7 @@ function convertirClienteTaller(
     id: cliente.id,
     iniciales: obtenerIniciales(cliente.nombre),
     nombre: cliente.nombre,
-    documentoIdentidad: cliente.documentoIdentidad,
     telefono: cliente.telefono,
-    correo: cliente.correo,
     direccion: cliente.direccion,
     activo: cliente.activo,
     cantidadVehiculos,

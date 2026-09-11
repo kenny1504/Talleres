@@ -10,7 +10,12 @@ El frontal vive en `src/Talleres.Web` y está diseñado primero para tablet hori
 - Navegación lateral para tablet horizontal y navegación inferior para formato vertical.
 - Gestión visual de órdenes, clientes, vehículos e inventario.
 - Flujo interactivo para crear órdenes y registrar la recepción del vehículo.
-- Inspección visual táctil por zonas, tipo y severidad del daño, con fotografías desde la cámara de la tablet.
+- Flujo operativo completo desde recepción hasta lista para entregar, con transiciones explícitas.
+- Diagnóstico persistido con dictado por voz, edición manual y evidencia fotográfica opcional.
+- Enlace público no predecible para consultar el diagnóstico y autorizar la continuación desde móvil o WhatsApp.
+- Registro táctil de productos de inventario, compras externas, mano de obra y otros cargos durante la reparación.
+- Total calculado y visible desde el detalle de la orden y la preparación de la entrega.
+- Inspección visual táctil por zonas, tipo y severidad del daño, con fotografías públicas en Amazon S3 que pueden consultarse desde el detalle de la orden.
 - Descripción editable para cada daño y observaciones generales de la recepción.
 - Consulta y edición posterior de los hallazgos visuales dentro del detalle de la orden.
 - Órdenes, recepción e inspección en páginas de trabajo completas; no utilizan paneles laterales ni modales estrechos.
@@ -24,15 +29,20 @@ El frontal vive en `src/Talleres.Web` y está diseñado primero para tablet hori
 
 - Registro, actualización, consulta y listado de clientes.
 - Registro y consulta de vehículos asociados a clientes.
+- Catálogo privado por empresa de marcas y modelos dependientes, reutilizado al registrar vehículos.
 - Creación y consulta de órdenes de servicio.
 - Recepción física del vehículo y avance automático a diagnóstico.
+- Diagnóstico obligatorio antes de solicitar autorización; el presupuesto y sus evidencias permanecen opcionales.
 - Transiciones controladas del estado de las órdenes.
+- Detalles de reparación persistidos con precio, cantidad, subtotal, origen y total de la orden.
+- Descuento auditable de inventario mediante una salida de consumo interno de SMART TPV NOVA cuando hay existencia suficiente; los faltantes se conservan como cargos sin alterar stock.
 - Historial de estados.
 - Aislamiento multitenant por `EmpresaId` en consultas y escrituras.
 - Empresa activa obtenida de una cookie de sesión HTTP-only; el cliente no puede elegirla mediante encabezados.
 - Denegación de acceso para usuarios normales cuya empresa no esté configurada como taller sincronizado.
 - Validaciones estructurales mediante Data Annotations.
 - Excepciones de negocio convertidas a `ProblemDetails` por middleware global.
+- Evidencias de inspección aisladas por empresa, con metadatos en SQL Server y objetos públicos en Amazon S3.
 
 ## Arquitectura
 
@@ -54,8 +64,9 @@ Los controladores delegan el trabajo a servicios. La aplicación depende de `ITa
 - SDK de .NET 9.
 - Node.js 22.13 o superior.
 - Una instancia remota de SQL Server accesible y configurada con TLS 1.2 o posterior.
-- Acceso de lectura a la base de SMART TPV NOVA (`AspNetUsers` y `Empresa`).
+- Acceso de lectura a catálogos y existencias de SMART TPV NOVA, y permiso para ejecutar `dbo.sp_RegistrarSalida` al consumir inventario.
 - Herramienta `dotnet-ef` 9.x para administrar migraciones.
+- Acceso de escritura al bucket de Amazon S3 cuando se usarán evidencias fotográficas.
 
 ## Puesta en marcha
 
@@ -84,7 +95,7 @@ Para ejecutarla fuera de Docker, puede configurar la conexión remota mediante u
 
 ```powershell
 $env:ConnectionStrings__TallerDb = "Server=sql.example.com,1433;Database=Talleres;User ID=usuario;Password=clave;Encrypt=True;TrustServerCertificate=False"
-$env:ConnectionStrings__SmartNova = "Server=sql.example.com,1433;Database=Galileo;User ID=usuario_lectura;Password=clave;Encrypt=True;TrustServerCertificate=False"
+$env:ConnectionStrings__SmartNova = "Server=sql.example.com,1433;Database=Galileo;User ID=usuario_integracion;Password=clave;Encrypt=True;TrustServerCertificate=False"
 ```
 
 También se admiten `TALLERES_CONNECTION_STRING` y `SMART_NOVA_CONNECTION_STRING`. En desarrollo, si
@@ -92,6 +103,8 @@ las variables correspondientes no están definidas, la API las carga desde el
 archivo `.env` ubicado junto a `Talleres.sln`. Esto permite usar `dotnet run` y los perfiles del
 IDE sin copiar credenciales a `launchSettings.json`. Las variables del proceso siempre tienen
 precedencia sobre el archivo local.
+
+Las fotografías de inspección usan por defecto el bucket público `biossoft-mereb-crm` en `eu-north-1`, igual que SMART TPV NOVA, y se aíslan bajo el prefijo `empresas/{empresaId}/recepciones/{recepcionId}/`. Para cargar y eliminar archivos defina `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` y, cuando corresponda, `AWS_SESSION_TOKEN` en el `.env` local ignorado. La identidad de AWS debe tener como mínimo `s3:PutObject` y `s3:DeleteObject` sobre ese prefijo. También se aceptan los nombres históricos `AmazonS3__UrlBucket`, `AmazonS3__Region`, `AmazonS3__AwsAccesKey` y `AmazonS3__AwsSecretKey`. Los objetos se publican con ACL `PublicRead` y la API redirige a su URL permanente `https://{bucket}.s3.amazonaws.com/{clave}` para mostrarlos en la inspección. Nunca versione las credenciales.
 
 El inicio de sesión se realiza mediante:
 
@@ -110,7 +123,7 @@ La API establece una cookie HTTP-only. El `EmpresaId` usado por todas las operac
 
 El acceso también admite Google y Microsoft. Cada proveedor es opcional y solo se habilita cuando están configurados tanto su identificador como su secreto. Configure `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `MICROSOFT_CLIENT_ID` y `MICROSOFT_CLIENT_SECRET` como secretos del entorno. Como la API se publica a través del frontal, registre los callbacks con el dominio público y el prefijo `/backend`, por ejemplo `https://talleres.example.com/backend/api/autenticacion/externo/google/callback` y `https://talleres.example.com/backend/api/autenticacion/externo/microsoft/callback`. El nombre `api:8080` es exclusivamente interno de Docker y no es una URL OAuth válida.
 
-La migración `AgregarTalleresSincronizados` crea la configuración local e incluye inicialmente la empresa NOVA `3071`. Agregar otra empresa a esa tabla la habilita como taller, siempre que exista en NOVA.
+La migración `AgregarTalleresSincronizados` crea la configuración local e incluye inicialmente la empresa NOVA `3071`. Agregar otra empresa a esa tabla la habilita como taller, siempre que exista en NOVA. La migración `AgregarDetallesOrdenServicio` agrega el detalle económico de las órdenes y `AgregarDiagnosticoYEnlacePublico` incorpora el diagnóstico, sus evidencias y la autorización pública, sin modificar el esquema de SMART TPV NOVA.
 
 ## Ejecución completa con Docker
 
@@ -122,7 +135,7 @@ La preparación del entorno se realiza una única vez:
 Copy-Item .env.example .env
 ```
 
-Edite `.env` y reemplace `TALLERES_CONNECTION_STRING` y `SMART_NOVA_CONNECTION_STRING` por las cadenas reales. La cuenta de NOVA debe tener el mínimo acceso de lectura necesario. El archivo `.env` está excluido de Git y no debe subirse al repositorio.
+Edite `.env` y reemplace `TALLERES_CONNECTION_STRING` y `SMART_NOVA_CONNECTION_STRING` por las cadenas reales. La cuenta de NOVA debe limitarse a las consultas indicadas y a ejecutar el procedimiento oficial de salida de inventario. El archivo `.env` está excluido de Git y no debe subirse al repositorio.
 
 `TALLERES_APLICAR_MIGRACIONES` permanece en `false` por defecto. Cámbielo a `true` únicamente cuando la API tenga autorización para aplicar las migraciones de EF Core sobre esa base.
 
@@ -164,7 +177,7 @@ Configure estas variables en la sección **Environment Variables** de Coolify:
 | Variable | Requerida | Valor recomendado |
 |---|---:|---|
 | `TALLERES_CONNECTION_STRING` | Sí | Cadena secreta de la base propia de Talleres |
-| `SMART_NOVA_CONNECTION_STRING` | Sí | Cadena secreta de SMART TPV NOVA; preferiblemente con permisos de lectura |
+| `SMART_NOVA_CONNECTION_STRING` | Sí | Cadena secreta de SMART TPV NOVA con lectura de catálogos y ejecución de salidas de inventario |
 | `TALLERES_APLICAR_MIGRACIONES` | No | `false`; habilitarla solo deliberadamente |
 | `TALLERES_COOKIE_SEGURA` | No | `true` cuando el dominio use exclusivamente HTTPS |
 | `TALLERES_URL_PUBLICA` | Sí para OAuth externo | Origen público del frontal, por ejemplo `https://talleres.example.com`, sin barra final |
@@ -172,6 +185,10 @@ Configure estas variables en la sección **Environment Variables** de Coolify:
 | `TALLERES_WEB_PORT` | No | `0`, para que Docker asigne un puerto anfitrión libre |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Solo si se usa Google | Credenciales secretas del proveedor OAuth |
 | `MICROSOFT_CLIENT_ID` / `MICROSOFT_CLIENT_SECRET` | Solo si se usa Microsoft | Credenciales secretas del proveedor OAuth |
+| `AWS_S3_BUCKET` | No | Bucket de evidencias; por defecto `biossoft-mereb-crm` |
+| `AWS_REGION` | No | Región del bucket; por defecto `eu-north-1` |
+| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | Según despliegue | Credenciales secretas; omitir cuando el contenedor usa un rol IAM |
+| `AWS_SESSION_TOKEN` | Solo para credenciales temporales | Token de sesión de AWS |
 
 Asigne el dominio público solamente al servicio `web` e indique el puerto interno `3000` en el dominio de Coolify, por ejemplo `https://talleres.example.com:3000`. No asigne un dominio al servicio `api`: no publica ningún puerto del servidor y el frontal reenvía `/backend` de forma privada a `http://api:8080` dentro de la red de Docker.
 
@@ -183,7 +200,7 @@ El archivo `.env` es solo para ejecución local y nunca debe subirse a Git. En C
 
 Para una base nueva, ejecute un primer despliegue controlado con `TALLERES_APLICAR_MIGRACIONES=true` y una cuenta con permisos para modificar el esquema. Cuando finalice correctamente, cambie inmediatamente la variable a `false` y vuelva a desplegar. Los despliegues ordinarios deben mantenerla en `false`. El período inicial del chequeo de salud permite completar ese primer arranque sin declarar prematuramente que la API está degradada.
 
-Si la API queda `unhealthy`, revise los logs del servicio `api`: `/salud` comprueba las conexiones de `TALLERES_CONNECTION_STRING` y `SMART_NOVA_CONNECTION_STRING`. Verifique credenciales, acceso del servidor Coolify al puerto de SQL Server, reglas de firewall y configuración TLS. No deje en Coolify los valores demostrativos `sql.example.com`, `usuario_lectura` o `clave` de `.env.example`.
+Si la API queda `unhealthy`, revise los logs del servicio `api`: `/salud` comprueba las conexiones de `TALLERES_CONNECTION_STRING` y `SMART_NOVA_CONNECTION_STRING`. Verifique credenciales, acceso del servidor Coolify al puerto de SQL Server, reglas de firewall y configuración TLS. No deje en Coolify los valores demostrativos `sql.example.com`, `usuario_integracion` o `clave` de `.env.example`.
 
 ## Rutas principales
 
@@ -204,10 +221,23 @@ Si la API queda `unhealthy`, revise los logs del servicio `api`: `/salud` compru
 | `GET` | `/api/vehiculos` | Lista vehículos |
 | `GET` | `/api/vehiculos/{id}` | Obtiene un vehículo |
 | `GET` | `/api/vehiculos/por-cliente/{id}` | Lista vehículos del cliente |
+| `GET` / `POST` / `PUT` | `/api/catalogos-vehiculos/marcas` | Consulta y administra marcas de la empresa |
+| `GET` / `POST` / `PUT` | `/api/catalogos-vehiculos/modelos` | Consulta y administra modelos dependientes de una marca |
 | `GET` | `/api/ordenes-servicio` | Lista órdenes |
 | `POST` | `/api/ordenes-servicio` | Crea una orden |
 | `PUT` | `/api/ordenes-servicio/{id}/estado` | Cambia el estado |
+| `GET` / `PUT` | `/api/ordenes-servicio/{id}/diagnostico` | Consulta o guarda el diagnóstico y genera su token público |
+| `POST` / `DELETE` | `/api/ordenes-servicio/{id}/diagnostico/evidencias` | Administra evidencia fotográfica opcional del diagnóstico |
+| `GET` | `/api/publico/ordenes-servicio/{token}` | Muestra al cliente la información limitada de su orden sin iniciar sesión |
+| `POST` | `/api/publico/ordenes-servicio/{token}/autorizar` | Registra la autorización del cliente para continuar |
+| `GET` | `/api/ordenes-servicio/{id}/detalles` | Consulta productos, cargos y total |
+| `POST` | `/api/ordenes-servicio/{id}/detalles/inventario` | Agrega un producto y descuenta existencia cuando está disponible |
+| `POST` | `/api/ordenes-servicio/{id}/detalles/manual` | Agrega mano de obra, una compra externa u otro cargo manual |
+| `DELETE` | `/api/ordenes-servicio/{id}/detalles/{detalleId}` | Elimina un cargo que no haya generado una salida de inventario |
 | `POST` | `/api/ordenes-servicio/{id}/recepcion` | Registra la recepción |
+| `POST` | `/api/ordenes-servicio/{id}/recepcion/evidencias` | Carga fotografías JPEG, PNG o WebP a S3 |
+| `GET` | `/api/ordenes-servicio/{id}/recepcion/evidencias/{evidenciaId}/contenido` | Valida la empresa y redirige a la URL pública permanente de la evidencia |
+| `DELETE` | `/api/ordenes-servicio/{id}/recepcion/evidencias/{evidenciaId}` | Elimina la fotografía de S3 y de la inspección |
 
 ## Verificación
 

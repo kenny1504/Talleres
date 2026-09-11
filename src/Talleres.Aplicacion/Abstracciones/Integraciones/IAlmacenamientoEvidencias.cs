@@ -36,7 +36,7 @@ public interface IAlmacenamientoEvidencias
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Elimina un objeto cargado cuando no fue posible registrar sus metadatos.
+    /// Elimina del almacenamiento una evidencia que ya no debe conservarse.
     /// </summary>
     /// <param name="claveObjeto">Clave del objeto.</param>
     /// <param name="cancellationToken">Token para cancelar la eliminación.</param>

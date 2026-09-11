@@ -34,7 +34,7 @@ public sealed class DetalleOrdenServicio(
     {
         var empresaId = contextoEmpresa.ObtenerEmpresaIdRequerido();
         var orden = await ObtenerOrdenAsync(ordenServicioId, cancellationToken);
-        ValidarOrdenEnReparacion(orden);
+        ValidarDetallesEditables(orden);
 
         if (empresaId != empresaNovaId)
         {
@@ -128,7 +128,7 @@ public sealed class DetalleOrdenServicio(
     {
         var empresaId = contextoEmpresa.ObtenerEmpresaIdRequerido();
         var orden = await ObtenerOrdenAsync(ordenServicioId, cancellationToken);
-        ValidarOrdenEnReparacion(orden);
+        ValidarDetallesEditables(orden);
 
         dbContext.DetallesOrdenesServicio.Add(new Talleres.Dominio.Entidades.DetalleOrdenServicio
         {
@@ -152,7 +152,7 @@ public sealed class DetalleOrdenServicio(
         CancellationToken cancellationToken = default)
     {
         var orden = await ObtenerOrdenAsync(ordenServicioId, cancellationToken);
-        ValidarOrdenEnReparacion(orden);
+        ValidarDetallesEditables(orden);
         var detalle = await dbContext.DetallesOrdenesServicio.SingleOrDefaultAsync(
                           item => item.Id == detalleId && item.OrdenServicioId == ordenServicioId,
                           cancellationToken)
@@ -208,12 +208,12 @@ public sealed class DetalleOrdenServicio(
             detalles.Sum(item => item.Subtotal));
     }
 
-    private static void ValidarOrdenEnReparacion(OrdenServicio orden)
+    private static void ValidarDetallesEditables(OrdenServicio orden)
     {
-        if (orden.Estado != EstadoOrdenServicio.Reparacion)
+        if (orden.Estado is not EstadoOrdenServicio.Reparacion and not EstadoOrdenServicio.ListaParaEntrega)
         {
             throw new ReglaNegocioException(
-                "Los productos y cargos solo pueden modificarse mientras la orden está en reparación.");
+                "Los productos y cargos solo pueden modificarse durante la reparación o mientras la orden está lista para entregar.");
         }
     }
 

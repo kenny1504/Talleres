@@ -11,18 +11,20 @@ namespace Talleres.Pruebas.Servicios;
 public sealed class ClienteServicioPruebas
 {
     [Fact]
-    public async Task CrearAsync_DocumentoDuplicadoEnMismaEmpresa_LanzaReglaNegocio()
+    public async Task CrearAsync_RegistraCliente()
     {
         var contextoEmpresa = new ContextoEmpresaPrueba(1);
         await using var dbContext = CrearDbContext(contextoEmpresa);
         var servicio = new ClienteServicio(dbContext, contextoEmpresa);
-        var solicitud = CrearSolicitudCliente("001-010190-0001A");
 
-        await servicio.CrearAsync(solicitud, CancellationToken.None);
+        var cliente = await servicio.CrearAsync(new CrearClienteSolicitud
+        {
+            Nombre = "María López",
+            Telefono = "8888-0000"
+        }, CancellationToken.None);
 
-        var excepcion = await Assert.ThrowsAsync<ReglaNegocioException>(() =>
-            servicio.CrearAsync(solicitud, CancellationToken.None));
-        Assert.Contains("documento", excepcion.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal("María López", cliente.Nombre);
+        Assert.Equal("8888-0000", cliente.Telefono);
     }
 
     [Fact]
@@ -37,7 +39,7 @@ public sealed class ClienteServicioPruebas
         {
             var servicioUno = new ClienteServicio(contextoUno, empresaUno);
             await servicioUno.CrearAsync(
-                CrearSolicitudCliente("DOC-COMPARTIDO"),
+                CrearSolicitudCliente(),
                 CancellationToken.None);
         }
 
@@ -49,15 +51,14 @@ public sealed class ClienteServicioPruebas
         Assert.Empty(clientesEmpresaDos);
 
         var clienteEmpresaDos = await servicioDos.CrearAsync(
-            CrearSolicitudCliente("DOC-COMPARTIDO"),
+            CrearSolicitudCliente(),
             CancellationToken.None);
-        Assert.Equal("DOC-COMPARTIDO", clienteEmpresaDos.DocumentoIdentidad);
+        Assert.Equal("Cliente de prueba", clienteEmpresaDos.Nombre);
     }
 
-    private static CrearClienteSolicitud CrearSolicitudCliente(string documento) => new()
+    private static CrearClienteSolicitud CrearSolicitudCliente() => new()
     {
         Nombre = "Cliente de prueba",
-        DocumentoIdentidad = documento,
         Telefono = "8888-0000"
     };
 

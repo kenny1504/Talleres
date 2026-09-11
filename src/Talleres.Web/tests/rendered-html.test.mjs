@@ -225,14 +225,13 @@ test("alta y edición de clientes usan un formulario completo y persisten median
   assert.match(pagina, /onClick=\{alCrearCliente\}><Plus[^>]*\/>Nuevo cliente/);
   assert.match(pagina, /function FormularioCliente\(/);
   assert.match(pagina, /name="nombre"/);
-  assert.match(pagina, /name="documentoIdentidad"/);
   assert.match(pagina, /name="telefono"/);
-  assert.match(pagina, /name="correo"/);
+  assert.match(pagina, /Nombre completo <span aria-hidden="true">\*<\/span>/);
+  assert.match(pagina, /Teléfono <span aria-hidden="true">\*<\/span>/);
   assert.match(pagina, /name="direccion"/);
   assert.match(pagina, /name="activo"/);
   assert.match(pagina, /method: clienteId \? "PUT" : "POST"/);
   assert.match(pagina, /onClick=\{\(\) => alEditarCliente\(cliente\)\}/);
-  assert.match(pagina, /defaultValue=\{cliente\?\.documentoIdentidad/);
   assert.match(pagina, /setClientes\(\(actuales\) =>/);
   assert.match(pagina, /obtenerMensajeErrorApi/);
 });
@@ -296,13 +295,28 @@ test("lleva la orden hasta entrega y registra productos y cargos durante reparac
   assert.match(pagina, /Solicitar aprobación por WhatsApp/);
   assert.match(pagina, /Iniciar reparación/);
   assert.match(pagina, /Marcar lista para entregar/);
-  assert.match(pagina, /Desde inventario/);
+  assert.match(pagina, /Agregar desde inventario/);
+  assert.match(pagina, /Escribe al menos 2 caracteres para buscar un producto/);
+  assert.match(pagina, /terminoBusquedaProducto, controlador\.signal/);
+  assert.match(pagina, /Cantidad para \{articuloSeleccionado\.nombre\}/);
+  assert.match(pagina, /productosCoincidentes = articulos\.slice\(0, 6\)/);
   assert.match(pagina, /Cargo manual/);
+  assert.match(pagina, /Añadir cargo manual/);
+  assert.match(pagina, /titulo-modal-cargo-manual/);
+  assert.match(pagina, /Guarda cada cargo para añadir otro sin cerrar esta ventana/);
+  assert.match(pagina, /setMensajeCargoManual\(null\); setMostrarCargoManual\(false\)/);
+  assert.match(pagina, /mensajeCargoManual && <div className=\{mensajeCargoManual\.esError/);
+  assert.match(pagina, /setMensajeCargoManual\(\{ texto: "Cargo manual agregado a la orden\."/);
+  assert.doesNotMatch(pagina, /name="unidadMedida"/);
   assert.match(pagina, /Total de la orden/);
   assert.match(pagina, /existencia insuficiente/);
+  assert.match(pagina, /const detallesEditables = orden\.estado === "Reparación" \|\| orden\.estado === "Lista para entregar"/);
+  assert.match(pagina, /Puedes corregir el diagnóstico, las evidencias, los productos y los cargos antes de entregarlo/);
   assert.match(pagina, /api\/ordenes-servicio\/\$\{ordenServicioId\}\/detalles\/inventario/);
-  assert.match(estilos, /\.formularios-cargos\s*\{[^}]*grid-template-columns:\s*repeat\(2/s);
+  assert.match(estilos, /\.formularios-cargos\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1\.25fr\)/s);
   assert.match(estilos, /\.formulario-cargo input,[\s\S]*min-height:\s*46px/s);
+  assert.match(estilos, /\.producto-seleccionado-inventario\s*\{/);
+  assert.match(estilos, /\.modal-cargo-manual\s*\{/);
   assert.match(estilos, /@media \(max-width:\s*680px\)[\s\S]*\.formularios-cargos\s*\{\s*grid-template-columns:\s*1fr/s);
 });
 
@@ -331,6 +345,8 @@ test("registra, dicta y comparte el diagnóstico mediante un enlace público", a
   assert.doesNotMatch(pagina, /https:\/\/wa\.me\/\?text=/);
   assert.match(pagina, /guardarDiagnosticoOrdenApi/);
   assert.match(paginaPublica, /Autorizar continuar/);
+  assert.match(paginaPublica, /Estado actual:/);
+  assert.match(paginaPublica, /etiquetaEstado\(orden\.estado\)/);
   assert.match(paginaPublica, /api\/publico\/ordenes-servicio/);
   assert.match(paginaPublica, /Inspección del vehículo/);
   assert.match(paginaPublica, /Fotografías de la inspección/);
@@ -365,6 +381,14 @@ test("acumula selecciones consecutivas de fotografías en diagnóstico e inspecc
   );
   assert.match(pagina, /function sincronizarFotografiasEntrada\(entrada: HTMLInputElement, fotografias: File\[\]\)/);
   assert.match(pagina, /entrada\.files = transferencia\.files/);
+  assert.equal(
+    pagina.match(/aria-label=\{`Quitar \$\{vista\.nombre\}`\}/g)?.length,
+    2,
+  );
+  assert.equal(
+    pagina.match(/fotografias\.filter\(\(_, posicion\) => posicion !== indice\)/g)?.length,
+    2,
+  );
 });
 
 test("usa un cargador global accesible para las operaciones críticas", async () => {

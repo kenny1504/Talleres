@@ -28,9 +28,7 @@ Content-Type: application/json
 
 {
   "nombre": "Ana López",
-  "documentoIdentidad": "001-010190-0001A",
   "telefono": "8888-0000",
-  "correo": "ana@example.com",
   "direccion": "Managua"
 }
 

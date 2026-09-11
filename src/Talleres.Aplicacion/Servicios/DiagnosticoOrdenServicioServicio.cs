@@ -39,14 +39,7 @@ public sealed class DiagnosticoOrdenServicioServicio(
             .SingleOrDefaultAsync(item => item.Id == ordenServicioId, cancellationToken)
             ?? throw new RecursoNoEncontradoException("La orden de servicio solicitada no existe.");
 
-        if (orden.Estado is not EstadoOrdenServicio.Diagnostico and not EstadoOrdenServicio.PendienteAprobacion)
-        {
-            throw new ReglaNegocioException("El diagnóstico solo puede editarse durante diagnóstico o mientras espera aprobación.");
-        }
-        if (orden.FechaAutorizacionClienteUtc is not null)
-        {
-            throw new ReglaNegocioException("El diagnóstico ya fue autorizado por el cliente y no puede modificarse.");
-        }
+        ValidarDiagnosticoEditable(orden);
 
         orden.Diagnostico = solicitud.Diagnostico.Trim();
         orden.FechaDiagnosticoUtc = DateTime.UtcNow;
@@ -64,8 +57,7 @@ public sealed class DiagnosticoOrdenServicioServicio(
             ?? throw new RecursoNoEncontradoException("La orden de servicio solicitada no existe.");
         if (orden.EvidenciasDiagnostico.Count + solicitudes.Count > CantidadMaximaEvidencias)
             throw new ReglaNegocioException($"El diagnóstico puede conservar como máximo {CantidadMaximaEvidencias} fotografías.");
-        if (orden.Estado is not EstadoOrdenServicio.Diagnostico and not EstadoOrdenServicio.PendienteAprobacion || orden.FechaAutorizacionClienteUtc is not null)
-            throw new ReglaNegocioException("Las evidencias solo pueden cambiarse antes de la autorización del cliente.");
+        ValidarDiagnosticoEditable(orden);
 
         var claves = new List<string>();
         try
@@ -101,11 +93,14 @@ public sealed class DiagnosticoOrdenServicioServicio(
     public async Task EliminarEvidenciaAsync(long ordenServicioId, long evidenciaId, CancellationToken cancellationToken = default)
     {
         contextoEmpresa.ObtenerEmpresaIdRequerido();
+        var orden = await dbContext.OrdenesServicio
+            .SingleOrDefaultAsync(item => item.Id == ordenServicioId, cancellationToken)
+            ?? throw new RecursoNoEncontradoException("La orden de servicio solicitada no existe.");
+        ValidarDiagnosticoEditable(orden);
         var evidencia = await dbContext.EvidenciasDiagnostico
             .Where(item => item.Id == evidenciaId && item.OrdenServicioId == ordenServicioId)
-            .Where(item => item.OrdenServicio.FechaAutorizacionClienteUtc == null)
             .SingleOrDefaultAsync(cancellationToken)
-            ?? throw new RecursoNoEncontradoException("La evidencia del diagnóstico no existe o ya no puede modificarse.");
+            ?? throw new RecursoNoEncontradoException("La evidencia del diagnóstico no existe.");
         await almacenamientoEvidencias.EliminarAsync(evidencia.ClaveObjeto, cancellationToken);
         dbContext.EvidenciasDiagnostico.Remove(evidencia);
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -223,6 +218,19 @@ public sealed class DiagnosticoOrdenServicioServicio(
     private static DiagnosticoOrdenServicioDto ConvertirDiagnostico(OrdenServicio orden) => new(
         orden.Diagnostico, orden.FechaDiagnosticoUtc, orden.TokenPublico, orden.FechaAutorizacionClienteUtc,
         orden.EvidenciasDiagnostico.OrderBy(item => item.FechaCargaUtc).Select(item => new EvidenciaDiagnosticoDto(item.Id, item.NombreArchivo, item.TipoContenido, item.Longitud, item.FechaCargaUtc)).ToArray());
+
+    private static void ValidarDiagnosticoEditable(OrdenServicio orden)
+    {
+        if (orden.Estado is not EstadoOrdenServicio.Diagnostico
+            and not EstadoOrdenServicio.PendienteAprobacion
+            and not EstadoOrdenServicio.PreparacionReparacion
+            and not EstadoOrdenServicio.Reparacion
+            and not EstadoOrdenServicio.ListaParaEntrega)
+        {
+            throw new ReglaNegocioException(
+                "El diagnóstico solo puede modificarse durante el trabajo del taller y hasta que la orden sea entregada.");
+        }
+    }
 
     private static string CrearTokenPublico() => Convert.ToHexString(RandomNumberGenerator.GetBytes(24)).ToLowerInvariant();
 

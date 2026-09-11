@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Talleres.Aplicacion.Abstracciones.Integraciones;
 using Talleres.Aplicacion.Abstracciones.Multitenencia;
 using Talleres.Aplicacion.Abstracciones.Persistencia;
@@ -13,7 +14,8 @@ namespace Talleres.Aplicacion.Servicios;
 public sealed class EvidenciaInspeccionServicio(
     ITallerDbContext dbContext,
     IContextoEmpresa contextoEmpresa,
-    IAlmacenamientoEvidencias almacenamientoEvidencias) : IEvidenciaInspeccionServicio
+    IAlmacenamientoEvidencias almacenamientoEvidencias,
+    ILogger<EvidenciaInspeccionServicio>? logger = null) : IEvidenciaInspeccionServicio
 {
     private const int CantidadMaximaEvidencias = 12;
 
@@ -128,11 +130,25 @@ public sealed class EvidenciaInspeccionServicio(
                         ?? throw new RecursoNoEncontradoException(
                             "La evidencia que intenta eliminar no existe en esta orden.");
 
-        await almacenamientoEvidencias.EliminarAsync(
-            evidencia.ClaveObjeto,
-            cancellationToken);
         dbContext.EvidenciasInspeccion.Remove(evidencia);
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        try
+        {
+            await almacenamientoEvidencias.EliminarAsync(
+                evidencia.ClaveObjeto,
+                cancellationToken);
+        }
+        catch (IntegracionNoDisponibleException excepcion)
+        {
+            // La corrección de la inspección no debe quedar bloqueada por una falla externa.
+            // El bucket debe aplicar su ciclo de vida a cualquier objeto que quede huérfano.
+            logger?.LogWarning(
+                excepcion,
+                "La evidencia {EvidenciaId} de la orden {OrdenServicioId} se desvinculó, pero S3 no pudo eliminar el objeto.",
+                evidenciaId,
+                ordenServicioId);
+        }
     }
 
     private static EvidenciaInspeccionDto ConvertirDto(EvidenciaInspeccion evidencia) => new(

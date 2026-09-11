@@ -172,7 +172,7 @@ export default function OrdenPublicaPagina({ params }: { params: Promise<{ token
       {orden.detalles.length > 0 && <section className="tarjeta-publica cargos-publicos"><span className="sobrelinea">Productos y servicios registrados</span><h2>Detalle de la orden</h2>{orden.detalles.map((detalle) => <article key={detalle.id}><span><strong>{detalle.descripcion}</strong><small>{detalle.cantidad} {detalle.unidadMedida || "unidad"} × {moneda(detalle.precioUnitario)}</small></span><strong>{moneda(detalle.subtotal)}</strong></article>)}<div><span>Total</span><strong>{moneda(orden.total)}</strong></div></section>}
       <section className={`autorizacion-publica ${autorizada ? "autorizada" : ""}`}>
         <span>{autorizada ? <CircleCheck size={30} /> : <Wrench size={30} />}</span>
-        <div><span className="sobrelinea">Autorización</span><h2>{autorizada ? "Autorización registrada" : "¿Autorizas continuar?"}</h2><p>{autorizada ? "El taller ya puede continuar con la reparación." : "Esta autorización permite al taller continuar. Los productos, servicios y el total pueden agregarse después durante la reparación."}</p></div>
+        <div><span className="sobrelinea">Autorización</span><h2>{autorizada ? "Autorización registrada" : "¿Autorizas continuar?"}</h2><p>{autorizada ? "El taller ya puede continuar con la reparación." : "Esta autorización permite al taller continuar. Los productos, servicios y el total pueden agregarse después durante la reparación."}</p>{autorizada && <p className="estado-autorizacion-publica">Estado actual: <strong>{etiquetaEstado(orden.estado)}</strong></p>}</div>
         {!autorizada && orden.estado === "PendienteAprobacion" && <button type="button" className="boton-primario" onClick={autorizar}><Check size={20} />Autorizar continuar</button>}
       </section>
       <footer className="pie-publico">
@@ -221,7 +221,7 @@ async function autorizarOrden(token: string): Promise<OrdenPublica> {
   return await respuesta.json() as OrdenPublica;
 }
 function moneda(valor: number) { return new Intl.NumberFormat("es-NI", { style: "currency", currency: "NIO" }).format(valor); }
-function etiquetaEstado(estado: string) { return ({ Diagnostico: "Diagnóstico", PendienteAprobacion: "Por autorizar", Reparacion: "En reparación", ListaParaEntrega: "Lista para entregar" } as Record<string, string>)[estado] ?? estado; }
+function etiquetaEstado(estado: string) { return ({ Recepcion: "Recepción", Diagnostico: "Diagnóstico", Cotizacion: "Cotización", PendienteAprobacion: "Por autorizar", PreparacionReparacion: "Preparación de reparación", Reparacion: "En reparación", ControlCalidad: "Control de calidad", ListaParaEntrega: "Lista para entregar", Entregada: "Entregada", Cerrada: "Cerrada", Cancelada: "Cancelada" } as Record<string, string>)[estado] ?? estado; }
 function etiquetaCombustible(porcentaje: number) { return porcentaje >= 88 ? "Tanque lleno" : porcentaje >= 63 ? "3/4 de tanque" : porcentaje >= 38 ? "Medio tanque" : porcentaje >= 13 ? "1/4 de tanque" : "Reserva"; }
 function elementosEntregados(orden: OrdenPublica) { const elementos = [orden.dejaLlaves ? "Llaves" : "", orden.dejaDocumentos ? "Documentos" : ""].filter(Boolean); return elementos.length > 0 ? elementos.join(" y ") : "Ninguno registrado"; }
 function etiquetaTipoDanio(tipo: string) { return tipo === "Rayon" ? "Rayón" : tipo; }

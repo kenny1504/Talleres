@@ -11,11 +11,7 @@ public sealed class Cliente : IEntidadEmpresa
 
     public required string Nombre { get; set; }
 
-    public required string DocumentoIdentidad { get; set; }
-
     public required string Telefono { get; set; }
-
-    public string? Correo { get; set; }
 
     public string? Direccion { get; set; }
 

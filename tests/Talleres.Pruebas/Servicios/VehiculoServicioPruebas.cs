@@ -129,10 +129,9 @@ public sealed class VehiculoServicioPruebas
                 CancellationToken.None));
     }
 
-    private static CrearClienteSolicitud CrearCliente(string documento) => new()
+    private static CrearClienteSolicitud CrearCliente(string _) => new()
     {
         Nombre = "Cliente de prueba",
-        DocumentoIdentidad = documento,
         Telefono = "8888-0000"
     };
 
