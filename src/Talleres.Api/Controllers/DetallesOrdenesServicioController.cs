@@ -64,6 +64,8 @@ public sealed class DetallesOrdenesServicioController(
         var resumen = await detalleOrdenServicio.EliminarAsync(
             ordenServicioId,
             detalleId,
+            ObtenerEmpresaNovaId(),
+            ObtenerUsuarioId(),
             cancellationToken);
         return Ok(resumen);
     }

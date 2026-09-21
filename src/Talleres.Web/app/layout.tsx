@@ -3,7 +3,7 @@ import "./globals.css";
 import { ProveedorCargadorPantalla } from "./componentes/ProveedorCargadorPantalla";
 
 export const metadata: Metadata = {
-  title: "Taller Uno | Operación del taller",
+  title: "Taller Smart | Operación del taller",
   description: "Sistema de gestión de taller diseñado para trabajar cómodamente desde tablet.",
   openGraph: {
     title: "Taller Uno",
@@ -17,8 +17,8 @@ export const metadata: Metadata = {
     images: ["/og.png"],
   },
   icons: {
-    icon: "/favicon.svg",
-    shortcut: "/favicon.svg",
+    icon: "/icono-talleres.png",
+    shortcut: "/icono-talleres.png",
   },
 };
 

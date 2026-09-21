@@ -116,6 +116,84 @@ public sealed class DetalleOrdenServicioPruebas
         Assert.Equal("Ajuste final de mano de obra", Assert.Single(resumen.Detalles).Descripcion);
     }
 
+    [Fact]
+    public async Task EliminarAsync_ProductoConSalida_DevuelveExistenciaYEliminaDetalle()
+    {
+        var empresa = new ContextoEmpresaPrueba(1);
+        await using var dbContext = CrearDbContext(empresa);
+        var orden = await CrearOrdenAsync(dbContext, empresa.EmpresaId, EstadoOrdenServicio.ListaParaEntrega);
+        var detalle = new Talleres.Dominio.Entidades.DetalleOrdenServicio
+        {
+            EmpresaId = empresa.EmpresaId,
+            OrdenServicioId = orden.Id,
+            Tipo = TipoDetalleOrdenServicio.Inventario,
+            ProductoInventarioId = 20,
+            BodegaInventarioId = 3,
+            SalidaInventarioId = 900,
+            CodigoProducto = "REP-20",
+            Descripcion = "Pastillas de freno",
+            UnidadMedida = "unidad",
+            Cantidad = 2,
+            PrecioUnitario = 125.50m,
+            ExistenciaDescontada = true,
+            FechaCreacion = DateTime.UtcNow
+        };
+        dbContext.DetallesOrdenesServicio.Add(detalle);
+        await dbContext.SaveChangesAsync();
+        var inventario = new InventarioPrueba(null);
+        var servicio = new Talleres.Aplicacion.Servicios.DetalleOrdenServicio(
+            dbContext, empresa, inventario);
+
+        var resumen = await servicio.EliminarAsync(
+            orden.Id,
+            detalle.Id,
+            1,
+            "usuario-prueba",
+            CancellationToken.None);
+
+        Assert.Empty(resumen.Detalles);
+        Assert.Equal(0m, resumen.Total);
+        Assert.Equal(1, inventario.AnulacionesRegistradas);
+        Assert.Equal(900, inventario.UltimaSalidaAnuladaId);
+        Assert.Empty(await dbContext.DetallesOrdenesServicio.ToListAsync());
+    }
+
+    [Fact]
+    public async Task EliminarAsync_SiNoPuedeDevolverExistencia_ConservaDetalle()
+    {
+        var empresa = new ContextoEmpresaPrueba(1);
+        await using var dbContext = CrearDbContext(empresa);
+        var orden = await CrearOrdenAsync(dbContext, empresa.EmpresaId, EstadoOrdenServicio.Reparacion);
+        var detalle = new Talleres.Dominio.Entidades.DetalleOrdenServicio
+        {
+            EmpresaId = empresa.EmpresaId,
+            OrdenServicioId = orden.Id,
+            Tipo = TipoDetalleOrdenServicio.Inventario,
+            ProductoInventarioId = 20,
+            BodegaInventarioId = 3,
+            SalidaInventarioId = 900,
+            Descripcion = "Pastillas de freno",
+            Cantidad = 1,
+            PrecioUnitario = 100m,
+            ExistenciaDescontada = true,
+            FechaCreacion = DateTime.UtcNow
+        };
+        dbContext.DetallesOrdenesServicio.Add(detalle);
+        await dbContext.SaveChangesAsync();
+        var inventario = new InventarioPrueba(null, fallarAnulacion: true);
+        var servicio = new Talleres.Aplicacion.Servicios.DetalleOrdenServicio(
+            dbContext, empresa, inventario);
+
+        await Assert.ThrowsAsync<IntegracionNoDisponibleException>(() => servicio.EliminarAsync(
+            orden.Id,
+            detalle.Id,
+            1,
+            "usuario-prueba",
+            CancellationToken.None));
+
+        Assert.Equal(1, await dbContext.DetallesOrdenesServicio.CountAsync());
+    }
+
     private static TallerDbContext CrearDbContext(ContextoEmpresaPrueba empresa)
     {
         var opciones = new DbContextOptionsBuilder<TallerDbContext>()
@@ -174,9 +252,13 @@ public sealed class DetalleOrdenServicioPruebas
         return orden;
     }
 
-    private sealed class InventarioPrueba(ArticuloInventarioDto? articulo) : IInventarioSmartNova
+    private sealed class InventarioPrueba(
+        ArticuloInventarioDto? articulo,
+        bool fallarAnulacion = false) : IInventarioSmartNova
     {
         public int SalidasRegistradas { get; private set; }
+        public int AnulacionesRegistradas { get; private set; }
+        public int? UltimaSalidaAnuladaId { get; private set; }
 
         public Task<IReadOnlyList<BodegaInventarioDto>> ObtenerBodegasAsync(
             int empresaNovaId,
@@ -210,6 +292,17 @@ public sealed class DetalleOrdenServicioPruebas
             int salidaId,
             string usuarioId,
             string motivo,
-            CancellationToken cancellationToken) => Task.CompletedTask;
+            CancellationToken cancellationToken)
+        {
+            if (fallarAnulacion)
+            {
+                throw new IntegracionNoDisponibleException(
+                    "No fue posible devolver la existencia.");
+            }
+
+            AnulacionesRegistradas++;
+            UltimaSalidaAnuladaId = salidaId;
+            return Task.CompletedTask;
+        }
     }
 }

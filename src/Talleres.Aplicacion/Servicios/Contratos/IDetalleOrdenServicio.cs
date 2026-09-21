@@ -41,13 +41,17 @@ public interface IDetalleOrdenServicio
         AgregarDetalleManualSolicitud solicitud,
         CancellationToken cancellationToken = default);
 
-    /// <summary>Elimina un concepto que todavía no haya producido un movimiento de inventario.</summary>
+    /// <summary>Elimina un concepto y, si produjo una salida de inventario, la anula para restituir la existencia.</summary>
     /// <param name="ordenServicioId">Orden propietaria del detalle.</param>
     /// <param name="detalleId">Detalle que se eliminará.</param>
+    /// <param name="empresaNovaId">Empresa autenticada en NOVA.</param>
+    /// <param name="usuarioId">Usuario autenticado que solicita la eliminación.</param>
     /// <param name="cancellationToken">Token para cancelar la operación.</param>
     /// <returns>Resumen actualizado de la orden.</returns>
     Task<ResumenDetallesOrdenServicioDto> EliminarAsync(
         long ordenServicioId,
         long detalleId,
+        int empresaNovaId,
+        string usuarioId,
         CancellationToken cancellationToken = default);
 }

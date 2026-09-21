@@ -20,8 +20,11 @@ import {
   ClipboardList,
   Clock3,
   Copy,
+  Eye,
+  EyeOff,
   Fuel,
   LayoutDashboard,
+  LockKeyhole,
   LogOut,
   MessageCircleMore,
   Mic,
@@ -949,13 +952,17 @@ export default function PaginaPrincipal() {
       <BarraLateral
         vista={vista}
         nombreTaller={sesion.taller.nombreComercial || sesion.taller.nombreLegal}
+        logoTaller={sesion.taller.logo}
         alNavegar={navegar}
       />
 
       <div className={`superficie ${procesoActivo ? "proceso-activo" : ""}`}>
         <header className="barra-superior">
           <div className="marca-compacta">
-            <span className="marca-simbolo">T</span>
+            <LogoTaller
+              nombreTaller={sesion.taller.nombreComercial || sesion.taller.nombreLegal}
+              logo={sesion.taller.logo}
+            />
             <span>{sesion.taller.nombreComercial || sesion.taller.nombreLegal}</span>
           </div>
 
@@ -1184,6 +1191,7 @@ function PantallaInicioSesion({
   const [enviando, setEnviando] = useState(false);
   const [proveedorEnviando, setProveedorEnviando] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [mostrarContrasena, setMostrarContrasena] = useState(false);
 
   useEffect(() => {
     const mensaje = new URLSearchParams(window.location.search).get("error");
@@ -1226,54 +1234,71 @@ function PantallaInicioSesion({
       <section className="presentacion-acceso" aria-label="Bienvenida a Talleres">
         <div className="marca marca-acceso">
           <span className="marca-simbolo">T</span>
-          <span>Talleres</span>
+          <span>Taller Smart</span>
         </div>
-        <div>
+        <div className="mensaje-presentacion-acceso">
           <span className="sobrelinea">Integrado con SMART TPV NOVA</span>
-          <h1>La operación del taller, en un solo lugar.</h1>
-          <p>Ingresa con tu cuenta de SMART TPV NOVA. El sistema abrirá únicamente el taller que tienes autorizado.</p>
+          <h1>Todo tu taller.<br />Una sola vista.</h1>
+          <p>Gestiona órdenes, clientes, vehículos e inventario de forma simple y rápida.</p>
         </div>
-        <small>Acceso seguro · Información aislada por empresa</small>
       </section>
 
       <section className="contenedor-login">
         <form className="formulario-login" onSubmit={enviar}>
-          <div>
-            <span className="sobrelinea">Bienvenido</span>
-            <h2>Iniciar sesión</h2>
-            <p>Utiliza las mismas credenciales de SMART TPV NOVA.</p>
-          </div>
+          <header className="encabezado-login">
+            <span className="sobrelinea">Bienvenido de nuevo</span>
+            <h2>Inicia sesión</h2>
+            <p>Usa tus credenciales de SMART TPV NOVA.</p>
+          </header>
 
           {error && <div className="mensaje-acceso-error" role="alert"><TriangleAlert size={20} />{error}</div>}
 
-          <label>
-            Usuario
-            <input
-              name="usuario"
-              type="text"
-              autoComplete="username"
-              required
-              maxLength={256}
-            />
+          <label className="campo-login">
+            <span>Usuario</span>
+            <span className="control-login">
+              <UserRound size={19} aria-hidden="true" />
+              <input
+                name="usuario"
+                type="text"
+                autoComplete="username"
+                placeholder="Ingresa tu usuario"
+                required
+                maxLength={256}
+              />
+            </span>
           </label>
-          <label>
-            Contraseña
-            <input
-              name="contrasena"
-              type="password"
-              autoComplete="current-password"
-              required
-              maxLength={256}
-            />
+          <label className="campo-login">
+            <span>Contraseña</span>
+            <span className="control-login">
+              <LockKeyhole size={19} aria-hidden="true" />
+              <input
+                name="contrasena"
+                type={mostrarContrasena ? "text" : "password"}
+                autoComplete="current-password"
+                placeholder="Ingresa tu contraseña"
+                required
+                maxLength={256}
+              />
+              <button
+                type="button"
+                className="alternar-contrasena"
+                aria-label={mostrarContrasena ? "Ocultar contraseña" : "Mostrar contraseña"}
+                aria-pressed={mostrarContrasena}
+                onClick={() => setMostrarContrasena((visible) => !visible)}
+              >
+                {mostrarContrasena ? <EyeOff size={19} /> : <Eye size={19} />}
+              </button>
+            </span>
           </label>
           <label className="opcion-recordarme">
             <input name="recordarme" type="checkbox" />
-            Mantener mi sesión iniciada
+            <span>Recordarme</span>
           </label>
-          <button className="boton-primario boton-ancho" disabled={enviando}>
-            Ingresar al taller
+          <button type="submit" className="boton-primario boton-ancho boton-ingresar" disabled={enviando}>
+            <span>Ingresar al taller</span>
+            <ChevronRight size={19} aria-hidden="true" />
           </button>
-          <div className="separador-login"><span>o continúa con</span></div>
+          <div className="separador-login"><span>También puedes ingresar con</span></div>
           <div className="botones-proveedor-login">
             <button
               type="button"
@@ -1285,7 +1310,8 @@ function PantallaInicioSesion({
                 window.location.assign(`${obtenerDireccionApi()}/api/autenticacion/externo/google`);
               }}
             >
-              Continuar con Google
+              <span className="distintivo-proveedor" aria-hidden="true">G</span>
+              <span>Google</span>
             </button>
             <button
               type="button"
@@ -1297,7 +1323,8 @@ function PantallaInicioSesion({
                 window.location.assign(`${obtenerDireccionApi()}/api/autenticacion/externo/microsoft`);
               }}
             >
-              Continuar con Microsoft
+              <span className="distintivo-proveedor distintivo-microsoft" aria-hidden="true"><i /><i /><i /><i /></span>
+              <span>Microsoft</span>
             </button>
           </div>
         </form>
@@ -1321,6 +1348,7 @@ function VistaAdministracion({
   const [cargando, setCargando] = useState(true);
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");
+  const [tallerPorRetirar, setTallerPorRetirar] = useState<TallerSincronizadoApi | null>(null);
 
   const cargar = useCallback(async (mostrarCargador = true) => {
     setCargando(true);
@@ -1359,15 +1387,17 @@ function VistaAdministracion({
     }
   }
 
-  async function retirar(id: number) {
-    if (!window.confirm("¿Retirar este taller de la sincronización?")) return;
+  async function retirar() {
+    if (!tallerPorRetirar) return;
     setGuardando(true);
+    setError("");
     try {
       await ejecutarConCargadorPantalla("Retirando el taller de la sincronización…", async () => {
-        await retirarTallerSincronizadoApi(id);
+        await retirarTallerSincronizadoApi(tallerPorRetirar.empresaNovaId);
         await cargar(false);
         alActualizarSesion(await obtenerSesionApi(new AbortController().signal));
       });
+      setTallerPorRetirar(null);
     } catch (excepcion) {
       setError(excepcion instanceof Error ? excepcion.message : "No fue posible retirar el taller.");
     } finally {
@@ -1411,13 +1441,25 @@ function VistaAdministracion({
                   <strong>{taller.nombreComercial || taller.nombreLegal}</strong>
                   <small>{taller.activo ? "Disponible para iniciar sesión" : "Retirado de la sincronización"}</small>
                 </div>
-                {taller.activo && <button className="boton-secundario" disabled={guardando} onClick={() => retirar(taller.empresaNovaId)}>Retirar</button>}
+                {taller.activo && <button className="boton-secundario" disabled={guardando} onClick={() => { setError(""); setTallerPorRetirar(taller); }}>Retirar</button>}
               </article>
             ))}
           </div>
         )}
       </div>
       <p className="nota-administracion">El usuario actual: {sesion.nombreUsuario}. La autorización se vuelve a comprobar en SMART TPV NOVA en cada operación.</p>
+      {tallerPorRetirar && (
+        <ModalConfirmacion
+          titulo="Retirar taller"
+          descripcion={`¿Deseas retirar ${tallerPorRetirar.nombreComercial || tallerPorRetirar.nombreLegal} de la sincronización?`}
+          detalle="El taller dejará de estar disponible para iniciar sesión."
+          etiquetaConfirmar="Retirar taller"
+          procesando={guardando}
+          mensajeError={error}
+          alCancelar={() => setTallerPorRetirar(null)}
+          alConfirmar={retirar}
+        />
+      )}
     </section>
   );
 }
@@ -1425,16 +1467,18 @@ function VistaAdministracion({
 function BarraLateral({
   vista,
   nombreTaller,
+  logoTaller,
   alNavegar,
 }: {
   vista: Vista;
   nombreTaller: string;
+  logoTaller: string | null;
   alNavegar: (vista: Vista) => void;
 }) {
   return (
     <aside className="barra-lateral">
       <button className="marca" onClick={() => alNavegar("inicio")} aria-label="Ir al inicio">
-        <span className="marca-simbolo">T</span>
+        <LogoTaller nombreTaller={nombreTaller} logo={logoTaller} />
         <span className="marca-nombre">{nombreTaller}</span>
       </button>
 
@@ -1463,6 +1507,23 @@ function BarraLateral({
         <ChevronRight size={18} />
       </div>
     </aside>
+  );
+}
+
+function LogoTaller({ nombreTaller, logo }: { nombreTaller: string; logo: string | null }) {
+  return (
+    <span className="marca-simbolo" aria-hidden="true">
+      <span>{nombreTaller.trim().charAt(0).toUpperCase() || "T"}</span>
+      {logo && (
+        // El origen del logo se configura por empresa y no se conoce durante la compilación.
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={logo}
+          alt=""
+          onError={(evento) => { evento.currentTarget.hidden = true; }}
+        />
+      )}
+    </span>
   );
 }
 
@@ -1553,13 +1614,13 @@ function VistaInicio({
           <span className="estado-operativo">Operación en línea</span>
         </div>
         <div className="datos-taller">
-          <span><strong>Razón social</strong><em>{taller.nombreLegal}</em></span>
-          <span><strong>RUC</strong><em>{taller.ruc || "No registrado"}</em></span>
-          <span><strong>Teléfono</strong><em>+{taller.prefijoTelefono} {taller.telefono}</em></span>
-          <span><strong>Correo</strong><em>{taller.correo || "No registrado"}</em></span>
+          {taller.nombreComercial && taller.nombreLegal !== taller.nombreComercial && (
+            <span className="dato-taller-ancho"><strong>Razón social</strong><em>{taller.nombreLegal}</em></span>
+          )}
+          <span className="dato-taller-ruc"><strong>RUC</strong><em>{taller.ruc || "No registrado"}</em></span>
+          <span className="dato-taller-telefono"><strong>Teléfono</strong><em>+{taller.prefijoTelefono} {taller.telefono}</em></span>
+          <span className="dato-taller-contacto"><strong>Correo</strong><em>{taller.correo || "No registrado"}</em></span>
           <span className="dato-taller-ancho"><strong>Dirección</strong><em>{[taller.direccion, taller.ciudad, taller.barrio, taller.calle].filter(Boolean).join(", ") || "No registrada"}</em></span>
-          <span><strong>Horario</strong><em>{formatearHora(taller.horaApertura)} – {formatearHora(taller.horaCierre)}</em></span>
-          {taller.logo && <span><strong>Identidad visual</strong><a href={taller.logo} target="_blank" rel="noreferrer">Abrir logo registrado</a></span>}
         </div>
       </section>
 
@@ -2309,11 +2370,6 @@ function FormularioCliente({
         Nombre completo <span aria-hidden="true">*</span>
         <input name="nombre" type="text" required minLength={2} maxLength={150} defaultValue={cliente?.nombre ?? ""} autoComplete="name" placeholder="Ej. María Fernández López" />
       </label>
-      <div className="separador-formulario" />
-      <div className="paso-formulario">
-        <span>2</span>
-        <div><strong>Contacto</strong><small>Información para avisos y seguimiento de órdenes</small></div>
-      </div>
       <label>
         Teléfono <span aria-hidden="true">*</span>
         <input name="telefono" type="tel" required minLength={7} maxLength={30} defaultValue={cliente?.telefono ?? ""} autoComplete="tel" inputMode="tel" placeholder="Ej. 8888-0000" />
@@ -2530,6 +2586,7 @@ function DetalleOrden({
   const [buscandoProductos, setBuscandoProductos] = useState(false);
   const [mostrarCargoManual, setMostrarCargoManual] = useState(false);
   const [mensajeCargoManual, setMensajeCargoManual] = useState<{ texto: string; esError: boolean } | null>(null);
+  const [detallePorEliminar, setDetallePorEliminar] = useState<DetalleOrdenServicioApi | null>(null);
   const [cargandoProceso, setCargandoProceso] = useState(true);
   const [guardandoProceso, setGuardandoProceso] = useState(false);
   const [errorProceso, setErrorProceso] = useState("");
@@ -2545,6 +2602,16 @@ function DetalleOrden({
   const articuloSeleccionado = articulos.find((articulo) => articulo.productoId === productoId);
   const terminoBusquedaProducto = busquedaProducto.trim();
   const productosCoincidentes = articulos.slice(0, 6);
+
+  useEffect(() => {
+    if (!mensajeCargoManual || mensajeCargoManual.esError) return;
+
+    const temporizador = window.setTimeout(() => {
+      setMensajeCargoManual((mensajeActual) =>
+        mensajeActual?.esError ? mensajeActual : null);
+    }, 4000);
+    return () => window.clearTimeout(temporizador);
+  }, [mensajeCargoManual]);
 
   useEffect(() => {
     const controlador = new AbortController();
@@ -2685,14 +2752,20 @@ function DetalleOrden({
     }
   }
 
-  async function eliminarDetalle(detalleId: number) {
+  async function eliminarDetalle() {
+    if (!detallePorEliminar) return;
+    const devuelveExistencia = detallePorEliminar.tipo === "Inventario" && detallePorEliminar.existenciaDescontada;
     setGuardandoProceso(true);
+    setErrorProceso("");
     try {
       setResumen(await ejecutarConCargadorPantalla(
-        "Eliminando el cargo de la orden…",
-        () => eliminarDetalleOrdenApi(orden.id, detalleId),
+        devuelveExistencia ? "Devolviendo el producto al inventario…" : "Eliminando el cargo de la orden…",
+        () => eliminarDetalleOrdenApi(orden.id, detallePorEliminar.id),
       ));
-      alMostrarAviso("Cargo eliminado de la orden");
+      setDetallePorEliminar(null);
+      alMostrarAviso(devuelveExistencia
+        ? "Producto eliminado y existencia devuelta al inventario"
+        : "Cargo eliminado de la orden");
     } catch (error) {
       setErrorProceso(error instanceof Error ? error.message : "No fue posible eliminar el cargo.");
     } finally {
@@ -2891,7 +2964,7 @@ function DetalleOrden({
                     <button className="boton-secundario" type="button" disabled={guardandoProceso} onClick={() => { setMensajeCargoManual(null); setMostrarCargoManual(true); }}><Plus size={18} />Añadir cargo manual</button>
                   </section>
                 </div>
-                <ResumenCargosOrden resumen={resumen} cargando={cargandoProceso} guardando={guardandoProceso} alEliminar={eliminarDetalle} />
+                <ResumenCargosOrden resumen={resumen} cargando={cargandoProceso} guardando={guardandoProceso} alEliminar={(detalle) => { setErrorProceso(""); setDetallePorEliminar(detalle); }} />
                 {orden.estado === "Reparación" && <button className="boton-primario boton-ancho" disabled={guardandoProceso} onClick={() => avanzar("ListaParaEntrega", "Reparación finalizada; vehículo listo para entregar.")}><CircleCheck size={20} />Marcar lista para entregar</button>}
               </section>
             )}
@@ -2914,7 +2987,7 @@ function DetalleOrden({
               <button className="boton-icono" type="button" onClick={() => { setMensajeCargoManual(null); setMostrarCargoManual(false); }} aria-label="Cerrar cargos manuales"><X size={20} /></button>
             </div>
             <div className="contenido-modal-alta">
-              {mensajeCargoManual && <div className={mensajeCargoManual.esError ? "estado-datos estado-datos-error" : "estado-datos"} role={mensajeCargoManual.esError ? "alert" : "status"}>{mensajeCargoManual.texto}</div>}
+              {mensajeCargoManual && <div className={mensajeCargoManual.esError ? "estado-datos estado-datos-error mensaje-modal-cargo" : "estado-datos mensaje-modal-cargo mensaje-modal-cargo-exito"} role={mensajeCargoManual.esError ? "alert" : "status"} aria-live="polite">{mensajeCargoManual.esError ? <TriangleAlert size={20} aria-hidden="true" /> : <CircleCheck size={20} aria-hidden="true" />}<span>{mensajeCargoManual.texto}</span></div>}
               <form className="formulario-cargo formulario-cargo-modal" onSubmit={agregarManual}>
                 <label>Descripción<input name="descripcion" maxLength={300} minLength={2} required placeholder="Ej. Cambio de pastillas de freno" /></label>
                 <label>Cantidad<input name="cantidad" type="number" min="0.0001" step="0.0001" defaultValue="1" required inputMode="decimal" /></label>
@@ -2928,6 +3001,76 @@ function DetalleOrden({
           </section>
         </div>
       )}
+      {detallePorEliminar && (
+        <ModalConfirmacion
+          titulo={detallePorEliminar.tipo === "Inventario" ? "Eliminar producto" : "Eliminar cargo"}
+          descripcion={`¿Deseas eliminar ${detallePorEliminar.descripcion} de la orden?`}
+          detalle={detallePorEliminar.existenciaDescontada
+            ? `Se devolverán ${detallePorEliminar.cantidad} ${detallePorEliminar.unidadMedida || "unidad(es)"} al inventario.`
+            : "Este concepto se quitará del total de la orden."}
+          etiquetaConfirmar={detallePorEliminar.existenciaDescontada ? "Eliminar y devolver" : "Eliminar cargo"}
+          procesando={guardandoProceso}
+          mensajeError={errorProceso}
+          alCancelar={() => setDetallePorEliminar(null)}
+          alConfirmar={eliminarDetalle}
+        />
+      )}
+    </div>
+  );
+}
+
+function ModalConfirmacion({
+  titulo,
+  descripcion,
+  detalle,
+  etiquetaConfirmar,
+  procesando,
+  mensajeError,
+  alCancelar,
+  alConfirmar,
+}: {
+  titulo: string;
+  descripcion: string;
+  detalle: string;
+  etiquetaConfirmar: string;
+  procesando: boolean;
+  mensajeError?: string;
+  alCancelar: () => void;
+  alConfirmar: () => Promise<void>;
+}) {
+  const botonCancelarRef = useRef<HTMLButtonElement | null>(null);
+
+  useEffect(() => {
+    botonCancelarRef.current?.focus();
+  }, []);
+
+  useEffect(() => {
+    function cerrarConEscape(evento: KeyboardEvent) {
+      if (evento.key === "Escape" && !procesando) alCancelar();
+    }
+
+    document.addEventListener("keydown", cerrarConEscape);
+    return () => document.removeEventListener("keydown", cerrarConEscape);
+  }, [alCancelar, procesando]);
+
+  return (
+    <div className="fondo-modal-alta">
+      <button className="cerrador-modal-fondo" type="button" disabled={procesando} aria-label="Cancelar confirmación" onClick={alCancelar} />
+      <section className="modal-alta modal-confirmacion" role="alertdialog" aria-modal="true" aria-labelledby="titulo-modal-confirmacion" aria-describedby="detalle-modal-confirmacion">
+        <div className="cabecera-modal-alta">
+          <div><span className="sobrelinea">Confirmación</span><h2 id="titulo-modal-confirmacion">{titulo}</h2></div>
+          <button className="boton-icono" type="button" disabled={procesando} onClick={alCancelar} aria-label="Cancelar"><X size={20} /></button>
+        </div>
+        <div className="contenido-modal-alta contenido-modal-confirmacion">
+          <p>{descripcion}</p>
+          <div id="detalle-modal-confirmacion" className="detalle-modal-confirmacion"><TriangleAlert size={20} aria-hidden="true" /><span>{detalle}</span></div>
+          {mensajeError && <div className="estado-datos estado-datos-error" role="alert">{mensajeError}</div>}
+          <div className="acciones-modal-confirmacion">
+            <button ref={botonCancelarRef} className="boton-secundario" type="button" disabled={procesando} onClick={alCancelar}>Cancelar</button>
+            <button className="boton-eliminar-confirmacion" type="button" disabled={procesando} onClick={() => void alConfirmar()}><Trash2 size={18} />{etiquetaConfirmar}</button>
+          </div>
+        </div>
+      </section>
     </div>
   );
 }
@@ -3178,7 +3321,7 @@ function ResumenCargosOrden({
   resumen: ResumenDetallesOrdenServicioApi;
   cargando: boolean;
   guardando: boolean;
-  alEliminar: (detalleId: number) => Promise<void>;
+  alEliminar: (detalle: DetalleOrdenServicioApi) => void;
   soloLectura?: boolean;
 }) {
   if (cargando) return null;
@@ -3192,7 +3335,7 @@ function ResumenCargosOrden({
           <span>{detalle.cantidad} {detalle.unidadMedida || ""}</span>
           <span>{formatearMoneda(detalle.precioUnitario)}</span>
           <strong>{formatearMoneda(detalle.subtotal)}</strong>
-          {!soloLectura && !detalle.existenciaDescontada ? <button type="button" disabled={guardando} onClick={() => alEliminar(detalle.id)} aria-label={`Eliminar ${detalle.descripcion}`}><Trash2 size={17} /></button> : <span />}
+          {!soloLectura ? <button type="button" disabled={guardando} onClick={() => alEliminar(detalle)} aria-label={`Eliminar ${detalle.descripcion}`}><Trash2 size={17} /></button> : <span />}
         </article>
       ))}
       <div className="total-cargos"><span>Total de la orden</span><strong>{formatearMoneda(resumen.total)}</strong></div>
@@ -3219,7 +3362,7 @@ function FormularioRecepcion({
   const [fotografias, setFotografias] = useState<File[]>([]);
   const entradaFotografias = useRef<HTMLInputElement | null>(null);
   const [errorFotos, setErrorFotos] = useState("");
-  const [evidenciaConfirmandoId, setEvidenciaConfirmandoId] = useState<number | null>(null);
+  const [evidenciaPorEliminar, setEvidenciaPorEliminar] = useState<EvidenciaInspeccion | null>(null);
   const [evidenciaEliminandoId, setEvidenciaEliminandoId] = useState<number | null>(null);
   const [guardando, setGuardando] = useState(false);
   const vistasPrevias = useMemo(
@@ -3259,7 +3402,26 @@ function FormularioRecepcion({
     );
   }
 
+  async function eliminarEvidenciaConfirmada() {
+    if (!evidenciaPorEliminar) return;
+    setEvidenciaEliminandoId(evidenciaPorEliminar.id);
+    setErrorFotos("");
+    try {
+      await alEliminarEvidencia(evidenciaPorEliminar.id);
+      setEvidenciaPorEliminar(null);
+    } catch (error) {
+      setErrorFotos(
+        error instanceof Error
+          ? error.message
+          : "No fue posible eliminar la fotografía.",
+      );
+    } finally {
+      setEvidenciaEliminandoId(null);
+    }
+  }
+
   return (
+    <>
     <form
       className="formulario formulario-recepcion-pagina"
       aria-busy={guardando}
@@ -3467,37 +3629,13 @@ function FormularioRecepcion({
               />
               <figcaption>Guardada</figcaption>
               <button
-                className={`boton-eliminar-evidencia ${evidenciaConfirmandoId === evidencia.id ? "confirmando" : ""}`}
+                className="boton-eliminar-evidencia"
                 type="button"
                 disabled={evidenciaEliminandoId !== null}
-                aria-label={evidenciaConfirmandoId === evidencia.id
-                  ? `Confirmar eliminación de ${evidencia.nombreArchivo}`
-                  : `Eliminar ${evidencia.nombreArchivo}`}
-                onClick={async () => {
-                  if (evidenciaConfirmandoId !== evidencia.id) {
-                    setEvidenciaConfirmandoId(evidencia.id);
-                    setErrorFotos("");
-                    return;
-                  }
-
-                  setEvidenciaEliminandoId(evidencia.id);
-                  try {
-                    await alEliminarEvidencia(evidencia.id);
-                    setEvidenciaConfirmandoId(null);
-                  } catch (error) {
-                    setErrorFotos(
-                      error instanceof Error
-                        ? error.message
-                        : "No fue posible eliminar la fotografía.",
-                    );
-                  } finally {
-                    setEvidenciaEliminandoId(null);
-                  }
-                }}
+                aria-label={`Eliminar ${evidencia.nombreArchivo}`}
+                onClick={() => { setErrorFotos(""); setEvidenciaPorEliminar(evidencia); }}
               >
-                {evidenciaConfirmandoId === evidencia.id
-                  ? "Confirmar"
-                  : <Trash2 size={18} />}
+                <Trash2 size={18} />
               </button>
             </figure>
           ))}
@@ -3536,6 +3674,19 @@ function FormularioRecepcion({
           : "Guardar y pasar a diagnóstico"}
       </button>
     </form>
+    {evidenciaPorEliminar && (
+      <ModalConfirmacion
+        titulo="Eliminar fotografía"
+        descripcion={`¿Deseas eliminar ${evidenciaPorEliminar.nombreArchivo} de la inspección?`}
+        detalle="La fotografía guardada se eliminará de forma permanente."
+        etiquetaConfirmar="Eliminar fotografía"
+        procesando={evidenciaEliminandoId !== null}
+        mensajeError={errorFotos}
+        alCancelar={() => setEvidenciaPorEliminar(null)}
+        alConfirmar={eliminarEvidenciaConfirmada}
+      />
+    )}
+    </>
   );
 }
 
@@ -3679,15 +3830,6 @@ function normalizarClase(valor: string) {
     .replace(/[\u0300-\u036f]/g, "")
     .toLocaleLowerCase("es")
     .replaceAll(" ", "-");
-}
-
-function formatearHora(hora: string) {
-  const [horas, minutos] = hora.split(":");
-  const fecha = new Date(2000, 0, 1, Number(horas), Number(minutos));
-  return new Intl.DateTimeFormat("es-NI", {
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(fecha);
 }
 
 function obtenerDireccionApi() {

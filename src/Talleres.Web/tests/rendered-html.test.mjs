@@ -32,9 +32,9 @@ test("representa el acceso protegido a Talleres en español", async () => {
 
   const html = await respuesta.text();
   assert.match(html, /<html[^>]*\blang=["']es["']/i);
-  assert.match(html, /<title>Taller Uno \| Operación del taller<\/title>/i);
+  assert.match(html, /<title>Taller Smart \| Operación del taller<\/title>/i);
   assert.match(html, /Preparando Talleres/i);
-  assert.match(html, /href=["']\/favicon\.svg["']/i);
+  assert.match(html, /href=["']\/icono-talleres\.png["']/i);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape|Building your site/i);
 });
 
@@ -66,11 +66,11 @@ test("conserva el flujo de inspección en página completa y adaptable", async (
   assert.match(estilos, /@media \(max-width:\s*900px\)/);
   assert.match(estilos, /\.detalle-orden-pagina\s*\{\s*grid-template-columns:\s*1fr/s);
   assert.match(estilos, /@media \(prefers-reduced-motion:\s*reduce\)/);
-  assert.match(disposicion, /title:\s*"Taller Uno \| Operación del taller"/);
+  assert.match(disposicion, /title:\s*"Taller Smart \| Operación del taller"/);
   assert.doesNotMatch(pagina, /_sites-preview|SkeletonPreview/);
   assert.doesNotMatch(paquete, /react-loading-skeleton|drizzle-(orm|kit)/);
 
-  await access(new URL("../public/favicon.svg", import.meta.url));
+  await access(new URL("../public/icono-talleres.png", import.meta.url));
   await access(new URL("../public/og.png", import.meta.url));
 });
 
@@ -145,6 +145,11 @@ test("el login usa la identidad de NOVA y no acepta la empresa desde el navegado
 
   assert.match(pagina, /function PantallaInicioSesion/);
   assert.match(pagina, /SMART TPV NOVA/);
+  assert.match(pagina, /Todo tu taller/);
+  assert.match(pagina, /Gestiona órdenes, clientes, vehículos e inventario/);
+  assert.match(pagina, /aria-label=\{mostrarContrasena \? "Ocultar contraseña" : "Mostrar contraseña"\}/);
+  assert.doesNotMatch(pagina, /Información aislada por empresa/);
+  assert.doesNotMatch(pagina, /El sistema abrirá únicamente el taller que tienes autorizado/);
   assert.match(pagina, /api\/autenticacion\/iniciar/);
   assert.match(pagina, /api\/autenticacion\/seleccionar-taller/);
   assert.match(pagina, /if \(!sesion\) \{\s*return <PantallaInicioSesion/);
@@ -169,6 +174,21 @@ test("la navegación global cierra cualquier proceso activo", async () => {
   assert.match(pagina, /onChange=\{\(evento\) => buscar\(evento\.target\.value\)\}/);
   assert.match(pagina, /<NavegacionInferior vista=\{vista\} alNavegar=\{navegar\} \/>/);
   assert.doesNotMatch(pagina, /!procesoActivo && <NavegacionInferior/);
+});
+
+test("muestra el logo del taller en la marca y simplifica su información en el inicio", async () => {
+  const pagina = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+  const estilos = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
+
+  assert.match(pagina, /logoTaller=\{sesion\.taller\.logo\}/);
+  assert.match(pagina, /function LogoTaller\(/);
+  assert.match(pagina, /<img\s+src=\{logo\}/);
+  assert.doesNotMatch(pagina, /<strong>Horario<\/strong>/);
+  assert.doesNotMatch(pagina, /Abrir logo registrado/);
+  assert.match(estilos, /\.marca-simbolo img\s*\{[^}]*object-fit:\s*contain/s);
+  assert.match(pagina, /taller\.nombreComercial && taller\.nombreLegal !== taller\.nombreComercial/);
+  assert.match(estilos, /@media \(max-width:\s*620px\)[\s\S]*\.datos-taller\s*\{[^}]*grid-template-columns:\s*repeat\(2,/s);
+  assert.match(estilos, /\.dato-taller-contacto,[\s\S]*\.dato-taller-ancho\s*\{[^}]*grid-column:\s*1 \/ -1/s);
 });
 
 test("crear una orden desde clientes conserva el cliente y el regreso", async () => {
@@ -275,15 +295,29 @@ test("la inspección carga y muestra evidencias públicas de Amazon S3", async (
   assert.match(estilos, /\.galeria-evidencias img\s*\{[^}]*object-fit:\s*cover/s);
 });
 
-test("permite confirmar y eliminar fotografías guardadas de una orden", async () => {
+test("confirma en un modal la eliminación de fotografías guardadas", async () => {
   const pagina = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
   const estilos = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
 
   assert.match(pagina, /method:\s*"DELETE"/);
-  assert.match(pagina, /Confirmar eliminación de/);
+  assert.match(pagina, /titulo="Eliminar fotografía"/);
+  assert.match(pagina, /alConfirmar=\{eliminarEvidenciaConfirmada\}/);
   assert.match(pagina, /alEliminarEvidencia/);
   assert.match(estilos, /\.boton-eliminar-evidencia/);
   assert.match(estilos, /min-height:\s*44px/);
+});
+
+test("permite eliminar productos descontados y comunica la devolución al inventario", async () => {
+  const pagina = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+
+  assert.match(pagina, /!soloLectura \? <button[^>]+onClick=\{\(\) => alEliminar\(detalle\)\}/);
+  assert.match(pagina, /detallePorEliminar\.tipo === "Inventario"/);
+  assert.match(pagina, /detallePorEliminar\.existenciaDescontada/);
+  assert.match(pagina, /<ModalConfirmacion/);
+  assert.match(pagina, /role="alertdialog"/);
+  assert.match(pagina, /Devolviendo el producto al inventario…/);
+  assert.match(pagina, /Producto eliminado y existencia devuelta al inventario/);
+  assert.doesNotMatch(pagina, /window\.(?:alert|confirm)\s*\(/);
 });
 
 test("lleva la orden hasta entrega y registra productos y cargos durante reparación", async () => {
@@ -307,6 +341,10 @@ test("lleva la orden hasta entrega y registra productos y cargos durante reparac
   assert.match(pagina, /setMensajeCargoManual\(null\); setMostrarCargoManual\(false\)/);
   assert.match(pagina, /mensajeCargoManual && <div className=\{mensajeCargoManual\.esError/);
   assert.match(pagina, /setMensajeCargoManual\(\{ texto: "Cargo manual agregado a la orden\."/);
+  assert.match(pagina, /mensaje-modal-cargo mensaje-modal-cargo-exito/);
+  assert.match(pagina, /window\.setTimeout\(\(\) => \{[\s\S]*setMensajeCargoManual[\s\S]*\}, 4000\)/);
+  assert.match(pagina, /window\.clearTimeout\(temporizador\)/);
+  assert.match(pagina, /aria-live="polite"/);
   assert.doesNotMatch(pagina, /name="unidadMedida"/);
   assert.match(pagina, /Total de la orden/);
   assert.match(pagina, /existencia insuficiente/);
@@ -317,6 +355,9 @@ test("lleva la orden hasta entrega y registra productos y cargos durante reparac
   assert.match(estilos, /\.formulario-cargo input,[\s\S]*min-height:\s*46px/s);
   assert.match(estilos, /\.producto-seleccionado-inventario\s*\{/);
   assert.match(estilos, /\.modal-cargo-manual\s*\{/);
+  assert.match(estilos, /\.mensaje-modal-cargo\s*\{[^}]*position:\s*sticky;[^}]*top:\s*0;[^}]*z-index:\s*2/s);
+  assert.match(estilos, /\.mensaje-modal-cargo-exito\s*\{[^}]*background:\s*var\(--verde-claro\);[^}]*color:\s*var\(--verde-profundo\)/s);
+  assert.match(estilos, /\.aviso\s*\{[^}]*z-index:\s*130/s);
   assert.match(estilos, /@media \(max-width:\s*680px\)[\s\S]*\.formularios-cargos\s*\{\s*grid-template-columns:\s*1fr/s);
 });
 

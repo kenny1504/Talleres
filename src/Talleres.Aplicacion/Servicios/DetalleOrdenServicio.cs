@@ -149,10 +149,18 @@ public sealed class DetalleOrdenServicio(
     public async Task<ResumenDetallesOrdenServicioDto> EliminarAsync(
         long ordenServicioId,
         long detalleId,
+        int empresaNovaId,
+        string usuarioId,
         CancellationToken cancellationToken = default)
     {
+        var empresaId = contextoEmpresa.ObtenerEmpresaIdRequerido();
         var orden = await ObtenerOrdenAsync(ordenServicioId, cancellationToken);
         ValidarDetallesEditables(orden);
+        if (empresaId != empresaNovaId)
+        {
+            throw new ReglaNegocioException("La empresa activa no coincide con la empresa del inventario.");
+        }
+
         var detalle = await dbContext.DetallesOrdenesServicio.SingleOrDefaultAsync(
                           item => item.Id == detalleId && item.OrdenServicioId == ordenServicioId,
                           cancellationToken)
@@ -160,8 +168,18 @@ public sealed class DetalleOrdenServicio(
                           "El detalle solicitado no existe en esta orden.");
         if (detalle.ExistenciaDescontada)
         {
-            throw new ReglaNegocioException(
-                "El producto ya generó una salida de inventario y no puede eliminarse desde la orden.");
+            if (!detalle.SalidaInventarioId.HasValue)
+            {
+                throw new ReglaNegocioException(
+                    "El producto descontó existencia, pero no conserva la salida necesaria para devolverla.");
+            }
+
+            await inventario.AnularSalidaAsync(
+                empresaNovaId,
+                detalle.SalidaInventarioId.Value,
+                usuarioId,
+                $"Producto retirado de la orden {orden.Numero}.",
+                cancellationToken);
         }
 
         dbContext.DetallesOrdenesServicio.Remove(detalle);
