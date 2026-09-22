@@ -14,6 +14,8 @@ public sealed class OrdenServicioServicio(
     ITallerDbContext dbContext,
     IContextoEmpresa contextoEmpresa) : IOrdenServicioServicio
 {
+    private static readonly TimeSpan PermanenciaListaParaEntregaEnInicio = TimeSpan.FromHours(36);
+
     public async Task<OrdenServicioDto> CrearAsync(
         CrearOrdenServicioSolicitud solicitud,
         CancellationToken cancellationToken = default)
@@ -65,7 +67,7 @@ public sealed class OrdenServicioServicio(
         dbContext.OrdenesServicio.Add(orden);
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        return ConvertirDto(orden, cliente.Nombre, vehiculo.Placa, false);
+        return ConvertirDto(orden, cliente.Nombre, vehiculo.Placa, false, fechaActual);
     }
 
     public async Task<OrdenServicioDto> ObtenerPorIdAsync(
@@ -127,6 +129,7 @@ public sealed class OrdenServicioServicio(
         }
 
         var estadoAnterior = orden.Estado;
+        var fechaCambioEstado = DateTime.UtcNow;
         orden.Estado = solicitud.Estado;
         orden.Historial.Add(new HistorialOrdenServicio
         {
@@ -134,7 +137,7 @@ public sealed class OrdenServicioServicio(
             EstadoAnterior = estadoAnterior,
             EstadoNuevo = solicitud.Estado,
             Descripcion = solicitud.Descripcion.Trim(),
-            Fecha = DateTime.UtcNow
+            Fecha = fechaCambioEstado
         });
 
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -143,15 +146,19 @@ public sealed class OrdenServicioServicio(
             orden,
             orden.Cliente.Nombre,
             orden.Vehiculo.Placa,
-            orden.Recepcion is not null);
+            orden.Recepcion is not null,
+            fechaCambioEstado);
     }
 
     private IQueryable<OrdenServicio> ConsultarOrdenes() =>
         dbContext.OrdenesServicio.AsNoTracking();
 
     private static IQueryable<OrdenServicioDto> ProyectarDto(
-        IQueryable<OrdenServicio> consulta) => consulta
-        .Select(orden => new OrdenServicioDto(
+        IQueryable<OrdenServicio> consulta)
+    {
+        var limiteListaParaEntrega = DateTime.UtcNow.Subtract(PermanenciaListaParaEntregaEnInicio);
+
+        return consulta.Select(orden => new OrdenServicioDto(
             orden.Id,
             orden.Numero,
             orden.ClienteId,
@@ -160,14 +167,29 @@ public sealed class OrdenServicioServicio(
             orden.Vehiculo.Placa,
             orden.Estado,
             orden.FechaIngreso,
+            orden.Historial
+                .Where(historial => historial.EstadoNuevo == orden.Estado)
+                .OrderByDescending(historial => historial.Fecha)
+                .ThenByDescending(historial => historial.Id)
+                .Select(historial => (DateTime?)historial.Fecha)
+                .FirstOrDefault() ?? orden.FechaIngreso,
             orden.Observaciones,
-            orden.Recepcion != null));
+            orden.Recepcion != null,
+            orden.Estado != EstadoOrdenServicio.ListaParaEntrega ||
+            (orden.Historial
+                .Where(historial => historial.EstadoNuevo == orden.Estado)
+                .OrderByDescending(historial => historial.Fecha)
+                .ThenByDescending(historial => historial.Id)
+                .Select(historial => (DateTime?)historial.Fecha)
+                .FirstOrDefault() ?? orden.FechaIngreso) > limiteListaParaEntrega));
+    }
 
     private static OrdenServicioDto ConvertirDto(
         OrdenServicio orden,
         string nombreCliente,
         string placaVehiculo,
-        bool tieneRecepcion) => new(
+        bool tieneRecepcion,
+        DateTime fechaUltimoCambioEstado) => new(
             orden.Id,
             orden.Numero,
             orden.ClienteId,
@@ -176,8 +198,11 @@ public sealed class OrdenServicioServicio(
             placaVehiculo,
             orden.Estado,
             orden.FechaIngreso,
+            fechaUltimoCambioEstado,
             orden.Observaciones,
-            tieneRecepcion);
+            tieneRecepcion,
+            orden.Estado != EstadoOrdenServicio.ListaParaEntrega ||
+            fechaUltimoCambioEstado > DateTime.UtcNow.Subtract(PermanenciaListaParaEntregaEnInicio));
 
     private static string GenerarNumero(DateTime fecha) =>
         $"OS-{fecha:yyyyMMddHHmmss}-{Guid.NewGuid():N}"[..25].ToUpperInvariant();

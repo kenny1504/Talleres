@@ -10,7 +10,6 @@ import {
   ArrowLeft,
   Bell,
   Boxes,
-  CalendarDays,
   Camera,
   CarFront,
   Check,
@@ -23,6 +22,7 @@ import {
   Eye,
   EyeOff,
   Fuel,
+  History,
   LayoutDashboard,
   LockKeyhole,
   LogOut,
@@ -71,6 +71,7 @@ interface OrdenTaller {
   hora: string;
   progreso: number;
   color: string;
+  visibleEnInicio: boolean;
   prioridad?: boolean;
 }
 
@@ -154,7 +155,9 @@ interface OrdenServicioApi {
   placaVehiculo: string;
   estado: string;
   fechaIngreso: string;
+  fechaUltimoCambioEstado: string;
   observaciones: string | null;
+  visibleEnInicio: boolean;
 }
 
 interface DetalleOrdenServicioApi {
@@ -244,6 +247,12 @@ interface VehiculoTaller {
   detalle: string;
   cliente: string;
   activo: boolean;
+}
+
+interface FiltroHistorialOrdenes {
+  tipo: "cliente" | "vehiculo";
+  id: number;
+  nombre: string;
 }
 
 interface MarcaVehiculoApi {
@@ -358,6 +367,7 @@ export default function PaginaPrincipal() {
   const [guardandoVehiculo, setGuardandoVehiculo] = useState(false);
   const [busqueda, setBusqueda] = useState("");
   const [filtroEstado, setFiltroEstado] = useState("Todas");
+  const [filtroHistorialOrdenes, setFiltroHistorialOrdenes] = useState<FiltroHistorialOrdenes | null>(null);
   const [mostrarNuevaOrden, setMostrarNuevaOrden] = useState(false);
   const [mostrarNuevoCliente, setMostrarNuevoCliente] = useState(false);
   const [clienteEditando, setClienteEditando] = useState<ClienteTaller | null>(null);
@@ -440,15 +450,19 @@ export default function PaginaPrincipal() {
     const termino = busqueda.trim().toLocaleLowerCase("es");
     return ordenes.filter((orden) => {
       const coincideEstado = filtroEstado === "Todas" || orden.estado === filtroEstado;
+      const coincideHistorial = !filtroHistorialOrdenes ||
+        (filtroHistorialOrdenes.tipo === "cliente"
+          ? orden.clienteId === filtroHistorialOrdenes.id
+          : orden.vehiculoId === filtroHistorialOrdenes.id);
       const coincideBusqueda =
         !termino ||
         [orden.numero, orden.cliente, orden.vehiculo, orden.placa]
           .join(" ")
           .toLocaleLowerCase("es")
           .includes(termino);
-      return coincideEstado && coincideBusqueda;
+      return coincideEstado && coincideHistorial && coincideBusqueda;
     });
-  }, [busqueda, filtroEstado, ordenes]);
+  }, [busqueda, filtroEstado, filtroHistorialOrdenes, ordenes]);
 
   function navegar(nuevaVista: Vista) {
     setMostrarAdministracion(false);
@@ -460,6 +474,7 @@ export default function PaginaPrincipal() {
     setClienteInicialNuevaOrdenId(null);
     setOrdenDetalle(null);
     setMostrarRecepcion(false);
+    setFiltroHistorialOrdenes(null);
     setVista(nuevaVista);
     setBusqueda("");
   }
@@ -476,7 +491,24 @@ export default function PaginaPrincipal() {
     setClienteInicialNuevaOrdenId(null);
     setOrdenDetalle(null);
     setMostrarRecepcion(false);
+    setFiltroHistorialOrdenes(null);
     setVista("ordenes");
+  }
+
+  function abrirHistorialCliente(cliente: ClienteTaller) {
+    navegar("ordenes");
+    setFiltroEstado("Todas");
+    setFiltroHistorialOrdenes({ tipo: "cliente", id: cliente.id, nombre: cliente.nombre });
+  }
+
+  function abrirHistorialVehiculo(vehiculo: VehiculoTaller) {
+    navegar("ordenes");
+    setFiltroEstado("Todas");
+    setFiltroHistorialOrdenes({
+      tipo: "vehiculo",
+      id: vehiculo.id,
+      nombre: `${vehiculo.nombre} · ${vehiculo.placa}`,
+    });
   }
 
   function iniciarNuevaOrden(clienteId?: number) {
@@ -486,6 +518,7 @@ export default function PaginaPrincipal() {
     setVehiculoEditando(null);
     setOrdenDetalle(null);
     setMostrarRecepcion(false);
+    setFiltroHistorialOrdenes(null);
     setClienteInicialNuevaOrdenId(clienteId ?? null);
     setMostrarNuevaOrden(true);
   }
@@ -1128,7 +1161,7 @@ export default function PaginaPrincipal() {
             </PaginaProceso>
           ) : vista === "inicio" ? (
             <VistaInicio
-              ordenes={ordenes}
+              ordenes={ordenes.filter((orden) => orden.visibleEnInicio)}
               nombreUsuario={sesion.nombreUsuario}
               taller={sesion.taller}
               cargando={cargandoDatos}
@@ -1146,6 +1179,8 @@ export default function PaginaPrincipal() {
               alFiltrar={setFiltroEstado}
               alCrearOrden={() => iniciarNuevaOrden()}
               alAbrirOrden={abrirOrden}
+              filtroHistorial={filtroHistorialOrdenes}
+              alLimpiarHistorial={() => setFiltroHistorialOrdenes(null)}
             />
           ) : vista === "clientes" ? (
             <VistaClientes
@@ -1155,6 +1190,7 @@ export default function PaginaPrincipal() {
               alCrearCliente={iniciarNuevoCliente}
               alEditarCliente={editarCliente}
               alCrearOrden={iniciarNuevaOrden}
+              alVerHistorial={abrirHistorialCliente}
             />
           ) : vista === "vehiculos" ? (
             <VistaVehiculos
@@ -1163,6 +1199,7 @@ export default function PaginaPrincipal() {
               datosDisponibles={!errorDatos}
               alCrear={() => abrirFormularioVehiculo()}
               alEditar={abrirFormularioVehiculo}
+              alVerHistorial={abrirHistorialVehiculo}
             />
           ) : (
             <VistaInventario taller={sesion.taller} />
@@ -1675,21 +1712,6 @@ function VistaInicio({
           </div>
         </section>
 
-        <aside className="panel panel-agenda">
-          <div className="titulo-panel">
-            <div>
-              <span className="sobrelinea">Próximamente</span>
-              <h2>Agenda de hoy</h2>
-            </div>
-            <CalendarDays size={22} />
-          </div>
-
-          <EstadoVacio
-            icono={CalendarDays}
-            titulo="Agenda sin datos"
-            detalle="La agenda todavía no dispone de un contrato HTTP persistido."
-          />
-        </aside>
       </div>
 
       <section className="panel decisiones">
@@ -1750,6 +1772,8 @@ function VistaOrdenes({
   alFiltrar,
   alCrearOrden,
   alAbrirOrden,
+  filtroHistorial,
+  alLimpiarHistorial,
 }: {
   ordenes: OrdenTaller[];
   cargando: boolean;
@@ -1758,6 +1782,8 @@ function VistaOrdenes({
   alFiltrar: (filtro: string) => void;
   alCrearOrden: () => void;
   alAbrirOrden: (orden: OrdenTaller) => void;
+  filtroHistorial: FiltroHistorialOrdenes | null;
+  alLimpiarHistorial: () => void;
 }) {
   const filtros = ["Todas", "Recepción", "Diagnóstico", "Por aprobar", "Reparación", "Lista para entregar"];
   const [busquedaOrdenes, setBusquedaOrdenes] = useState("");
@@ -1777,6 +1803,18 @@ function VistaOrdenes({
         <div><span className="sobrelinea">Operación</span><h1>Órdenes de servicio</h1><p>Sigue cada vehículo desde la recepción hasta la entrega.</p></div>
         <button className="boton-primario" onClick={alCrearOrden}><Plus size={21} />Nueva orden</button>
       </section>
+      {filtroHistorial && (
+        <section className="contexto-historial" aria-label="Filtro de historial de órdenes">
+          <span className="icono-historial"><History size={21} aria-hidden="true" /></span>
+          <span>
+            <strong>Historial de {filtroHistorial.tipo === "cliente" ? "cliente" : "vehículo"}</strong>
+            <small>{filtroHistorial.nombre} · {ordenes.length} {ordenes.length === 1 ? "orden" : "órdenes"}</small>
+          </span>
+          <button className="boton-secundario" type="button" onClick={alLimpiarHistorial}>
+            <ArrowLeft size={18} />Ver todas las órdenes
+          </button>
+        </section>
+      )}
       <div className="filtros" role="group" aria-label="Filtrar órdenes por estado">
         {filtros.map((item) => <button key={item} className={filtro === item ? "activo" : ""} onClick={() => alFiltrar(item)}>{item}</button>)}
       </div>
@@ -1797,7 +1835,9 @@ function VistaOrdenes({
             icono={Search}
             titulo={datosDisponibles ? "No hay órdenes para mostrar" : "Órdenes no disponibles"}
             detalle={datosDisponibles
-              ? "La API no devolvió registros o ningún registro coincide con el filtro."
+              ? filtroHistorial
+                ? `Este ${filtroHistorial.tipo} no tiene órdenes que coincidan con el filtro seleccionado.`
+                : "La API no devolvió registros o ningún registro coincide con el filtro."
               : "No fue posible consultar las órdenes en la API."}
           />
         )}
@@ -1816,6 +1856,7 @@ function VistaClientes({
   alCrearCliente,
   alEditarCliente,
   alCrearOrden,
+  alVerHistorial,
 }: {
   clientes: ClienteTaller[];
   cargando: boolean;
@@ -1823,6 +1864,7 @@ function VistaClientes({
   alCrearCliente: () => void;
   alEditarCliente: (cliente: ClienteTaller) => void;
   alCrearOrden: (clienteId: number) => void;
+  alVerHistorial: (cliente: ClienteTaller) => void;
 }) {
   const [busquedaClientes, setBusquedaClientes] = useState("");
   const clientesVisibles = useMemo(() => {
@@ -1851,6 +1893,7 @@ function VistaClientes({
             {!cliente.activo && <span className="estado-cliente-inactivo">Inactivo</span>}
             <span className="acciones-cliente">
               <button className="boton-icono" type="button" onClick={() => alEditarCliente(cliente)} aria-label={`Editar cliente ${cliente.nombre}`}><Pencil size={18} /></button>
+              <button className="boton-secundario boton-historial" type="button" onClick={() => alVerHistorial(cliente)}><History size={18} />Historial</button>
               <button className="boton-primario" type="button" disabled={!cliente.activo} onClick={() => alCrearOrden(cliente.id)}>Crear orden</button>
             </span>
           </article>
@@ -1878,12 +1921,14 @@ function VistaVehiculos({
   datosDisponibles,
   alCrear,
   alEditar,
+  alVerHistorial,
 }: {
   vehiculos: VehiculoTaller[];
   cargando: boolean;
   datosDisponibles: boolean;
   alCrear: () => void;
   alEditar: (vehiculo: VehiculoTaller) => void;
+  alVerHistorial: (vehiculo: VehiculoTaller) => void;
 }) {
   const [busquedaVehiculos, setBusquedaVehiculos] = useState("");
   const vehiculosVisibles = useMemo(() => {
@@ -1905,13 +1950,16 @@ function VistaVehiculos({
       <BuscadorListado valor={busquedaVehiculos} alCambiar={setBusquedaVehiculos} etiqueta="Buscar vehículos" marcador="Placa, marca, modelo o cliente" />
       <section className="panel lista-vehiculos">
         {vehiculosVisibles.map((vehiculo) => (
-          <button key={vehiculo.id} onClick={() => alEditar(vehiculo)} aria-label={`Editar vehículo ${vehiculo.placa}`}>
+          <article className="fila-vehiculo" key={vehiculo.id}>
             <span className="icono-vehiculo"><CarFront size={25} /></span>
             <span><strong>{vehiculo.nombre}</strong><small>{vehiculo.detalle}</small></span>
             <span><strong>{vehiculo.placa}</strong><small>{vehiculo.cliente}</small></span>
             <span className={`estado-vehiculo ${vehiculo.activo ? "listo" : ""}`}>{vehiculo.activo ? "Registrado" : "Inactivo"}</span>
-            <ChevronRight size={20} />
-          </button>
+            <span className="acciones-vehiculo">
+              <button className="boton-secundario boton-historial" type="button" onClick={() => alVerHistorial(vehiculo)}><History size={18} />Historial</button>
+              <button className="boton-icono" type="button" onClick={() => alEditar(vehiculo)} aria-label={`Editar vehículo ${vehiculo.placa}`}><Pencil size={18} /></button>
+            </span>
+          </article>
         ))}
         {!cargando && vehiculos.length === 0 && (
           <EstadoVacio
@@ -3357,7 +3405,8 @@ function FormularioRecepcion({
   const [tipoDanio, setTipoDanio] = useState<TipoDanio>("Rayón");
   const [severidad, setSeveridad] = useState<SeveridadDanio>("Leve");
   const [danios, setDanios] = useState<DanioVisual[]>(inspeccionInicial?.danios || []);
-  const [danioEditandoId, setDanioEditandoId] = useState<string | null>(null);
+  const [danioEditando, setDanioEditando] = useState<DanioVisual | null>(null);
+  const [errorDetalleDanio, setErrorDetalleDanio] = useState("");
   const [cantidadFotos, setCantidadFotos] = useState(0);
   const [fotografias, setFotografias] = useState<File[]>([]);
   const entradaFotografias = useRef<HTMLInputElement | null>(null);
@@ -3376,30 +3425,41 @@ function FormularioRecepcion({
     () => () => vistasPrevias.forEach((vista) => URL.revokeObjectURL(vista.direccion)),
     [vistasPrevias],
   );
-  const danioEditando = danios.find((danio) => danio.id === danioEditandoId);
-
   function marcarZona(zona: ZonaVehiculo) {
     const id = `${zona}-${tipoDanio}-${Date.now()}`;
-    setDanios((actuales) => [
-      ...actuales,
-      {
-        id,
-        zona,
-        tipo: tipoDanio,
-        severidad,
-        observacion: "",
-      },
-    ]);
-    setDanioEditandoId(id);
+    setDanioEditando({
+      id,
+      zona,
+      tipo: tipoDanio,
+      severidad,
+      observacion: "",
+    });
+    setErrorDetalleDanio("");
   }
 
   function actualizarDanio(cambios: Partial<DanioVisual>) {
-    if (!danioEditandoId) return;
-    setDanios((actuales) =>
-      actuales.map((danio) =>
-        danio.id === danioEditandoId ? { ...danio, ...cambios } : danio,
-      ),
-    );
+    setDanioEditando((actual) => actual ? { ...actual, ...cambios } : null);
+    if (cambios.observacion?.trim()) setErrorDetalleDanio("");
+  }
+
+  function guardarDanio() {
+    if (!danioEditando) return;
+
+    const detalle = danioEditando.observacion.trim();
+    if (!detalle) {
+      setErrorDetalleDanio("Ingresa el detalle del hallazgo antes de guardarlo.");
+      return;
+    }
+
+    const danioGuardado = { ...danioEditando, observacion: detalle };
+    setDanios((actuales) => {
+      const yaExiste = actuales.some((danio) => danio.id === danioGuardado.id);
+      return yaExiste
+        ? actuales.map((danio) => danio.id === danioGuardado.id ? danioGuardado : danio)
+        : [...actuales, danioGuardado];
+    });
+    setDanioEditando(null);
+    setErrorDetalleDanio("");
   }
 
   async function eliminarEvidenciaConfirmada() {
@@ -3427,6 +3487,18 @@ function FormularioRecepcion({
       aria-busy={guardando}
       onSubmit={async (evento) => {
         if (guardando) return;
+        if (danioEditando) {
+          evento.preventDefault();
+          guardarDanio();
+          return;
+        }
+        const danioSinDetalle = danios.find((danio) => !danio.observacion.trim());
+        if (danioSinDetalle) {
+          evento.preventDefault();
+          setDanioEditando({ ...danioSinDetalle });
+          setErrorDetalleDanio("Completa el detalle de este hallazgo antes de guardar la inspección.");
+          return;
+        }
         setGuardando(true);
         try {
           await alEnviar(evento);
@@ -3490,7 +3562,7 @@ function FormularioRecepcion({
                 <span className="sobrelinea">Editar hallazgo</span>
                 <strong>{etiquetaZona(danioEditando.zona)}</strong>
               </div>
-              <button type="button" onClick={() => setDanioEditandoId(null)} aria-label="Cerrar editor">
+              <button type="button" onClick={() => { setDanioEditando(null); setErrorDetalleDanio(""); }} aria-label="Cerrar editor">
                 <X size={18} />
               </button>
             </div>
@@ -3523,14 +3595,20 @@ function FormularioRecepcion({
               <textarea
                 rows={3}
                 maxLength={500}
+                aria-required="true"
                 value={danioEditando.observacion}
                 onChange={(evento) => actualizarDanio({ observacion: evento.target.value })}
                 placeholder="Ej. Rayón superficial de 12 cm en la puerta trasera..."
+                aria-invalid={Boolean(errorDetalleDanio)}
+                aria-describedby={errorDetalleDanio ? "error-detalle-danio" : undefined}
               />
-              <small>{danioEditando.observacion.length}/500 caracteres</small>
+              <span className="ayuda-detalle-danio">
+                {errorDetalleDanio && <small id="error-detalle-danio" className="error-detalle-danio" role="alert">{errorDetalleDanio}</small>}
+                <small>{danioEditando.observacion.length}/500 caracteres</small>
+              </span>
             </label>
-            <button className="boton-secundario boton-ancho" type="button" onClick={() => setDanioEditandoId(null)}>
-              <Check size={18} /> Listo
+            <button className="boton-secundario boton-ancho" type="button" onClick={guardarDanio}>
+              <Check size={18} /> Guardar hallazgo
             </button>
           </div>
         )}
@@ -3539,7 +3617,7 @@ function FormularioRecepcion({
           <div className="danios-registrados">
             <div className="titulo-danios">
               <strong>Daños registrados</strong>
-              <button type="button" onClick={() => { setDanios([]); setDanioEditandoId(null); }}>
+              <button type="button" onClick={() => { setDanios([]); setDanioEditando(null); setErrorDetalleDanio(""); }}>
                 <RotateCcw size={15} /> Limpiar
               </button>
             </div>
@@ -3556,7 +3634,7 @@ function FormularioRecepcion({
                   <button
                     type="button"
                     aria-label={`Editar ${danio.tipo} en ${etiquetaZona(danio.zona)}`}
-                    onClick={() => setDanioEditandoId(danio.id)}
+                    onClick={() => { setDanioEditando({ ...danio }); setErrorDetalleDanio(""); }}
                   >
                     <Pencil size={16} />
                   </button>
@@ -3565,7 +3643,7 @@ function FormularioRecepcion({
                     aria-label={`Eliminar ${danio.tipo} en ${etiquetaZona(danio.zona)}`}
                     onClick={() => {
                       setDanios((actuales) => actuales.filter((item) => item.id !== danio.id));
-                      if (danioEditandoId === danio.id) setDanioEditandoId(null);
+                      if (danioEditando?.id === danio.id) setDanioEditando(null);
                     }}
                   >
                     <Trash2 size={16} />
@@ -4241,6 +4319,7 @@ function convertirOrdenApi(orden: OrdenServicioApi): OrdenTaller {
     }),
     progreso: progresoPorEstado(estado),
     color: colorPorEstado(estado),
+    visibleEnInicio: orden.visibleEnInicio,
   };
 }
 

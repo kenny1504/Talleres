@@ -48,6 +48,14 @@ test("no sustituye la API con registros de demostración", async () => {
   assert.doesNotMatch(pagina, /Ana Martínez|Carlos Herrera|OT-2039|M 347-891/);
 });
 
+test("oculta del inicio las órdenes vencidas sin retirarlas de la lista general", async () => {
+  const pagina = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+
+  assert.match(pagina, /ordenes=\{ordenes\.filter\(\(orden\) => orden\.visibleEnInicio\)\}/);
+  assert.match(pagina, /ordenes=\{ordenesFiltradas\}/);
+  assert.match(pagina, /visibleEnInicio: orden\.visibleEnInicio/);
+});
+
 test("conserva el flujo de inspección en página completa y adaptable", async () => {
   const [pagina, estilos, disposicion, paquete] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
@@ -61,6 +69,9 @@ test("conserva el flujo de inspección en página completa y adaptable", async (
   assert.match(pagina, /Guardar cambios de inspección/);
   assert.match(pagina, /Editar inspección y observaciones/);
   assert.match(pagina, /Descripción u observación/);
+  assert.match(pagina, /Ingresa el detalle del hallazgo antes de guardarlo/);
+  assert.match(pagina, /Guardar hallazgo/);
+  assert.match(pagina, /setDanioEditando\(null\)/);
   assert.match(pagina, /Observaciones generales/);
   assert.match(estilos, /\.formulario-recepcion-pagina\s*\{[^}]*grid-template-columns:\s*minmax/s);
   assert.match(estilos, /@media \(max-width:\s*900px\)/);
@@ -198,6 +209,25 @@ test("crear una orden desde clientes conserva el cliente y el regreso", async ()
   assert.match(pagina, /alCrearOrden\(cliente\.id\)/);
   assert.match(pagina, /clienteInicialId && clientes\.some/);
   assert.match(pagina, /`Volver a \$\{navegacion\.find/);
+});
+
+test("clientes y vehículos permiten consultar su historial y abrir el detalle de una orden", async () => {
+  const [pagina, estilos] = await Promise.all([
+    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(pagina, /function abrirHistorialCliente\(cliente: ClienteTaller\)/);
+  assert.match(pagina, /function abrirHistorialVehiculo\(vehiculo: VehiculoTaller\)/);
+  assert.match(pagina, /orden\.clienteId === filtroHistorialOrdenes\.id/);
+  assert.match(pagina, /orden\.vehiculoId === filtroHistorialOrdenes\.id/);
+  assert.match(pagina, /alVerHistorial\(cliente\)/);
+  assert.match(pagina, /alVerHistorial\(vehiculo\)/);
+  assert.match(pagina, /Historial de \{filtroHistorial\.tipo === "cliente" \? "cliente" : "vehículo"\}/);
+  assert.match(pagina, /onClick=\{\(\) => alAbrirOrden\(orden\)\}/);
+  assert.match(pagina, /Ver todas las órdenes/);
+  assert.match(estilos, /\.contexto-historial\s*\{[^}]*grid-template-columns:\s*42px minmax\(0, 1fr\) auto/s);
+  assert.match(estilos, /\.acciones-vehiculo button\s*\{[^}]*min-height:\s*44px/s);
 });
 
 test("nueva orden registra clientes y vehículos sin abandonar el formulario", async () => {

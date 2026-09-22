@@ -217,6 +217,45 @@ public sealed class OrdenServicioPruebas
         }
 
         Assert.Equal(EstadoOrdenServicio.ListaParaEntrega, orden.Estado);
+        Assert.True(orden.VisibleEnInicio);
+        Assert.True(orden.FechaUltimoCambioEstado > orden.FechaIngreso);
+    }
+
+    [Fact]
+    public async Task ListarAsync_ListaParaEntregaConMasDe36Horas_NoEsVisibleEnInicio()
+    {
+        var empresa = new ContextoEmpresaPrueba(1);
+        await using var dbContext = CrearDbContext(empresa);
+        var ordenServicio = new OrdenServicioServicio(dbContext, empresa);
+        var modeloId = await CrearCatalogoAsync(dbContext, empresa.EmpresaId);
+        var clienteServicio = new ClienteServicio(dbContext, empresa);
+        var vehiculoServicio = new VehiculoServicio(dbContext, empresa);
+        var cliente = await clienteServicio.CrearAsync(CrearCliente("CLIENTE-ANTIGUO"));
+        var vehiculo = await vehiculoServicio.CrearAsync(CrearVehiculo(cliente.Id, modeloId, "M000004"));
+        var ordenCreada = await ordenServicio.CrearAsync(new CrearOrdenServicioSolicitud
+        {
+            ClienteId = cliente.Id,
+            VehiculoId = vehiculo.Id
+        });
+        var entidad = await dbContext.OrdenesServicio
+            .Include(orden => orden.Historial)
+            .SingleAsync();
+        entidad.Estado = EstadoOrdenServicio.ListaParaEntrega;
+        Assert.Single(entidad.Historial).Fecha = DateTime.UtcNow.AddHours(-48);
+        entidad.Historial.Add(new Talleres.Dominio.Entidades.HistorialOrdenServicio
+        {
+            EmpresaId = empresa.EmpresaId,
+            EstadoAnterior = EstadoOrdenServicio.Reparacion,
+            EstadoNuevo = EstadoOrdenServicio.ListaParaEntrega,
+            Descripcion = "Lista para entregar desde hace más de 36 horas.",
+            Fecha = DateTime.UtcNow.AddHours(-37)
+        });
+        await dbContext.SaveChangesAsync();
+
+        var orden = Assert.Single(await ordenServicio.ListarAsync());
+
+        Assert.Equal(ordenCreada.Id, orden.Id);
+        Assert.False(orden.VisibleEnInicio);
     }
 
     [Fact]

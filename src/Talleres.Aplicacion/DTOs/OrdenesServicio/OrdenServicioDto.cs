@@ -11,5 +11,7 @@ public sealed record OrdenServicioDto(
     string PlacaVehiculo,
     EstadoOrdenServicio Estado,
     DateTime FechaIngreso,
+    DateTime FechaUltimoCambioEstado,
     string? Observaciones,
-    bool TieneRecepcion);
+    bool TieneRecepcion,
+    bool VisibleEnInicio);
