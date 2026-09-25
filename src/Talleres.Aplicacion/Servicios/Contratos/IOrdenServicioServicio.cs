@@ -46,4 +46,14 @@ public interface IOrdenServicioServicio
         long ordenServicioId,
         CambiarEstadoOrdenServicioSolicitud solicitud,
         CancellationToken cancellationToken = default);
+
+    /// <summary>Asigna un técnico activo de la empresa a una orden existente.</summary>
+    /// <param name="ordenServicioId">Identificador de la orden.</param>
+    /// <param name="solicitud">Técnico responsable solicitado.</param>
+    /// <param name="cancellationToken">Token para cancelar el cambio.</param>
+    /// <returns>La orden con el nuevo responsable.</returns>
+    Task<OrdenServicioDto> AsignarTecnicoAsync(
+        long ordenServicioId,
+        AsignarTecnicoOrdenSolicitud solicitud,
+        CancellationToken cancellationToken = default);
 }

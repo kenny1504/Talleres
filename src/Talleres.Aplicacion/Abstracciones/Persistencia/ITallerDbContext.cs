@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using Talleres.Dominio.Entidades;
 
 namespace Talleres.Aplicacion.Abstracciones.Persistencia;
@@ -17,6 +18,10 @@ public interface ITallerDbContext
     DbSet<ModeloVehiculo> ModelosVehiculo { get; }
 
     DbSet<OrdenServicio> OrdenesServicio { get; }
+
+    DbSet<PagoCliente> PagosClientes { get; }
+
+    DbSet<TecnicoTaller> TecnicosTaller { get; }
 
     DbSet<RecepcionVehiculo> RecepcionesVehiculo { get; }
 
@@ -38,4 +43,7 @@ public interface ITallerDbContext
     /// <param name="cancellationToken">Token para cancelar la operación.</param>
     /// <returns>Cantidad de registros afectados.</returns>
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>Inicia una transacción para cambios relacionados que necesitan varios guardados.</summary>
+    Task<IDbContextTransaction> IniciarTransaccionAsync(CancellationToken cancellationToken = default);
 }

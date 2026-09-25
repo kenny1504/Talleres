@@ -43,6 +43,11 @@ public sealed class OrdenServicioServicio(
                 "El vehículo seleccionado no pertenece al cliente indicado.");
         }
 
+        var tecnico = solicitud.TecnicoTallerId.HasValue
+            ? await ObtenerTecnicoActivoAsync(solicitud.TecnicoTallerId.Value, cancellationToken)
+            : await dbContext.TecnicosTaller.AsNoTracking().SingleOrDefaultAsync(
+                item => item.EsPredeterminado && item.Activo, cancellationToken);
+
         var fechaActual = DateTime.UtcNow;
         var orden = new OrdenServicio
         {
@@ -50,6 +55,7 @@ public sealed class OrdenServicioServicio(
             Numero = GenerarNumero(fechaActual),
             ClienteId = cliente.Id,
             VehiculoId = vehiculo.Id,
+            TecnicoTallerId = tecnico?.Id,
             Estado = EstadoOrdenServicio.Recepcion,
             FechaIngreso = fechaActual,
             Observaciones = LimpiarOpcional(solicitud.Observaciones)
@@ -67,7 +73,7 @@ public sealed class OrdenServicioServicio(
         dbContext.OrdenesServicio.Add(orden);
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        return ConvertirDto(orden, cliente.Nombre, vehiculo.Placa, false, fechaActual);
+        return ConvertirDto(orden, cliente.Nombre, vehiculo.Placa, false, fechaActual, tecnico?.Nombre);
     }
 
     public async Task<OrdenServicioDto> ObtenerPorIdAsync(
@@ -102,6 +108,7 @@ public sealed class OrdenServicioServicio(
                         .Include(item => item.Cliente)
                         .Include(item => item.Vehiculo)
                         .Include(item => item.Recepcion)
+                        .Include(item => item.TecnicoTaller)
                         .SingleOrDefaultAsync(item => item.Id == ordenServicioId, cancellationToken)
                     ?? throw new RecursoNoEncontradoException(
                         "La orden de servicio solicitada no existe.");
@@ -150,6 +157,40 @@ public sealed class OrdenServicioServicio(
             fechaCambioEstado);
     }
 
+    public async Task<OrdenServicioDto> AsignarTecnicoAsync(
+        long ordenServicioId,
+        AsignarTecnicoOrdenSolicitud solicitud,
+        CancellationToken cancellationToken = default)
+    {
+        contextoEmpresa.ObtenerEmpresaIdRequerido();
+        var orden = await dbContext.OrdenesServicio
+            .Include(item => item.Cliente)
+            .Include(item => item.Vehiculo)
+            .Include(item => item.Recepcion)
+            .Include(item => item.Historial)
+            .SingleOrDefaultAsync(item => item.Id == ordenServicioId, cancellationToken)
+            ?? throw new RecursoNoEncontradoException("La orden de servicio solicitada no existe.");
+        var tecnico = await ObtenerTecnicoActivoAsync(solicitud.TecnicoTallerId, cancellationToken);
+        orden.TecnicoTallerId = tecnico.Id;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        var fechaUltimoCambioEstado = orden.Historial
+            .Where(item => item.EstadoNuevo == orden.Estado)
+            .OrderByDescending(item => item.Fecha)
+            .ThenByDescending(item => item.Id)
+            .Select(item => item.Fecha)
+            .FirstOrDefault();
+        return ConvertirDto(
+            orden, orden.Cliente.Nombre, orden.Vehiculo.Placa,
+            orden.Recepcion is not null,
+            fechaUltimoCambioEstado == default ? orden.FechaIngreso : fechaUltimoCambioEstado,
+            tecnico.Nombre);
+    }
+
+    private async Task<TecnicoTaller> ObtenerTecnicoActivoAsync(long tecnicoId, CancellationToken cancellationToken) =>
+        await dbContext.TecnicosTaller.AsNoTracking().SingleOrDefaultAsync(
+            item => item.Id == tecnicoId && item.Activo, cancellationToken)
+        ?? throw new RecursoNoEncontradoException("El técnico indicado no existe o está inactivo.");
+
     private IQueryable<OrdenServicio> ConsultarOrdenes() =>
         dbContext.OrdenesServicio.AsNoTracking();
 
@@ -181,7 +222,9 @@ public sealed class OrdenServicioServicio(
                 .OrderByDescending(historial => historial.Fecha)
                 .ThenByDescending(historial => historial.Id)
                 .Select(historial => (DateTime?)historial.Fecha)
-                .FirstOrDefault() ?? orden.FechaIngreso) > limiteListaParaEntrega));
+                .FirstOrDefault() ?? orden.FechaIngreso) > limiteListaParaEntrega,
+            orden.TecnicoTallerId,
+            orden.TecnicoTaller == null ? null : orden.TecnicoTaller.Nombre));
     }
 
     private static OrdenServicioDto ConvertirDto(
@@ -189,7 +232,8 @@ public sealed class OrdenServicioServicio(
         string nombreCliente,
         string placaVehiculo,
         bool tieneRecepcion,
-        DateTime fechaUltimoCambioEstado) => new(
+        DateTime fechaUltimoCambioEstado,
+        string? nombreTecnico = null) => new(
             orden.Id,
             orden.Numero,
             orden.ClienteId,
@@ -202,7 +246,9 @@ public sealed class OrdenServicioServicio(
             orden.Observaciones,
             tieneRecepcion,
             orden.Estado != EstadoOrdenServicio.ListaParaEntrega ||
-            fechaUltimoCambioEstado > DateTime.UtcNow.Subtract(PermanenciaListaParaEntregaEnInicio));
+            fechaUltimoCambioEstado > DateTime.UtcNow.Subtract(PermanenciaListaParaEntregaEnInicio),
+            orden.TecnicoTallerId,
+            nombreTecnico ?? orden.TecnicoTaller?.Nombre);
 
     private static string GenerarNumero(DateTime fecha) =>
         $"OS-{fecha:yyyyMMddHHmmss}-{Guid.NewGuid():N}"[..25].ToUpperInvariant();

@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using Talleres.Aplicacion.Abstracciones.Multitenencia;
 using Talleres.Aplicacion.Abstracciones.Persistencia;
 using Talleres.Dominio.Entidades;
@@ -19,6 +20,10 @@ public sealed class TallerDbContext(
     public DbSet<ModeloVehiculo> ModelosVehiculo => Set<ModeloVehiculo>();
 
     public DbSet<OrdenServicio> OrdenesServicio => Set<OrdenServicio>();
+
+    public DbSet<PagoCliente> PagosClientes => Set<PagoCliente>();
+
+    public DbSet<TecnicoTaller> TecnicosTaller => Set<TecnicoTaller>();
 
     public DbSet<RecepcionVehiculo> RecepcionesVehiculo => Set<RecepcionVehiculo>();
 
@@ -44,6 +49,9 @@ public sealed class TallerDbContext(
         return base.SaveChangesAsync(cancellationToken);
     }
 
+    public Task<IDbContextTransaction> IniciarTransaccionAsync(CancellationToken cancellationToken = default) =>
+        Database.BeginTransactionAsync(cancellationToken);
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(
@@ -61,6 +69,10 @@ public sealed class TallerDbContext(
         modelBuilder.Entity<ModeloVehiculo>()
             .HasQueryFilter(entidad => entidad.EmpresaId == contextoEmpresa.EmpresaId);
         modelBuilder.Entity<OrdenServicio>()
+            .HasQueryFilter(entidad => entidad.EmpresaId == contextoEmpresa.EmpresaId);
+        modelBuilder.Entity<PagoCliente>()
+            .HasQueryFilter(entidad => entidad.EmpresaId == contextoEmpresa.EmpresaId);
+        modelBuilder.Entity<TecnicoTaller>()
             .HasQueryFilter(entidad => entidad.EmpresaId == contextoEmpresa.EmpresaId);
         modelBuilder.Entity<RecepcionVehiculo>()
             .HasQueryFilter(entidad => entidad.EmpresaId == contextoEmpresa.EmpresaId);

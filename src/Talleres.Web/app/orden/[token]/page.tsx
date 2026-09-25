@@ -3,6 +3,7 @@
 import { use, useEffect, useState } from "react";
 import { Building2, CalendarDays, Camera, CarFront, Check, ChevronLeft, ChevronRight, CircleCheck, ClipboardList, FileText, Fuel, KeyRound, MapPin, Phone, RotateCcw, Wrench, X, ZoomIn, ZoomOut } from "lucide-react";
 import { useCargadorPantalla } from "../../componentes/ProveedorCargadorPantalla";
+import { formatearFechaHoraOrden } from "../../fechaHoraOrden";
 
 interface EvidenciaPublica { id: number; nombreArchivo: string; }
 interface DanioInspeccionPublico { id: number; zona: string; tipo: string; severidad: string; observacion: string | null; }
@@ -165,7 +166,7 @@ export default function OrdenPublicaPagina({ params }: { params: Promise<{ token
           ))}</div>}
         </section>
         <aside className="tarjeta-publica datos-publicos">
-          <div><CalendarDays size={19} /><span><small>Ingreso</small><strong>{new Intl.DateTimeFormat("es-NI", { dateStyle: "medium" }).format(new Date(orden.fechaIngreso))}</strong></span></div>
+          <div><CalendarDays size={19} /><span><small>Fecha y hora de ingreso</small><strong>{formatearFechaHoraOrden(orden.fechaIngreso)}</strong></span></div>
           {orden.motivoIngreso && <div className="dato-publico-ancho"><span><small>Motivo de ingreso</small><strong>{orden.motivoIngreso}</strong></span></div>}
         </aside>
       </div>

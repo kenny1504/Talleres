@@ -39,8 +39,76 @@ Accept: application/json
 
 ###
 
+GET {{Talleres_Api_HostAddress}}/api/clientes/1/estado-cuenta
+Accept: application/json
+
+###
+
+POST {{Talleres_Api_HostAddress}}/api/clientes/1/pagos
+Content-Type: application/json
+
+{
+  "monto": 500.00
+}
+
+###
+
+POST {{Talleres_Api_HostAddress}}/api/clientes/1/pagos/1/anular
+
+###
+
 GET {{Talleres_Api_HostAddress}}/api/vehiculos
 Accept: application/json
+
+###
+
+GET {{Talleres_Api_HostAddress}}/api/tecnicos-taller
+Accept: application/json
+
+###
+
+POST {{Talleres_Api_HostAddress}}/api/tecnicos-taller
+Content-Type: application/json
+
+{
+  "nombre": "Carlos Pérez",
+  "esPredeterminado": true
+}
+
+###
+
+PUT {{Talleres_Api_HostAddress}}/api/tecnicos-taller/1
+Content-Type: application/json
+
+{
+  "nombre": "Carlos Pérez",
+  "activo": true
+}
+
+###
+
+PUT {{Talleres_Api_HostAddress}}/api/tecnicos-taller/1/predeterminado
+
+###
+
+PUT {{Talleres_Api_HostAddress}}/api/ordenes-servicio/1/tecnico
+Content-Type: application/json
+
+{
+  "tecnicoTallerId": 1
+}
+
+###
+
+POST {{Talleres_Api_HostAddress}}/api/ordenes-servicio
+Content-Type: application/json
+
+{
+  "clienteId": 1,
+  "vehiculoId": 1,
+  "observaciones": "Revisión general",
+  "tecnicoTallerId": 1
+}
 
 ###
 

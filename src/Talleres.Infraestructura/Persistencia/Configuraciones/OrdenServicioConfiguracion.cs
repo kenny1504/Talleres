@@ -37,5 +37,11 @@ public sealed class OrdenServicioConfiguracion : IEntityTypeConfiguration<OrdenS
             .WithMany(vehiculo => vehiculo.OrdenesServicio)
             .HasForeignKey(orden => orden.VehiculoId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne(orden => orden.TecnicoTaller)
+            .WithMany(tecnico => tecnico.OrdenesServicio)
+            .HasForeignKey(orden => new { orden.EmpresaId, orden.TecnicoTallerId })
+            .HasPrincipalKey(tecnico => new { tecnico.EmpresaId, tecnico.Id })
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }

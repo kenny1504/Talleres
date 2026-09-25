@@ -1,7 +1,9 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Talleres.Aplicacion.DTOs.Clientes;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Talleres.Aplicacion.DTOs.OrdenesServicio;
 using Talleres.Aplicacion.DTOs.Recepciones;
+using Talleres.Aplicacion.DTOs.TecnicosTaller;
 using Talleres.Aplicacion.DTOs.Vehiculos;
 using Talleres.Aplicacion.Servicios;
 using Talleres.Dominio.Enumeraciones;
@@ -13,6 +15,76 @@ namespace Talleres.Pruebas.Servicios;
 
 public sealed class OrdenServicioPruebas
 {
+    [Fact]
+    public async Task RegistrarTecnicoComoPredeterminado_ReemplazaAlAnteriorParaOrdenesNuevas()
+    {
+        var empresa = new ContextoEmpresaPrueba(1);
+        var opciones = new DbContextOptionsBuilder<TallerDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .ConfigureWarnings(aviso => aviso.Ignore(InMemoryEventId.TransactionIgnoredWarning))
+            .Options;
+        await using var dbContext = new TallerDbContext(opciones, empresa);
+        var tecnicoServicio = new TecnicoTallerServicio(dbContext, empresa);
+        var primero = await tecnicoServicio.CrearAsync(new CrearTecnicoTallerSolicitud { Nombre = "Ana Ruiz" });
+        var segundo = await tecnicoServicio.CrearAsync(new CrearTecnicoTallerSolicitud
+        {
+            Nombre = "Luis Mora",
+            EsPredeterminado = true
+        });
+
+        var tecnicos = await tecnicoServicio.ListarAsync();
+        Assert.False(tecnicos.Single(tecnico => tecnico.Id == primero.Id).EsPredeterminado);
+        Assert.True(tecnicos.Single(tecnico => tecnico.Id == segundo.Id).EsPredeterminado);
+
+        var modeloId = await CrearCatalogoAsync(dbContext, empresa.EmpresaId);
+        var cliente = await new ClienteServicio(dbContext, empresa).CrearAsync(CrearCliente("PREFERIDO"));
+        var vehiculo = await new VehiculoServicio(dbContext, empresa).CrearAsync(
+            CrearVehiculo(cliente.Id, modeloId, "M009991"));
+        var orden = await new OrdenServicioServicio(dbContext, empresa).CrearAsync(
+            new CrearOrdenServicioSolicitud { ClienteId = cliente.Id, VehiculoId = vehiculo.Id });
+        Assert.Equal(segundo.Id, orden.TecnicoTallerId);
+    }
+
+    [Fact]
+    public async Task CrearYReasignarOrden_RespetaPredeterminadoYTecnicoActivo()
+    {
+        var empresa = new ContextoEmpresaPrueba(1);
+        await using var dbContext = CrearDbContext(empresa);
+        var tecnicoServicio = new TecnicoTallerServicio(dbContext, empresa);
+        var primerTecnico = await tecnicoServicio.CrearAsync(new CrearTecnicoTallerSolicitud { Nombre = "Ana Ruiz" });
+        var segundoTecnico = await tecnicoServicio.CrearAsync(new CrearTecnicoTallerSolicitud { Nombre = "Luis Mora" });
+        Assert.True(primerTecnico.EsPredeterminado);
+        Assert.False(segundoTecnico.EsPredeterminado);
+
+        var modeloId = await CrearCatalogoAsync(dbContext, empresa.EmpresaId);
+        var cliente = await new ClienteServicio(dbContext, empresa).CrearAsync(CrearCliente("TECNICO"));
+        var vehiculo = await new VehiculoServicio(dbContext, empresa).CrearAsync(
+            CrearVehiculo(cliente.Id, modeloId, "M009990"));
+        var ordenServicio = new OrdenServicioServicio(dbContext, empresa);
+        var orden = await ordenServicio.CrearAsync(new CrearOrdenServicioSolicitud
+        {
+            ClienteId = cliente.Id,
+            VehiculoId = vehiculo.Id
+        });
+        Assert.Equal(primerTecnico.Id, orden.TecnicoTallerId);
+        Assert.Equal("Ana Ruiz", orden.NombreTecnico);
+
+        var reasignada = await ordenServicio.AsignarTecnicoAsync(
+            orden.Id, new AsignarTecnicoOrdenSolicitud { TecnicoTallerId = segundoTecnico.Id });
+        Assert.Equal(segundoTecnico.Id, reasignada.TecnicoTallerId);
+        Assert.Equal("Luis Mora", (await ordenServicio.ObtenerPorIdAsync(orden.Id)).NombreTecnico);
+
+        await tecnicoServicio.ActualizarAsync(segundoTecnico.Id,
+            new GuardarTecnicoTallerSolicitud { Nombre = "Luis Mora", Activo = false });
+        await Assert.ThrowsAsync<RecursoNoEncontradoException>(() => ordenServicio.CrearAsync(
+            new CrearOrdenServicioSolicitud
+            {
+                ClienteId = cliente.Id,
+                VehiculoId = vehiculo.Id,
+                TecnicoTallerId = segundoTecnico.Id
+            }));
+    }
+
     [Fact]
     public async Task RegistrarRecepcionAsync_OrdenEnRecepcion_AvanzaADiagnostico()
     {

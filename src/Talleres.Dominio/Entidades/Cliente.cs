@@ -22,4 +22,6 @@ public sealed class Cliente : IEntidadEmpresa
     public ICollection<Vehiculo> Vehiculos { get; } = [];
 
     public ICollection<OrdenServicio> OrdenesServicio { get; } = [];
+
+    public ICollection<PagoCliente> Pagos { get; } = [];
 }

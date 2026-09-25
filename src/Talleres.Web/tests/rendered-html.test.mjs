@@ -68,9 +68,9 @@ test("conserva el flujo de inspección en página completa y adaptable", async (
   assert.match(pagina, /className="pagina-proceso"/);
   assert.match(pagina, /Guardar cambios de inspección/);
   assert.match(pagina, /Editar inspección y observaciones/);
-  assert.match(pagina, /Descripción u observación/);
-  assert.match(pagina, /Ingresa el detalle del hallazgo antes de guardarlo/);
+  assert.match(pagina, /Descripción u observación \(opcional\)/);
   assert.match(pagina, /Guardar hallazgo/);
+  assert.match(pagina, /Hallazgo guardado correctamente/);
   assert.match(pagina, /setDanioEditando\(null\)/);
   assert.match(pagina, /Observaciones generales/);
   assert.match(estilos, /\.formulario-recepcion-pagina\s*\{[^}]*grid-template-columns:\s*minmax/s);

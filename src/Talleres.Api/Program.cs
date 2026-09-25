@@ -155,9 +155,11 @@ builder.Services.AddScoped<IIdentidadSmartNova, IdentidadSmartNova>();
 builder.Services.AddScoped<IInventarioSmartNova, InventarioSmartNova>();
 
 builder.Services.AddScoped<IClienteServicio, ClienteServicio>();
+builder.Services.AddScoped<IEstadoCuentaClienteServicio, EstadoCuentaClienteServicio>();
 builder.Services.AddScoped<IVehiculoServicio, VehiculoServicio>();
 builder.Services.AddScoped<ICatalogoVehiculoServicio, CatalogoVehiculoServicio>();
 builder.Services.AddScoped<IOrdenServicioServicio, OrdenServicioServicio>();
+builder.Services.AddScoped<ITecnicoTallerServicio, TecnicoTallerServicio>();
 builder.Services.AddScoped<IDetalleOrdenServicio, DetalleOrdenServicio>();
 builder.Services.AddScoped<IDiagnosticoOrdenServicioServicio, DiagnosticoOrdenServicioServicio>();
 builder.Services.AddScoped<IRecepcionVehiculoServicio, RecepcionVehiculoServicio>();

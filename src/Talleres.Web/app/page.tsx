@@ -6,6 +6,8 @@ import {
   CargadorPantalla,
   useCargadorPantalla,
 } from "./componentes/ProveedorCargadorPantalla";
+import { EstadoCuentaCliente } from "./componentes/EstadoCuentaCliente";
+import { formatearFechaHoraOrden } from "./fechaHoraOrden";
 import {
   ArrowLeft,
   Bell,
@@ -47,7 +49,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-type Vista = "inicio" | "ordenes" | "clientes" | "vehiculos" | "inventario";
+type Vista = "inicio" | "ordenes" | "clientes" | "vehiculos" | "tecnicos" | "inventario";
 type EstadoOrden =
   | "Recepción"
   | "Diagnóstico"
@@ -68,7 +70,8 @@ interface OrdenTaller {
   estado: EstadoOrden;
   motivo: string;
   tecnico: string;
-  hora: string;
+  tecnicoTallerId: number | null;
+  fechaHoraIngreso: string;
   progreso: number;
   color: string;
   visibleEnInicio: boolean;
@@ -158,6 +161,15 @@ interface OrdenServicioApi {
   fechaUltimoCambioEstado: string;
   observaciones: string | null;
   visibleEnInicio: boolean;
+  tecnicoTallerId: number | null;
+  nombreTecnico: string | null;
+}
+
+interface TecnicoTallerApi {
+  id: number;
+  nombre: string;
+  activo: boolean;
+  esPredeterminado: boolean;
 }
 
 interface DetalleOrdenServicioApi {
@@ -334,6 +346,7 @@ const navegacion: NavegacionItem[] = [
   { id: "ordenes", etiqueta: "Órdenes", icono: ClipboardList },
   { id: "clientes", etiqueta: "Clientes", icono: Users },
   { id: "vehiculos", etiqueta: "Vehículos", icono: CarFront },
+  { id: "tecnicos", etiqueta: "Técnicos", icono: Wrench },
   { id: "inventario", etiqueta: "Inventario", icono: Boxes },
 ];
 
@@ -360,6 +373,7 @@ export default function PaginaPrincipal() {
   const [vehiculos, setVehiculos] = useState<VehiculoTaller[]>([]);
   const [marcasVehiculo, setMarcasVehiculo] = useState<MarcaVehiculoApi[]>([]);
   const [modelosVehiculo, setModelosVehiculo] = useState<ModeloVehiculoApi[]>([]);
+  const [tecnicosTaller, setTecnicosTaller] = useState<TecnicoTallerApi[]>([]);
   const [cargandoDatos, setCargandoDatos] = useState(true);
   const [errorDatos, setErrorDatos] = useState("");
   const [guardandoOrden, setGuardandoOrden] = useState(false);
@@ -371,6 +385,7 @@ export default function PaginaPrincipal() {
   const [mostrarNuevaOrden, setMostrarNuevaOrden] = useState(false);
   const [mostrarNuevoCliente, setMostrarNuevoCliente] = useState(false);
   const [clienteEditando, setClienteEditando] = useState<ClienteTaller | null>(null);
+  const [clienteEstadoCuenta, setClienteEstadoCuenta] = useState<ClienteTaller | null>(null);
   const [mostrarFormularioVehiculo, setMostrarFormularioVehiculo] = useState(false);
   const [vehiculoEditando, setVehiculoEditando] = useState<VehiculoTaller | null>(null);
   const [clienteInicialNuevaOrdenId, setClienteInicialNuevaOrdenId] = useState<number | null>(null);
@@ -379,7 +394,8 @@ export default function PaginaPrincipal() {
   const [aviso, setAviso] = useState("");
   const [inspecciones, setInspecciones] = useState<Record<number, InspeccionVisual>>({});
   const procesoActivo =
-    mostrarNuevaOrden || mostrarNuevoCliente || mostrarFormularioVehiculo || ordenDetalle !== null;
+    mostrarNuevaOrden || mostrarNuevoCliente || mostrarFormularioVehiculo ||
+    clienteEstadoCuenta !== null || ordenDetalle !== null;
 
   useEffect(() => {
     const controlador = new AbortController();
@@ -407,6 +423,7 @@ export default function PaginaPrincipal() {
         setVehiculos(datos.vehiculos);
         setMarcasVehiculo(datos.marcasVehiculo);
         setModelosVehiculo(datos.modelosVehiculo);
+        setTecnicosTaller(datos.tecnicosTaller);
         setErrorDatos("");
       })
       .catch(() => {
@@ -416,6 +433,7 @@ export default function PaginaPrincipal() {
         setVehiculos([]);
         setMarcasVehiculo([]);
         setModelosVehiculo([]);
+        setTecnicosTaller([]);
         setErrorDatos("No fue posible comunicarse con la API configurada.");
       })
       .finally(() => {
@@ -469,6 +487,7 @@ export default function PaginaPrincipal() {
     setMostrarNuevaOrden(false);
     setMostrarNuevoCliente(false);
     setClienteEditando(null);
+    setClienteEstadoCuenta(null);
     setMostrarFormularioVehiculo(false);
     setVehiculoEditando(null);
     setClienteInicialNuevaOrdenId(null);
@@ -486,6 +505,7 @@ export default function PaginaPrincipal() {
     setMostrarNuevaOrden(false);
     setMostrarNuevoCliente(false);
     setClienteEditando(null);
+    setClienteEstadoCuenta(null);
     setMostrarFormularioVehiculo(false);
     setVehiculoEditando(null);
     setClienteInicialNuevaOrdenId(null);
@@ -499,6 +519,11 @@ export default function PaginaPrincipal() {
     navegar("ordenes");
     setFiltroEstado("Todas");
     setFiltroHistorialOrdenes({ tipo: "cliente", id: cliente.id, nombre: cliente.nombre });
+  }
+
+  function abrirEstadoCuentaCliente(cliente: ClienteTaller) {
+    navegar("clientes");
+    setClienteEstadoCuenta(cliente);
   }
 
   function abrirHistorialVehiculo(vehiculo: VehiculoTaller) {
@@ -543,6 +568,7 @@ export default function PaginaPrincipal() {
     setMostrarNuevaOrden(false);
     setMostrarNuevoCliente(false);
     setClienteEditando(null);
+    setClienteEstadoCuenta(null);
     setMostrarFormularioVehiculo(false);
     setVehiculoEditando(null);
     setClienteInicialNuevaOrdenId(null);
@@ -595,6 +621,8 @@ export default function PaginaPrincipal() {
           clienteId: Number(datos.get("clienteId")),
           vehiculoId: Number(datos.get("vehiculoId")),
           observaciones: String(datos.get("motivo")),
+          tecnicoTallerId: datos.get("tecnicoTallerId")
+            ? Number(datos.get("tecnicoTallerId")) : null,
         }),
       );
       setOrdenes((actuales) => [nuevaOrden, ...actuales]);
@@ -888,7 +916,7 @@ export default function PaginaPrincipal() {
         orden.id === ordenDetalle.id
           ? esActualizacion
             ? orden
-            : { ...orden, estado: "Diagnóstico", progreso: 28, tecnico: "Por asignar" }
+            : { ...orden, estado: "Diagnóstico", progreso: 28 }
           : orden,
       ),
     );
@@ -952,6 +980,7 @@ export default function PaginaPrincipal() {
       setOrdenes([]);
       setClientes([]);
       setVehiculos([]);
+      setTecnicosTaller([]);
       setCargandoDatos(true);
       setSesion(nuevaSesion);
     } catch (error) {
@@ -966,9 +995,11 @@ export default function PaginaPrincipal() {
   async function cerrarSesion() {
     await ejecutarConCargadorPantalla("Cerrando la sesión…", cerrarSesionApi);
     setSesion(null);
+    setClienteEstadoCuenta(null);
     setOrdenes([]);
     setClientes([]);
     setVehiculos([]);
+    setTecnicosTaller([]);
     setMostrarAdministracion(false);
   }
 
@@ -1014,6 +1045,9 @@ export default function PaginaPrincipal() {
             <button className="boton-icono" aria-label="Ver notificaciones">
               <Bell size={22} />
               <span className="punto-notificacion" />
+            </button>
+            <button className="boton-icono" onClick={() => navegar("tecnicos")} aria-label="Administrar técnicos" title="Técnicos">
+              <Wrench size={21} />
             </button>
             {sesion.esSuperUsuario && (
               <button
@@ -1078,6 +1112,7 @@ export default function PaginaPrincipal() {
                   vehiculos={vehiculos}
                   marcasVehiculo={marcasVehiculo}
                   modelosVehiculo={modelosVehiculo}
+                  tecnicosTaller={tecnicosTaller}
                   clienteInicialId={clienteInicialNuevaOrdenId}
                   guardando={guardandoOrden}
                   guardandoCliente={guardandoCliente}
@@ -1089,6 +1124,19 @@ export default function PaginaPrincipal() {
                   alCrearModelo={crearModeloVehiculo}
                 />
               </div>
+            </PaginaProceso>
+          ) : clienteEstadoCuenta ? (
+            <PaginaProceso
+              titulo={`Estado de cuenta · ${clienteEstadoCuenta.nombre}`}
+              descripcion="Consulta los cargos de sus órdenes y registra abonos directamente al cliente."
+              alRegresar={regresarDesdeProceso}
+              etiquetaRegreso="Volver a clientes"
+              mostrarIndicadorGuardado={false}
+            >
+              <EstadoCuentaCliente
+                clienteId={clienteEstadoCuenta.id}
+                direccionApi={obtenerDireccionApi()}
+              />
             </PaginaProceso>
           ) : mostrarNuevoCliente ? (
             <PaginaProceso
@@ -1146,16 +1194,17 @@ export default function PaginaPrincipal() {
                   inspeccionInicial={inspecciones[ordenDetalle.id]}
                   alEnviar={registrarRecepcion}
                   alEliminarEvidencia={eliminarEvidenciaOrden}
+                  alMostrarAviso={mostrarAviso}
                 />
               ) : (
                 <DetalleOrden
                   orden={ordenDetalle}
+                  tecnicosTaller={tecnicosTaller}
                   cliente={clientes.find((cliente) => cliente.id === ordenDetalle.clienteId)}
                   inspeccion={inspecciones[ordenDetalle.id]}
                   alRecibir={() => setMostrarRecepcion(true)}
                   alActualizarOrden={actualizarOrdenEnPantalla}
                   alMostrarAviso={mostrarAviso}
-                  alNotificar={() => mostrarAviso("Actualización enviada a WhatsApp")}
                 />
               )}
             </PaginaProceso>
@@ -1191,6 +1240,7 @@ export default function PaginaPrincipal() {
               alEditarCliente={editarCliente}
               alCrearOrden={iniciarNuevaOrden}
               alVerHistorial={abrirHistorialCliente}
+              alVerEstadoCuenta={abrirEstadoCuentaCliente}
             />
           ) : vista === "vehiculos" ? (
             <VistaVehiculos
@@ -1201,6 +1251,8 @@ export default function PaginaPrincipal() {
               alEditar={abrirFormularioVehiculo}
               alVerHistorial={abrirHistorialVehiculo}
             />
+          ) : vista === "tecnicos" ? (
+            <VistaTecnicos tecnicos={tecnicosTaller} alActualizar={setTecnicosTaller} />
           ) : (
             <VistaInventario taller={sesion.taller} />
           )}
@@ -1565,29 +1617,64 @@ function LogoTaller({ nombreTaller, logo }: { nombreTaller: string; logo: string
 }
 
 function NavegacionInferior({ vista, alNavegar }: { vista: Vista; alNavegar: (vista: Vista) => void }) {
+  const [mostrarMas, setMostrarMas] = useState(false);
+
+  useEffect(() => {
+    if (!mostrarMas) return;
+    const cerrarConEscape = (evento: KeyboardEvent) => {
+      if (evento.key === "Escape") setMostrarMas(false);
+    };
+    window.addEventListener("keydown", cerrarConEscape);
+    return () => window.removeEventListener("keydown", cerrarConEscape);
+  }, [mostrarMas]);
+
+  function abrirVista(nuevaVista: Vista) {
+    setMostrarMas(false);
+    alNavegar(nuevaVista);
+  }
+
   return (
-    <nav className="navegacion-inferior" aria-label="Navegación para tablet vertical">
-      {navegacion.slice(0, 4).map((item) => {
-        const Icono = item.icono;
-        return (
-          <button
-            key={item.id}
-            className={vista === item.id ? "navegacion-activa" : ""}
-            onClick={() => alNavegar(item.id)}
-          >
-            <Icono size={22} />
-            <span>{item.etiqueta}</span>
-          </button>
-        );
-      })}
-      <button
-        className={vista === "inventario" ? "navegacion-activa" : ""}
-        onClick={() => alNavegar("inventario")}
-      >
-        <MoreHorizontal size={22} />
-        <span>Más</span>
-      </button>
-    </nav>
+    <>
+      {mostrarMas && <button className="fondo-menu-navegacion" type="button" aria-label="Cerrar opciones de navegación" onClick={() => setMostrarMas(false)} />}
+      <nav className="navegacion-inferior" aria-label="Navegación para tablet vertical">
+        {navegacion.slice(0, 4).map((item) => {
+          const Icono = item.icono;
+          return (
+            <button
+              type="button"
+              key={item.id}
+              className={vista === item.id ? "navegacion-activa" : ""}
+              onClick={() => abrirVista(item.id)}
+            >
+              <Icono size={22} />
+              <span>{item.etiqueta}</span>
+            </button>
+          );
+        })}
+        <button
+          type="button"
+          className={mostrarMas || vista === "inventario" || vista === "tecnicos" ? "navegacion-activa" : ""}
+          aria-expanded={mostrarMas}
+          aria-controls="opciones-mas-navegacion"
+          onClick={() => setMostrarMas((visible) => !visible)}
+        >
+          <MoreHorizontal size={22} />
+          <span>Más</span>
+        </button>
+        {mostrarMas && (
+          <div className="menu-mas-navegacion" id="opciones-mas-navegacion" role="group" aria-label="Más secciones">
+            {navegacion.slice(4).map((item) => {
+              const Icono = item.icono;
+              return (
+                <button key={item.id} type="button" className={vista === item.id ? "opcion-actual" : ""} onClick={() => abrirVista(item.id)}>
+                  <Icono size={20} aria-hidden="true" />{item.etiqueta}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </nav>
+    </>
   );
 }
 
@@ -1764,6 +1851,113 @@ function TarjetaMetrica({
   );
 }
 
+function VistaTecnicos({
+  tecnicos,
+  alActualizar,
+}: {
+  tecnicos: TecnicoTallerApi[];
+  alActualizar: (tecnicos: TecnicoTallerApi[]) => void;
+}) {
+  const { ejecutarConCargadorPantalla } = useCargadorPantalla();
+  const [nombreNuevo, setNombreNuevo] = useState("");
+  const [nuevoPredeterminado, setNuevoPredeterminado] = useState(false);
+  const [tecnicoEditandoId, setTecnicoEditandoId] = useState<number | null>(null);
+  const [nombreEditado, setNombreEditado] = useState("");
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState("");
+  const esPrimerTecnico = tecnicos.length === 0;
+
+  async function guardar(operacion: () => Promise<unknown>, mensaje: string) {
+    if (guardando) return false;
+    setGuardando(true);
+    setError("");
+    try {
+      const actualizados = await ejecutarConCargadorPantalla(mensaje, async () => {
+        await operacion();
+        return cargarTecnicosTallerApi();
+      });
+      alActualizar(actualizados);
+      return true;
+    } catch (errorOperacion) {
+      setError(errorOperacion instanceof Error ? errorOperacion.message : "No fue posible guardar el técnico.");
+      return false;
+    } finally {
+      setGuardando(false);
+    }
+  }
+
+  async function agregar(evento: FormEvent<HTMLFormElement>) {
+    evento.preventDefault();
+    if (await guardar(
+      () => crearTecnicoTallerApi({
+        nombre: nombreNuevo.trim(),
+        esPredeterminado: esPrimerTecnico || nuevoPredeterminado,
+      }),
+      "Registrando técnico…",
+    )) {
+      setNombreNuevo("");
+      setNuevoPredeterminado(false);
+    }
+  }
+
+  async function actualizar(tecnico: TecnicoTallerApi) {
+    if (await guardar(
+      () => guardarTecnicoTallerApi({ nombre: nombreEditado.trim(), activo: tecnico.activo }, tecnico.id),
+      "Actualizando técnico…",
+    )) {
+      setTecnicoEditandoId(null);
+    }
+  }
+
+  return (
+    <section className="vista-tecnicos">
+      <header className="cabecera-vista-tecnicos">
+        <div><span className="sobrelinea">Personal del taller</span><h1>Técnicos y mecánicos</h1><p>Marca quién será el predeterminado para las órdenes nuevas. Puedes cambiar el responsable en cada orden.</p></div>
+      </header>
+      {error && <div className="estado-datos estado-datos-error" role="alert">{error}</div>}
+      <form className="formulario-alta-tecnico" onSubmit={agregar}>
+        <label htmlFor="nombre-nuevo-tecnico">Agregar técnico o mecánico</label>
+        <div><input id="nombre-nuevo-tecnico" value={nombreNuevo} onChange={(evento) => setNombreNuevo(evento.target.value)} minLength={2} maxLength={150} required placeholder="Nombre completo" /><button className="boton-primario" type="submit" disabled={guardando || nombreNuevo.trim().length < 2}><Plus size={18} />Agregar</button></div>
+        <label className="opcion-predeterminado-tecnico">
+          <input type="checkbox" checked={esPrimerTecnico || nuevoPredeterminado} disabled={esPrimerTecnico || guardando} onChange={(evento) => setNuevoPredeterminado(evento.target.checked)} />
+          Usar como técnico predeterminado
+        </label>
+        {esPrimerTecnico && <small>El primer técnico queda predeterminado automáticamente.</small>}
+      </form>
+      <div className="lista-tecnicos">
+        {tecnicos.length === 0 && <p className="estado-vacio">Todavía no hay técnicos registrados. El primero quedará como predeterminado.</p>}
+        {tecnicos.map((tecnico) => (
+          <article key={tecnico.id}>
+            <div className="datos-tecnico">
+              {tecnicoEditandoId === tecnico.id ? (
+                <input aria-label={`Nombre de ${tecnico.nombre}`} value={nombreEditado} onChange={(evento) => setNombreEditado(evento.target.value)} minLength={2} maxLength={150} />
+              ) : <strong>{tecnico.nombre}</strong>}
+              <small>{tecnico.esPredeterminado ? "Predeterminado" : tecnico.activo ? "Activo" : "Inactivo"}</small>
+            </div>
+            <div className="acciones-tecnico">
+              <label className="opcion-predeterminado-tecnico">
+                <input type="checkbox" checked={tecnico.esPredeterminado} disabled={guardando || !tecnico.activo || tecnico.esPredeterminado} aria-label={`Usar a ${tecnico.nombre} como predeterminado`} onChange={() => { void guardar(() => establecerTecnicoPredeterminadoApi(tecnico.id), "Cambiando técnico predeterminado…"); }} />
+                Predeterminado
+              </label>
+              {tecnicoEditandoId === tecnico.id ? (
+                <>
+                  <button type="button" className="boton-secundario" disabled={guardando || nombreEditado.trim().length < 2} onClick={() => actualizar(tecnico)}>Guardar</button>
+                  <button type="button" className="boton-texto" onClick={() => setTecnicoEditandoId(null)}>Cancelar</button>
+                </>
+              ) : (
+                <>
+                  <button type="button" className="boton-texto" disabled={guardando} onClick={() => { setTecnicoEditandoId(tecnico.id); setNombreEditado(tecnico.nombre); }}>Editar nombre</button>
+                  {!tecnico.esPredeterminado && <button type="button" className="boton-texto" disabled={guardando} onClick={() => guardar(() => guardarTecnicoTallerApi({ nombre: tecnico.nombre, activo: !tecnico.activo }, tecnico.id), tecnico.activo ? "Desactivando técnico…" : "Activando técnico…")}>{tecnico.activo ? "Desactivar" : "Activar"}</button>}
+                </>
+              )}
+            </div>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function VistaOrdenes({
   ordenes,
   cargando,
@@ -1823,10 +2017,10 @@ function VistaOrdenes({
         <div className="cabecera-tabla"><span>Orden y vehículo</span><span>Cliente</span><span>Estado</span><span>Responsable</span><span /></div>
         {ordenesVisibles.map((orden) => (
           <button className="fila-tabla" key={orden.id} onClick={() => alAbrirOrden(orden)}>
-            <span className="celda-vehiculo"><span className="mini-auto"><CarFront size={21} /></span><span><strong>{orden.vehiculo}</strong><small>{orden.numero} · {orden.placa}</small></span></span>
+            <span className="celda-vehiculo"><span className="mini-auto"><CarFront size={21} /></span><span><strong>{orden.vehiculo}</strong><small>{orden.numero} · {orden.placa}</small><small>Ingreso: {orden.fechaHoraIngreso}</small></span></span>
             <span className="cliente-tabla"><strong>{orden.cliente}</strong><small>{orden.motivo}</small></span>
             <span><span className={`etiqueta-estado estado-${normalizarClase(orden.estado)}`}>{orden.estado}</span></span>
-            <span><strong>{orden.tecnico}</strong><small>Desde {orden.hora}</small></span>
+            <span><strong>{orden.tecnico}</strong></span>
             <ChevronRight size={20} />
           </button>
         ))}
@@ -1857,6 +2051,7 @@ function VistaClientes({
   alEditarCliente,
   alCrearOrden,
   alVerHistorial,
+  alVerEstadoCuenta,
 }: {
   clientes: ClienteTaller[];
   cargando: boolean;
@@ -1865,6 +2060,7 @@ function VistaClientes({
   alEditarCliente: (cliente: ClienteTaller) => void;
   alCrearOrden: (clienteId: number) => void;
   alVerHistorial: (cliente: ClienteTaller) => void;
+  alVerEstadoCuenta: (cliente: ClienteTaller) => void;
 }) {
   const [busquedaClientes, setBusquedaClientes] = useState("");
   const clientesVisibles = useMemo(() => {
@@ -1894,6 +2090,7 @@ function VistaClientes({
             <span className="acciones-cliente">
               <button className="boton-icono" type="button" onClick={() => alEditarCliente(cliente)} aria-label={`Editar cliente ${cliente.nombre}`}><Pencil size={18} /></button>
               <button className="boton-secundario boton-historial" type="button" onClick={() => alVerHistorial(cliente)}><History size={18} />Historial</button>
+              <button className="boton-secundario boton-estado-cuenta" type="button" onClick={() => alVerEstadoCuenta(cliente)}>Estado de cuenta</button>
               <button className="boton-primario" type="button" disabled={!cliente.activo} onClick={() => alCrearOrden(cliente.id)}>Crear orden</button>
             </span>
           </article>
@@ -2070,12 +2267,14 @@ function PaginaProceso({
   titulo,
   descripcion,
   etiquetaRegreso = "Volver",
+  mostrarIndicadorGuardado = true,
   alRegresar,
   children,
 }: {
   titulo: string;
   descripcion: string;
   etiquetaRegreso?: string;
+  mostrarIndicadorGuardado?: boolean;
   alRegresar: () => void;
   children: React.ReactNode;
 }) {
@@ -2091,7 +2290,7 @@ function PaginaProceso({
           <h1 id="titulo-pagina-proceso">{titulo}</h1>
           <p>{descripcion}</p>
         </div>
-        <span className="indicador-guardado"><CircleCheck size={17} />Guardado automático</span>
+        {mostrarIndicadorGuardado && <span className="indicador-guardado"><CircleCheck size={17} />Guardado automático</span>}
       </header>
       <div className="cuerpo-proceso">{children}</div>
     </section>
@@ -2103,6 +2302,7 @@ function FormularioNuevaOrden({
   vehiculos,
   marcasVehiculo,
   modelosVehiculo,
+  tecnicosTaller,
   clienteInicialId,
   guardando,
   guardandoCliente,
@@ -2117,6 +2317,7 @@ function FormularioNuevaOrden({
   vehiculos: VehiculoTaller[];
   marcasVehiculo: MarcaVehiculoApi[];
   modelosVehiculo: ModeloVehiculoApi[];
+  tecnicosTaller: TecnicoTallerApi[];
   clienteInicialId: number | null;
   guardando: boolean;
   guardandoCliente: boolean;
@@ -2346,6 +2547,18 @@ function FormularioNuevaOrden({
             </span>
           </div>
         </div>
+        <label className="campo-tecnico-orden">
+          Técnico responsable
+          <select name="tecnicoTallerId" defaultValue="">
+            <option value="">{tecnicosTaller.find((tecnico) => tecnico.esPredeterminado)?.nombre
+              ? `Predeterminado: ${tecnicosTaller.find((tecnico) => tecnico.esPredeterminado)?.nombre}`
+              : "Sin técnico predeterminado"}</option>
+            {tecnicosTaller.filter((tecnico) => tecnico.activo).map((tecnico) => (
+              <option key={tecnico.id} value={tecnico.id}>{tecnico.nombre}</option>
+            ))}
+          </select>
+          <small>Se asignará el predeterminado si no eliges otro técnico.</small>
+        </label>
         <div className="opciones-prioridad"><label><input type="radio" name="prioridad" defaultChecked />Normal</label><label><input type="radio" name="prioridad" />Prioritaria</label></div>
         <button className="boton-primario boton-ancho" type="submit" disabled={!formularioDisponible || guardando}>
           <Check size={20} />Crear orden de servicio
@@ -2607,20 +2820,20 @@ function FormularioVehiculo({
 
 function DetalleOrden({
   orden,
+  tecnicosTaller,
   cliente,
   inspeccion,
   alRecibir,
   alActualizarOrden,
   alMostrarAviso,
-  alNotificar,
 }: {
   orden: OrdenTaller;
+  tecnicosTaller: TecnicoTallerApi[];
   cliente?: ClienteTaller;
   inspeccion?: InspeccionVisual;
   alRecibir: () => void;
   alActualizarOrden: (orden: OrdenTaller) => void;
   alMostrarAviso: (mensaje: string) => void;
-  alNotificar: () => void;
 }) {
   const { ejecutarConCargadorPantalla } = useCargadorPantalla();
   const [resumen, setResumen] = useState<ResumenDetallesOrdenServicioApi>({ detalles: [], total: 0 });
@@ -2638,6 +2851,7 @@ function DetalleOrden({
   const [cargandoProceso, setCargandoProceso] = useState(true);
   const [guardandoProceso, setGuardandoProceso] = useState(false);
   const [errorProceso, setErrorProceso] = useState("");
+  const [tecnicoSeleccionadoId, setTecnicoSeleccionadoId] = useState(orden.tecnicoTallerId ?? 0);
   const etapas: EstadoOrden[] = [
     "Recepción",
     "Diagnóstico",
@@ -2650,6 +2864,24 @@ function DetalleOrden({
   const articuloSeleccionado = articulos.find((articulo) => articulo.productoId === productoId);
   const terminoBusquedaProducto = busquedaProducto.trim();
   const productosCoincidentes = articulos.slice(0, 6);
+
+  async function guardarTecnicoOrden() {
+    if (!tecnicoSeleccionadoId || guardandoProceso) return;
+    setGuardandoProceso(true);
+    setErrorProceso("");
+    try {
+      const actualizada = await ejecutarConCargadorPantalla(
+        "Asignando el técnico de la orden…",
+        () => asignarTecnicoOrdenApi(orden.id, tecnicoSeleccionadoId),
+      );
+      alActualizarOrden(actualizada);
+      alMostrarAviso("Responsable de la orden actualizado");
+    } catch (error) {
+      setErrorProceso(error instanceof Error ? error.message : "No fue posible asignar el técnico.");
+    } finally {
+      setGuardandoProceso(false);
+    }
+  }
 
   useEffect(() => {
     if (!mensajeCargoManual || mensajeCargoManual.esError) return;
@@ -2898,7 +3130,21 @@ function DetalleOrden({
       <div className="columna-orden">
         <div className="vehiculo-destacado"><span className="icono-auto-grande"><CarFront size={31} /></span><div><span className={`etiqueta-estado estado-${normalizarClase(orden.estado)}`}>{orden.estado}</span><h3>{orden.vehiculo}</h3><p>{orden.placa} · {orden.cliente}</p></div></div>
         <div className="bloque-detalle"><span className="sobrelinea">Motivo de ingreso</span><p>{orden.motivo}</p></div>
-        <div className="datos-rapidos"><div><UserRound size={20} /><span><small>Responsable</small><strong>{orden.tecnico}</strong></span></div><div><Clock3 size={20} /><span><small>Ingreso</small><strong>{orden.hora} a. m.</strong></span></div></div>
+        <div className="datos-rapidos"><div><UserRound size={20} /><span><small>Responsable</small><strong>{orden.tecnico}</strong></span></div><div><Clock3 size={20} /><span><small>Fecha y hora de ingreso</small><strong>{orden.fechaHoraIngreso}</strong></span></div></div>
+        <div className="asignacion-tecnico-orden">
+          <label htmlFor="tecnico-orden-detalle">Cambiar responsable</label>
+          <div>
+            <select id="tecnico-orden-detalle" value={tecnicoSeleccionadoId} onChange={(evento) => setTecnicoSeleccionadoId(Number(evento.target.value))}>
+              <option value={0}>Selecciona un técnico</option>
+              {tecnicosTaller.filter((tecnico) => tecnico.activo || tecnico.id === orden.tecnicoTallerId).map((tecnico) => (
+                <option key={tecnico.id} value={tecnico.id}>{tecnico.nombre}{tecnico.activo ? "" : " · Inactivo"}</option>
+              ))}
+            </select>
+            <button type="button" className="boton-secundario" disabled={!tecnicoSeleccionadoId || tecnicoSeleccionadoId === orden.tecnicoTallerId || guardandoProceso || !tecnicosTaller.find((tecnico) => tecnico.id === tecnicoSeleccionadoId)?.activo} onClick={guardarTecnicoOrden}>Guardar</button>
+          </div>
+          {tecnicosTaller.length === 0 && <small>Registra un técnico en el catálogo para asignarlo.</small>}
+          {errorProceso && <small role="alert">{errorProceso}</small>}
+        </div>
         <div className="bloque-detalle"><span className="sobrelinea">Avance de la orden</span><div className="barra-avance"><span style={{ width: `${orden.progreso}%` }} /></div><strong>{orden.progreso}% completado</strong></div>
         <div className="linea-tiempo linea-tiempo-orden">
           {etapas.map((etapa, indice) => (
@@ -2908,7 +3154,6 @@ function DetalleOrden({
             </div>
           ))}
         </div>
-        <button className="boton-secundario boton-ancho" onClick={alNotificar}><MessageCircleMore size={20} />Enviar actualización al cliente</button>
       </div>
 
       <div className="columna-inspeccion-orden flujo-orden">
@@ -3396,17 +3641,19 @@ function FormularioRecepcion({
   inspeccionInicial,
   alEnviar,
   alEliminarEvidencia,
+  alMostrarAviso,
 }: {
   orden: OrdenTaller;
   inspeccionInicial?: InspeccionVisual;
   alEnviar: (evento: FormEvent<HTMLFormElement>) => Promise<void>;
   alEliminarEvidencia: (evidenciaId: number) => Promise<void>;
+  alMostrarAviso: (mensaje: string) => void;
 }) {
   const [tipoDanio, setTipoDanio] = useState<TipoDanio>("Rayón");
   const [severidad, setSeveridad] = useState<SeveridadDanio>("Leve");
   const [danios, setDanios] = useState<DanioVisual[]>(inspeccionInicial?.danios || []);
   const [danioEditando, setDanioEditando] = useState<DanioVisual | null>(null);
-  const [errorDetalleDanio, setErrorDetalleDanio] = useState("");
+  const detalleDanioRef = useRef<HTMLTextAreaElement | null>(null);
   const [cantidadFotos, setCantidadFotos] = useState(0);
   const [fotografias, setFotografias] = useState<File[]>([]);
   const entradaFotografias = useRef<HTMLInputElement | null>(null);
@@ -3425,6 +3672,33 @@ function FormularioRecepcion({
     () => () => vistasPrevias.forEach((vista) => URL.revokeObjectURL(vista.direccion)),
     [vistasPrevias],
   );
+  const danioEditandoId = danioEditando?.id;
+  const esDanioExistente = danioEditando
+    ? danios.some((danio) => danio.id === danioEditando.id)
+    : false;
+
+  useEffect(() => {
+    if (!danioEditandoId) return;
+
+    detalleDanioRef.current?.focus();
+    const cerrarConEscape = (evento: KeyboardEvent) => {
+      if (evento.key === "Escape") {
+        setDanioEditando(null);
+      }
+    };
+    const desbordamientoAnterior = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    document.addEventListener("keydown", cerrarConEscape);
+    return () => {
+      document.body.style.overflow = desbordamientoAnterior;
+      document.removeEventListener("keydown", cerrarConEscape);
+    };
+  }, [danioEditandoId]);
+
+  function cerrarEditorDanio() {
+    setDanioEditando(null);
+  }
+
   function marcarZona(zona: ZonaVehiculo) {
     const id = `${zona}-${tipoDanio}-${Date.now()}`;
     setDanioEditando({
@@ -3434,24 +3708,20 @@ function FormularioRecepcion({
       severidad,
       observacion: "",
     });
-    setErrorDetalleDanio("");
   }
 
   function actualizarDanio(cambios: Partial<DanioVisual>) {
     setDanioEditando((actual) => actual ? { ...actual, ...cambios } : null);
-    if (cambios.observacion?.trim()) setErrorDetalleDanio("");
   }
 
   function guardarDanio() {
     if (!danioEditando) return;
 
-    const detalle = danioEditando.observacion.trim();
-    if (!detalle) {
-      setErrorDetalleDanio("Ingresa el detalle del hallazgo antes de guardarlo.");
-      return;
-    }
-
-    const danioGuardado = { ...danioEditando, observacion: detalle };
+    const esActualizacion = danios.some((danio) => danio.id === danioEditando.id);
+    const danioGuardado = {
+      ...danioEditando,
+      observacion: danioEditando.observacion.trim(),
+    };
     setDanios((actuales) => {
       const yaExiste = actuales.some((danio) => danio.id === danioGuardado.id);
       return yaExiste
@@ -3459,7 +3729,9 @@ function FormularioRecepcion({
         : [...actuales, danioGuardado];
     });
     setDanioEditando(null);
-    setErrorDetalleDanio("");
+    alMostrarAviso(esActualizacion
+      ? "Hallazgo actualizado correctamente"
+      : "Hallazgo guardado correctamente");
   }
 
   async function eliminarEvidenciaConfirmada() {
@@ -3490,13 +3762,6 @@ function FormularioRecepcion({
         if (danioEditando) {
           evento.preventDefault();
           guardarDanio();
-          return;
-        }
-        const danioSinDetalle = danios.find((danio) => !danio.observacion.trim());
-        if (danioSinDetalle) {
-          evento.preventDefault();
-          setDanioEditando({ ...danioSinDetalle });
-          setErrorDetalleDanio("Completa el detalle de este hallazgo antes de guardar la inspección.");
           return;
         }
         setGuardando(true);
@@ -3555,69 +3820,11 @@ function FormularioRecepcion({
 
         <MapaInspeccion danios={danios} alMarcar={marcarZona} />
 
-        {danioEditando && (
-          <div className="editor-danio">
-            <div className="encabezado-editor-danio">
-              <div>
-                <span className="sobrelinea">Editar hallazgo</span>
-                <strong>{etiquetaZona(danioEditando.zona)}</strong>
-              </div>
-              <button type="button" onClick={() => { setDanioEditando(null); setErrorDetalleDanio(""); }} aria-label="Cerrar editor">
-                <X size={18} />
-              </button>
-            </div>
-            <div className="fila-formulario">
-              <label>
-                Tipo de daño
-                <select
-                  value={danioEditando.tipo}
-                  onChange={(evento) => actualizarDanio({ tipo: evento.target.value as TipoDanio })}
-                >
-                  {(["Rayón", "Abolladura", "Golpe", "Vidrio", "Luz"] as TipoDanio[]).map((tipo) => (
-                    <option key={tipo}>{tipo}</option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Severidad
-                <select
-                  value={danioEditando.severidad}
-                  onChange={(evento) => actualizarDanio({ severidad: evento.target.value as SeveridadDanio })}
-                >
-                  {(["Leve", "Moderado", "Severo"] as SeveridadDanio[]).map((nivel) => (
-                    <option key={nivel}>{nivel}</option>
-                  ))}
-                </select>
-              </label>
-            </div>
-            <label>
-              Descripción u observación
-              <textarea
-                rows={3}
-                maxLength={500}
-                aria-required="true"
-                value={danioEditando.observacion}
-                onChange={(evento) => actualizarDanio({ observacion: evento.target.value })}
-                placeholder="Ej. Rayón superficial de 12 cm en la puerta trasera..."
-                aria-invalid={Boolean(errorDetalleDanio)}
-                aria-describedby={errorDetalleDanio ? "error-detalle-danio" : undefined}
-              />
-              <span className="ayuda-detalle-danio">
-                {errorDetalleDanio && <small id="error-detalle-danio" className="error-detalle-danio" role="alert">{errorDetalleDanio}</small>}
-                <small>{danioEditando.observacion.length}/500 caracteres</small>
-              </span>
-            </label>
-            <button className="boton-secundario boton-ancho" type="button" onClick={guardarDanio}>
-              <Check size={18} /> Guardar hallazgo
-            </button>
-          </div>
-        )}
-
         {danios.length > 0 ? (
           <div className="danios-registrados">
             <div className="titulo-danios">
               <strong>Daños registrados</strong>
-              <button type="button" onClick={() => { setDanios([]); setDanioEditando(null); setErrorDetalleDanio(""); }}>
+              <button type="button" onClick={() => { setDanios([]); setDanioEditando(null); }}>
                 <RotateCcw size={15} /> Limpiar
               </button>
             </div>
@@ -3634,7 +3841,7 @@ function FormularioRecepcion({
                   <button
                     type="button"
                     aria-label={`Editar ${danio.tipo} en ${etiquetaZona(danio.zona)}`}
-                    onClick={() => { setDanioEditando({ ...danio }); setErrorDetalleDanio(""); }}
+                    onClick={() => setDanioEditando({ ...danio })}
                   >
                     <Pencil size={16} />
                   </button>
@@ -3656,6 +3863,80 @@ function FormularioRecepcion({
           <div className="sin-danios"><Check size={18} />Aún no se marcaron daños visibles</div>
         )}
       </section>
+
+      {danioEditando && (
+        <div className="fondo-modal-alta fondo-modal-hallazgo">
+          <button
+            className="cerrador-modal-fondo"
+            type="button"
+            aria-label="Cerrar formulario del hallazgo"
+            onClick={cerrarEditorDanio}
+          />
+          <section
+            className="modal-alta modal-hallazgo"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="titulo-modal-hallazgo"
+            aria-describedby="zona-modal-hallazgo"
+          >
+            <div className="cabecera-modal-alta">
+              <div>
+                <span className="sobrelinea">Inspección visual</span>
+                <h2 id="titulo-modal-hallazgo">{esDanioExistente ? "Editar hallazgo" : "Añadir hallazgo"}</h2>
+                <p id="zona-modal-hallazgo">Zona: {etiquetaZona(danioEditando.zona)}</p>
+              </div>
+              <button className="boton-icono" type="button" onClick={cerrarEditorDanio} aria-label="Cerrar formulario del hallazgo">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="contenido-modal-alta">
+              <div className="editor-danio">
+                <div className="fila-formulario">
+                  <label>
+                    Tipo de daño
+                    <select
+                      value={danioEditando.tipo}
+                      onChange={(evento) => actualizarDanio({ tipo: evento.target.value as TipoDanio })}
+                    >
+                      {(["Rayón", "Abolladura", "Golpe", "Vidrio", "Luz"] as TipoDanio[]).map((tipo) => (
+                        <option key={tipo}>{tipo}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    Severidad
+                    <select
+                      value={danioEditando.severidad}
+                      onChange={(evento) => actualizarDanio({ severidad: evento.target.value as SeveridadDanio })}
+                    >
+                      {(["Leve", "Moderado", "Severo"] as SeveridadDanio[]).map((nivel) => (
+                        <option key={nivel}>{nivel}</option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+                <label>
+                  Descripción u observación (opcional)
+                  <textarea
+                    ref={detalleDanioRef}
+                    rows={4}
+                    maxLength={500}
+                    value={danioEditando.observacion}
+                    onChange={(evento) => actualizarDanio({ observacion: evento.target.value })}
+                    placeholder="Ej. Rayón superficial de 12 cm en la puerta trasera..."
+                  />
+                  <span className="ayuda-detalle-danio">
+                    <small>{danioEditando.observacion.length}/500 caracteres</small>
+                  </span>
+                </label>
+                <button className="boton-secundario boton-ancho" type="button" onClick={guardarDanio}>
+                  <Check size={18} /> Guardar hallazgo
+                </button>
+              </div>
+            </div>
+          </section>
+        </div>
+      )}
 
       <input type="hidden" name="danios" value={JSON.stringify(danios)} />
       <label>Observaciones generales<textarea name="estado" rows={4} required defaultValue={inspeccionInicial?.descripcionEstado || ""} placeholder="Describe el estado interior, accesorios o cualquier detalle adicional..." /></label>
@@ -4126,19 +4407,77 @@ async function cambiarEstadoOrdenApi(
   return convertirOrdenApi(await respuesta.json() as OrdenServicioApi);
 }
 
+async function asignarTecnicoOrdenApi(ordenServicioId: number, tecnicoTallerId: number): Promise<OrdenTaller> {
+  const respuesta = await fetch(`${obtenerDireccionApi()}/api/ordenes-servicio/${ordenServicioId}/tecnico`, {
+    method: "PUT",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ tecnicoTallerId }),
+  });
+  if (!respuesta.ok) throw new Error(await obtenerMensajeErrorApi(respuesta, "No fue posible asignar el técnico."));
+  return convertirOrdenApi(await respuesta.json() as OrdenServicioApi);
+}
+
+async function cargarTecnicosTallerApi(senal?: AbortSignal): Promise<TecnicoTallerApi[]> {
+  const respuesta = await fetch(`${obtenerDireccionApi()}/api/tecnicos-taller`, {
+    credentials: "include",
+    signal: senal,
+  });
+  if (!respuesta.ok) throw new Error(await obtenerMensajeErrorApi(respuesta, "No fue posible consultar los técnicos."));
+  return await respuesta.json() as TecnicoTallerApi[];
+}
+
+async function crearTecnicoTallerApi(
+  solicitud: { nombre: string; esPredeterminado: boolean },
+): Promise<TecnicoTallerApi> {
+  const respuesta = await fetch(`${obtenerDireccionApi()}/api/tecnicos-taller`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(solicitud),
+  });
+  if (!respuesta.ok) throw new Error(await obtenerMensajeErrorApi(respuesta, "No fue posible registrar el técnico."));
+  return await respuesta.json() as TecnicoTallerApi;
+}
+
+async function guardarTecnicoTallerApi(
+  solicitud: { nombre: string; activo: boolean },
+  tecnicoId: number,
+): Promise<TecnicoTallerApi> {
+  const respuesta = await fetch(`${obtenerDireccionApi()}/api/tecnicos-taller/${tecnicoId}`, {
+    method: "PUT",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(solicitud),
+  });
+  if (!respuesta.ok) throw new Error(await obtenerMensajeErrorApi(respuesta, "No fue posible guardar el técnico."));
+  return await respuesta.json() as TecnicoTallerApi;
+}
+
+async function establecerTecnicoPredeterminadoApi(tecnicoId: number): Promise<TecnicoTallerApi> {
+  const respuesta = await fetch(`${obtenerDireccionApi()}/api/tecnicos-taller/${tecnicoId}/predeterminado`, {
+    method: "PUT",
+    credentials: "include",
+  });
+  if (!respuesta.ok) throw new Error(await obtenerMensajeErrorApi(respuesta, "No fue posible cambiar el técnico predeterminado."));
+  return await respuesta.json() as TecnicoTallerApi;
+}
+
 async function cargarDatosApi(senal: AbortSignal): Promise<{
   ordenes: OrdenTaller[];
   clientes: ClienteTaller[];
   vehiculos: VehiculoTaller[];
   marcasVehiculo: MarcaVehiculoApi[];
   modelosVehiculo: ModeloVehiculoApi[];
+  tecnicosTaller: TecnicoTallerApi[];
 }> {
-  const [ordenes, clientesApi, vehiculosApi, marcasVehiculo, modelosVehiculo] = await Promise.all([
+  const [ordenes, clientesApi, vehiculosApi, marcasVehiculo, modelosVehiculo, tecnicosTaller] = await Promise.all([
     cargarOrdenesApi(senal),
     cargarClientesApi(senal),
     cargarVehiculosApi(senal),
     cargarMarcasVehiculoApi(senal),
     cargarModelosVehiculoApi(senal),
+    cargarTecnicosTallerApi(senal),
   ]);
 
   const clientes = clientesApi.map((cliente) =>
@@ -4153,7 +4492,7 @@ async function cargarDatosApi(senal: AbortSignal): Promise<{
   );
   const vehiculos = vehiculosApi.map(convertirVehiculoTaller);
 
-  return { ordenes, clientes, vehiculos, marcasVehiculo, modelosVehiculo };
+  return { ordenes, clientes, vehiculos, marcasVehiculo, modelosVehiculo, tecnicosTaller };
 }
 
 async function cargarOrdenesApi(senal: AbortSignal): Promise<OrdenTaller[]> {
@@ -4287,6 +4626,7 @@ async function crearOrdenApi(solicitud: {
   clienteId: number;
   vehiculoId: number;
   observaciones: string;
+  tecnicoTallerId: number | null;
 }): Promise<OrdenTaller> {
   const respuesta = await fetch(`${obtenerDireccionApi()}/api/ordenes-servicio`, {
     method: "POST",
@@ -4312,11 +4652,9 @@ function convertirOrdenApi(orden: OrdenServicioApi): OrdenTaller {
     placa: orden.placaVehiculo,
     estado,
     motivo: orden.observaciones || "Sin observaciones registradas",
-    tecnico: "Por asignar",
-    hora: new Date(orden.fechaIngreso).toLocaleTimeString("es-NI", {
-      hour: "numeric",
-      minute: "2-digit",
-    }),
+    tecnico: orden.nombreTecnico ?? "Por asignar",
+    tecnicoTallerId: orden.tecnicoTallerId,
+    fechaHoraIngreso: formatearFechaHoraOrden(orden.fechaIngreso),
     progreso: progresoPorEstado(estado),
     color: colorPorEstado(estado),
     visibleEnInicio: orden.visibleEnInicio,

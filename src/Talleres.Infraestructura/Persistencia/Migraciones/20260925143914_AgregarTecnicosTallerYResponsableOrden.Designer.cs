@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Talleres.Infraestructura.Persistencia;
 
@@ -11,9 +12,11 @@ using Talleres.Infraestructura.Persistencia;
 namespace Talleres.Infraestructura.Persistencia.Migraciones
 {
     [DbContext(typeof(TallerDbContext))]
-    partial class TallerDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260925143914_AgregarTecnicosTallerYResponsableOrden")]
+    partial class AgregarTecnicosTallerYResponsableOrden
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -33,9 +36,17 @@ namespace Talleres.Infraestructura.Persistencia.Migraciones
                     b.Property<bool>("Activo")
                         .HasColumnType("bit");
 
+                    b.Property<string>("Correo")
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
                     b.Property<string>("Direccion")
                         .HasMaxLength(300)
                         .HasColumnType("nvarchar(300)");
+
+                    b.Property<string>("DocumentoIdentidad")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
 
                     b.Property<long>("EmpresaId")
                         .HasColumnType("bigint");
@@ -55,6 +66,10 @@ namespace Talleres.Infraestructura.Persistencia.Migraciones
                         .HasColumnType("nvarchar(30)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("EmpresaId", "DocumentoIdentidad")
+                        .IsUnique()
+                        .HasFilter("[DocumentoIdentidad] IS NOT NULL");
 
                     b.HasIndex("EmpresaId", "Nombre");
 
@@ -433,47 +448,6 @@ namespace Talleres.Infraestructura.Persistencia.Migraciones
                     b.ToTable("OrdenesServicio", (string)null);
                 });
 
-            modelBuilder.Entity("Talleres.Dominio.Entidades.PagoCliente", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
-
-                    b.Property<long>("ClienteId")
-                        .HasColumnType("bigint");
-
-                    b.Property<long>("EmpresaId")
-                        .HasColumnType("bigint");
-
-                    b.Property<DateTime?>("FechaAnulacionUtc")
-                        .HasPrecision(0)
-                        .HasColumnType("datetime2(0)");
-
-                    b.Property<DateTime>("FechaRegistroUtc")
-                        .HasPrecision(0)
-                        .HasColumnType("datetime2(0)");
-
-                    b.Property<string>("FormaPago")
-                        .HasMaxLength(60)
-                        .HasColumnType("nvarchar(60)");
-
-                    b.Property<decimal>("Monto")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<string>("Referencia")
-                        .HasMaxLength(120)
-                        .HasColumnType("nvarchar(120)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("EmpresaId", "ClienteId", "FechaRegistroUtc");
-
-                    b.ToTable("PagosClientes", (string)null);
-                });
-
             modelBuilder.Entity("Talleres.Dominio.Entidades.RecepcionVehiculo", b =>
                 {
                     b.Property<long>("Id")
@@ -739,18 +713,6 @@ namespace Talleres.Infraestructura.Persistencia.Migraciones
                     b.Navigation("Vehiculo");
                 });
 
-            modelBuilder.Entity("Talleres.Dominio.Entidades.PagoCliente", b =>
-                {
-                    b.HasOne("Talleres.Dominio.Entidades.Cliente", "Cliente")
-                        .WithMany("Pagos")
-                        .HasForeignKey("EmpresaId", "ClienteId")
-                        .HasPrincipalKey("EmpresaId", "Id")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Cliente");
-                });
-
             modelBuilder.Entity("Talleres.Dominio.Entidades.RecepcionVehiculo", b =>
                 {
                     b.HasOne("Talleres.Dominio.Entidades.OrdenServicio", "OrdenServicio")
@@ -785,8 +747,6 @@ namespace Talleres.Infraestructura.Persistencia.Migraciones
             modelBuilder.Entity("Talleres.Dominio.Entidades.Cliente", b =>
                 {
                     b.Navigation("OrdenesServicio");
-
-                    b.Navigation("Pagos");
 
                     b.Navigation("Vehiculos");
                 });

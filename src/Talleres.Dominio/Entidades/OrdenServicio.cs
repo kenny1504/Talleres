@@ -17,6 +17,8 @@ public sealed class OrdenServicio : IEntidadEmpresa
 
     public long VehiculoId { get; set; }
 
+    public long? TecnicoTallerId { get; set; }
+
     public EstadoOrdenServicio Estado { get; set; }
 
     public DateTime FechaIngreso { get; set; }
@@ -34,6 +36,8 @@ public sealed class OrdenServicio : IEntidadEmpresa
     public Cliente Cliente { get; set; } = null!;
 
     public Vehiculo Vehiculo { get; set; } = null!;
+
+    public TecnicoTaller? TecnicoTaller { get; set; }
 
     public RecepcionVehiculo? Recepcion { get; set; }
 

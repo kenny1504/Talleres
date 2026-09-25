@@ -698,6 +698,34 @@ textarea:focus-visible {
 .lista-inventario strong, .lista-inventario small { display: block; }
 .lista-inventario small { margin-top: 4px; color: var(--tinta-suave); }
 .lista-inventario b { color: var(--verde-profundo); font-size: 18px; }
+.vista-tecnicos { display: grid; gap: 22px; max-width: 980px; margin: 0 auto; }
+.cabecera-vista-tecnicos h1 { margin: 4px 0 8px; font-size: clamp(25px, 2.4vw, 34px); }
+.cabecera-vista-tecnicos p { margin: 0; color: var(--tinta-suave); }
+.formulario-alta-tecnico { display: grid; gap: 9px; padding: 20px; border: 1px solid var(--borde); border-radius: 15px; background: white; }
+.formulario-alta-tecnico > label { font-weight: 750; }
+.formulario-alta-tecnico > div { display: flex; gap: 10px; }
+.formulario-alta-tecnico input, .datos-tecnico input, .asignacion-tecnico-orden select, .campo-tecnico-orden select { min-height: 44px; min-width: 0; padding: 0 12px; border: 1px solid var(--borde); border-radius: 10px; background: white; color: var(--tinta); font: inherit; }
+.formulario-alta-tecnico input { flex: 1; }
+.formulario-alta-tecnico > small { color: var(--tinta-suave); }
+.opcion-predeterminado-tecnico { display: inline-flex; align-items: center; gap: 9px; min-height: 44px; font-weight: 650; cursor: pointer; }
+.formulario-alta-tecnico .opcion-predeterminado-tecnico input[type="checkbox"], .acciones-tecnico .opcion-predeterminado-tecnico input[type="checkbox"] { width: 20px; height: 20px; min-height: 20px; flex: none; margin: 0; accent-color: var(--verde-profundo); }
+.opcion-predeterminado-tecnico:has(input:disabled) { cursor: default; }
+.lista-tecnicos { display: grid; gap: 10px; }
+.lista-tecnicos article { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 18px; border: 1px solid var(--borde); border-radius: 13px; background: white; }
+.datos-tecnico { display: grid; gap: 4px; min-width: 0; }
+.datos-tecnico strong { overflow-wrap: anywhere; }
+.datos-tecnico small, .campo-tecnico-orden small, .asignacion-tecnico-orden small { color: var(--tinta-suave); }
+.acciones-tecnico { display: flex; flex-wrap: wrap; gap: 8px; }
+.acciones-tecnico button { min-height: 44px; }
+.campo-tecnico-orden, .asignacion-tecnico-orden { display: grid; gap: 8px; font-weight: 700; }
+.asignacion-tecnico-orden { margin-top: 14px; }
+.asignacion-tecnico-orden > div { display: flex; gap: 8px; }
+.asignacion-tecnico-orden select { flex: 1; }
+@media (max-width: 760px) {
+  .lista-tecnicos article, .formulario-alta-tecnico > div, .asignacion-tecnico-orden > div { flex-direction: column; align-items: stretch; }
+  .acciones-tecnico { width: 100%; }
+  .acciones-tecnico button { flex: 1; }
+}
 .paginacion-inventario { display: flex; align-items: center; justify-content: center; gap: 18px; margin-top: 22px; }
 .paginacion-inventario button { min-height: 44px; padding: 0 16px; border: 1px solid var(--borde); border-radius: 10px; background: white; font-weight: 700; }
 .paginacion-inventario button:disabled { opacity: .45; }
@@ -1543,6 +1571,8 @@ textarea:focus-visible {
 .acciones-cliente {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 8px;
 }
 
@@ -1555,6 +1585,67 @@ textarea:focus-visible {
   gap: 6px;
   white-space: nowrap;
 }
+
+.boton-estado-cuenta { white-space: nowrap; }
+
+.estado-cuenta-cliente {
+  width: min(1200px, 100%);
+  margin: 0 auto;
+  display: grid;
+  gap: 15px;
+}
+
+.estado-cuenta-resumen {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.estado-cuenta-resumen > div,
+.estado-cuenta-panel {
+  min-width: 0;
+  border: 1px solid var(--borde);
+  border-radius: 16px;
+  background: white;
+  box-shadow: var(--sombra);
+}
+
+.estado-cuenta-resumen > div { padding: 17px 19px; }
+.estado-cuenta-resumen span,
+.estado-cuenta-resumen strong { display: block; }
+.estado-cuenta-resumen span { color: var(--tinta-suave); font-size: 12px; }
+.estado-cuenta-resumen strong { margin-top: 6px; overflow-wrap: anywhere; color: var(--tinta); font-size: clamp(20px, 2vw, 27px); }
+.estado-cuenta-resumen .estado-cuenta-saldo { border-color: #b7cfc2; background: var(--verde-claro); }
+.estado-cuenta-aclaracion { margin: 0; color: var(--tinta-suave); font-size: 12px; }
+.estado-cuenta-columnas { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(310px, .85fr); align-items: start; gap: 15px; }
+.estado-cuenta-pagos { display: grid; gap: 15px; }
+.estado-cuenta-panel { padding: 17px; }
+.estado-cuenta-panel > header { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 14px; }
+.estado-cuenta-panel > header svg { flex: none; color: var(--verde); }
+.estado-cuenta-panel h2 { margin: 0; color: var(--tinta); font-size: 17px; }
+.estado-cuenta-panel header p,
+.estado-cuenta-vacio { margin: 3px 0 0; color: var(--tinta-suave); font-size: 12px; }
+.estado-cuenta-lista { display: grid; }
+.estado-cuenta-fila { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 0; padding: 12px 0; border-top: 1px solid var(--borde); }
+.estado-cuenta-fila > div:first-child { min-width: 0; }
+.estado-cuenta-fila strong,
+.estado-cuenta-fila small { display: block; overflow-wrap: anywhere; }
+.estado-cuenta-fila strong { color: var(--tinta); font-size: 13px; }
+.estado-cuenta-fila small { margin-top: 3px; color: var(--tinta-suave); font-size: 11px; }
+.estado-cuenta-fila > strong { flex: none; white-space: nowrap; }
+.estado-cuenta-pago-anulado { opacity: .66; }
+.estado-cuenta-formulario { display: grid; gap: 9px; }
+.estado-cuenta-formulario label { color: var(--tinta); font-size: 12px; font-weight: 700; }
+.estado-cuenta-formulario input { width: 100%; min-width: 0; min-height: 44px; padding: 0 12px; border: 1px solid var(--borde); border-radius: 10px; background: white; color: var(--tinta); font: inherit; }
+.estado-cuenta-formulario summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; color: var(--tinta); font-size: 12px; font-weight: 650; }
+.estado-cuenta-campos-opcionales { display: grid; gap: 8px; padding-bottom: 8px; }
+.estado-cuenta-formulario .boton-primario { width: 100%; min-height: 46px; justify-content: center; }
+.estado-cuenta-confirmacion { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 6px; font-size: 11px; }
+.estado-cuenta-confirmacion .boton-secundario,
+.estado-cuenta-fila > .boton-secundario { min-height: 44px; padding-inline: 10px; }
+.estado-cuenta-aviso { border: 1px solid #b7cfc2; background: var(--verde-claro); color: var(--tinta); }
+.estado-cuenta-formulario input:focus-visible,
+.estado-cuenta-formulario summary:focus-visible { outline: 3px solid #79a593; outline-offset: 2px; }
 
 .fila-vehiculo {
   width: 100%;
@@ -1657,6 +1748,8 @@ textarea:focus-visible {
 .navegacion-inferior {
   display: none;
 }
+
+.fondo-menu-navegacion { display: none; }
 
 .contenido-proceso {
   width: min(1540px, 100%);
@@ -2902,37 +2995,16 @@ textarea:focus-visible {
 }
 
 .editor-danio {
-  margin-top: 13px;
-  padding: 14px;
   display: grid;
   gap: 12px;
-  border: 1px solid #cad9d2;
-  border-radius: 15px;
-  background: #f1f6f3;
-  box-shadow: inset 3px 0 var(--verde);
 }
 
-.encabezado-editor-danio {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+.modal-hallazgo {
+  width: min(560px, 100%);
 }
 
-.encabezado-editor-danio strong {
-  display: block;
-  margin-top: 3px;
-  font-size: 13px;
-}
-
-.encabezado-editor-danio > button {
-  width: 38px;
-  height: 38px;
-  display: grid;
-  place-items: center;
-  border-radius: 11px;
-  background: white;
-  color: var(--tinta-suave);
+.editor-danio textarea {
+  min-height: 118px;
 }
 
 .editor-danio > label {
@@ -2952,15 +3024,8 @@ textarea:focus-visible {
 .ayuda-detalle-danio {
   display: flex;
   align-items: flex-start;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 12px;
-}
-
-.editor-danio > label .error-detalle-danio {
-  color: #a53a32;
-  font-size: 10px;
-  font-weight: 700;
-  text-align: left;
 }
 
 .ayuda-detalle-danio > small:last-child {
@@ -3343,6 +3408,10 @@ textarea:focus-visible {
 @media (max-width: 900px) {
   .aplicacion { display: block; }
   .barra-lateral { display: none; }
+  .fila-cliente { grid-template-columns: 46px minmax(0, 1fr) auto; }
+  .fila-cliente .datos-cliente { grid-column: 2 / -1; }
+  .acciones-cliente { grid-column: 1 / -1; justify-self: stretch; justify-content: flex-start; }
+  .estado-cuenta-columnas { grid-template-columns: 1fr; }
   .barra-superior { height: 74px; grid-template-columns: auto minmax(120px, 1fr) auto; padding-inline: 20px; }
   .marca-compacta { display: flex; font-size: 15px; }
   .marca-compacta .marca-simbolo { width: 37px; height: 37px; flex-basis: 37px; font-size: 19px; }
@@ -3401,6 +3470,12 @@ textarea:focus-visible {
   }
   .navegacion-inferior button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; border-radius: 15px; background: transparent; color: #aab4b0; font-size: 9px; font-weight: 700; }
   .navegacion-inferior button.navegacion-activa { background: #285f4e; color: white; }
+  .fondo-menu-navegacion { position: fixed; inset: 0; z-index: 39; display: block; padding: 0; border: 0; background: transparent; }
+  .navegacion-inferior .menu-mas-navegacion { position: absolute; right: 0; bottom: calc(100% + 10px); width: min(260px, calc(100vw - 28px)); display: grid; gap: 4px; padding: 8px; border: 1px solid var(--borde); border-radius: 15px; background: white; box-shadow: var(--sombra); }
+  .navegacion-inferior .menu-mas-navegacion button { min-height: 48px; padding: 0 13px; flex-direction: row; justify-content: flex-start; gap: 12px; color: var(--tinta); font-size: 14px; text-align: left; }
+  .navegacion-inferior .menu-mas-navegacion button:hover,
+  .navegacion-inferior .menu-mas-navegacion button.opcion-actual { background: var(--verde-claro); color: var(--verde-profundo); }
+  .navegacion-inferior .menu-mas-navegacion button:focus-visible { outline: 3px solid var(--verde-profundo); outline-offset: -3px; }
   .tablero-principal { grid-template-columns: 1fr; }
   .cabecera-tabla { display: none; }
   .fila-tabla { grid-template-columns: 1.3fr 1fr auto 20px; min-height: 90px; }
@@ -3413,6 +3488,13 @@ textarea:focus-visible {
 }
 
 @media (max-width: 680px) {
+  .estado-cuenta-resumen { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .estado-cuenta-resumen .estado-cuenta-saldo { grid-column: 1 / -1; }
+  .estado-cuenta-resumen > div { padding: 14px; }
+  .estado-cuenta-panel { padding: 14px; }
+  .estado-cuenta-fila { align-items: flex-start; }
+  .estado-cuenta-fila > strong { white-space: normal; text-align: right; }
+  .acciones-cliente .boton-estado-cuenta { flex: 1; justify-content: center; }
   .barra-superior { grid-template-columns: auto 1fr; gap: 10px; padding-inline: 13px; }
   .marca-compacta > span:last-child { display: none; }
   .buscador-global { display: none; }

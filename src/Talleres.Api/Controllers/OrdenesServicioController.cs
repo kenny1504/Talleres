@@ -56,4 +56,16 @@ public sealed class OrdenesServicioController(
             cancellationToken);
         return Ok(orden);
     }
+
+    [HttpPut("{ordenServicioId:long}/tecnico")]
+    [ProducesResponseType<OrdenServicioDto>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<OrdenServicioDto>> AsignarTecnico(
+        long ordenServicioId,
+        AsignarTecnicoOrdenSolicitud solicitud,
+        CancellationToken cancellationToken)
+    {
+        var orden = await ordenServicioServicio.AsignarTecnicoAsync(
+            ordenServicioId, solicitud, cancellationToken);
+        return Ok(orden);
+    }
 }

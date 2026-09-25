@@ -6,7 +6,9 @@ namespace Talleres.Api.Controllers;
 
 [ApiController]
 [Route("api/clientes")]
-public sealed class ClientesController(IClienteServicio clienteServicio) : ControllerBase
+public sealed class ClientesController(
+    IClienteServicio clienteServicio,
+    IEstadoCuentaClienteServicio estadoCuentaClienteServicio) : ControllerBase
 {
     [HttpGet]
     [ProducesResponseType<IReadOnlyCollection<ClienteDto>>(StatusCodes.Status200OK)]
@@ -51,5 +53,36 @@ public sealed class ClientesController(IClienteServicio clienteServicio) : Contr
             solicitud,
             cancellationToken);
         return Ok(cliente);
+    }
+
+    [HttpGet("{clienteId:long}/estado-cuenta")]
+    [ProducesResponseType<EstadoCuentaClienteDto>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<EstadoCuentaClienteDto>> ObtenerEstadoCuenta(
+        long clienteId,
+        CancellationToken cancellationToken)
+    {
+        return Ok(await estadoCuentaClienteServicio.ObtenerAsync(clienteId, cancellationToken));
+    }
+
+    [HttpPost("{clienteId:long}/pagos")]
+    [ProducesResponseType<EstadoCuentaClienteDto>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<EstadoCuentaClienteDto>> RegistrarPago(
+        long clienteId,
+        RegistrarPagoClienteSolicitud solicitud,
+        CancellationToken cancellationToken)
+    {
+        return Ok(await estadoCuentaClienteServicio.RegistrarPagoAsync(
+            clienteId, solicitud, cancellationToken));
+    }
+
+    [HttpPost("{clienteId:long}/pagos/{pagoId:long}/anular")]
+    [ProducesResponseType<EstadoCuentaClienteDto>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<EstadoCuentaClienteDto>> AnularPago(
+        long clienteId,
+        long pagoId,
+        CancellationToken cancellationToken)
+    {
+        return Ok(await estadoCuentaClienteServicio.AnularPagoAsync(
+            clienteId, pagoId, cancellationToken));
     }
 }

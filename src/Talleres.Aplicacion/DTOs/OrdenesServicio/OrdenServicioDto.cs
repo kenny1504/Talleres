@@ -14,4 +14,6 @@ public sealed record OrdenServicioDto(
     DateTime FechaUltimoCambioEstado,
     string? Observaciones,
     bool TieneRecepcion,
-    bool VisibleEnInicio);
+    bool VisibleEnInicio,
+    long? TecnicoTallerId,
+    string? NombreTecnico);
