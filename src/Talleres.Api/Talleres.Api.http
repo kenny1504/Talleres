@@ -1,6 +1,7 @@
 @Talleres_Api_HostAddress = http://localhost:5056
 @UsuarioNova = usuario@example.com
 @ContrasenaNova = cambie-esta-clave
+@OrdenServicioId = 1
 
 GET {{Talleres_Api_HostAddress}}/salud
 Accept: application/json
@@ -83,6 +84,61 @@ Content-Type: application/json
 {
   "nombre": "Carlos Pérez",
   "activo": true
+}
+
+### Recepción: usar una orden nueva que aún esté en recepción.
+# descripcionEstado es opcional (máximo 2000 caracteres): se puede omitir, enviar null o "".
+
+POST {{Talleres_Api_HostAddress}}/api/ordenes-servicio/{{OrdenServicioId}}/recepcion
+Content-Type: application/json
+
+{
+  "kilometraje": 65000,
+  "porcentajeCombustible": 50,
+  "descripcionEstado": "Vehículo recibido para revisión general.",
+  "dejaLlaves": true,
+  "dejaDocumentos": true,
+  "dejaLlantaRepuesto": true,
+  "dejaTrianguloSeguridad": true,
+  "dejaGata": true,
+  "dejaLlaveRuedas": true,
+  "dejaGanchoRemolque": false,
+  "dejaExtintor": true,
+  "dejaBotiquin": false,
+  "dejaChalecoReflectante": false,
+  "otrosElementos": "Llave de seguridad de ruedas",
+  "aceptaPruebaRuta": true,
+  "danios": []
+}
+
+### Consultar todos los elementos y hallazgos persistidos.
+
+GET {{Talleres_Api_HostAddress}}/api/ordenes-servicio/{{OrdenServicioId}}/recepcion
+Accept: application/json
+
+### Corregir la inspección: enviar el conjunto completo, incluidos los hallazgos existentes.
+# Para quitar la observación general, enviar descripcionEstado como "" o null.
+
+PUT {{Talleres_Api_HostAddress}}/api/ordenes-servicio/{{OrdenServicioId}}/recepcion
+Content-Type: application/json
+
+{
+  "kilometraje": 65000,
+  "porcentajeCombustible": 50,
+  "descripcionEstado": "Vehículo recibido para revisión general.",
+  "dejaLlaves": true,
+  "dejaDocumentos": true,
+  "dejaLlantaRepuesto": true,
+  "dejaTrianguloSeguridad": true,
+  "dejaGata": true,
+  "dejaLlaveRuedas": true,
+  "dejaGanchoRemolque": false,
+  "dejaExtintor": true,
+  "dejaBotiquin": true,
+  "dejaChalecoReflectante": false,
+  "otrosElementos": "Llave de seguridad de ruedas y cables de arranque",
+  "aceptaPruebaRuta": true,
+  "danios": []
 }
 
 ###

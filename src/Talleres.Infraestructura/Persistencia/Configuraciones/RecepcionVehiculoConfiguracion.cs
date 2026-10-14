@@ -19,6 +19,7 @@ public sealed class RecepcionVehiculoConfiguracion : IEntityTypeConfiguration<Re
             .HasMaxLength(2000)
             .IsRequired();
         builder.Property(recepcion => recepcion.FechaRecepcion).HasPrecision(0);
+        builder.Property(recepcion => recepcion.OtrosElementos).HasMaxLength(500);
 
         builder.HasIndex(recepcion => new { recepcion.EmpresaId, recepcion.OrdenServicioId })
             .IsUnique();

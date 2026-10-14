@@ -180,6 +180,16 @@ public sealed class DiagnosticoOrdenServicioServicio(
                 DescripcionEstado = orden.Recepcion == null ? null : orden.Recepcion.DescripcionEstado,
                 DejaLlaves = orden.Recepcion != null && orden.Recepcion.DejaLlaves,
                 DejaDocumentos = orden.Recepcion != null && orden.Recepcion.DejaDocumentos,
+                DejaLlantaRepuesto = orden.Recepcion != null && orden.Recepcion.DejaLlantaRepuesto,
+                DejaTrianguloSeguridad = orden.Recepcion != null && orden.Recepcion.DejaTrianguloSeguridad,
+                DejaGata = orden.Recepcion != null && orden.Recepcion.DejaGata,
+                DejaLlaveRuedas = orden.Recepcion != null && orden.Recepcion.DejaLlaveRuedas,
+                DejaGanchoRemolque = orden.Recepcion != null && orden.Recepcion.DejaGanchoRemolque,
+                DejaExtintor = orden.Recepcion != null && orden.Recepcion.DejaExtintor,
+                DejaBotiquin = orden.Recepcion != null && orden.Recepcion.DejaBotiquin,
+                DejaChalecoReflectante = orden.Recepcion != null && orden.Recepcion.DejaChalecoReflectante,
+                OtrosElementos = orden.Recepcion == null ? null : orden.Recepcion.OtrosElementos,
+                AceptaPruebaRuta = orden.Recepcion != null && orden.Recepcion.AceptaPruebaRuta,
                 DaniosInspeccion = orden.Recepcion == null
                     ? Array.Empty<DanioVehiculoDto>()
                     : orden.Recepcion.Danios.Select(danio => new DanioVehiculoDto(danio.Id, danio.Zona, danio.Tipo, danio.Severidad, danio.Observacion)).ToArray(),
@@ -199,7 +209,19 @@ public sealed class DiagnosticoOrdenServicioServicio(
             FormatearDireccion(tallerNova.Direccion, tallerNova.Ciudad, tallerNova.Barrio, tallerNova.Calle),
             FormatearTelefono(tallerNova.PrefijoTelefono, tallerNova.Telefono),
             tallerNova.Logo);
-        return new OrdenServicioPublicaDto(taller, datos.Numero, datos.Estado, datos.FechaIngreso, datos.Nombre, datos.Placa, datos.Marca, datos.Modelo, datos.Anio, datos.Color, datos.NumeroVin, datos.MotivoIngreso, datos.Diagnostico!, datos.FechaAutorizacionClienteUtc, datos.Kilometraje, datos.Combustible, datos.DescripcionEstado, datos.DejaLlaves, datos.DejaDocumentos, datos.DaniosInspeccion, datos.EvidenciasInspeccion, datos.Evidencias, datos.Detalles, datos.Detalles.Sum(item => item.Subtotal));
+        return new OrdenServicioPublicaDto(taller, datos.Numero, datos.Estado, datos.FechaIngreso, datos.Nombre, datos.Placa, datos.Marca, datos.Modelo, datos.Anio, datos.Color, datos.NumeroVin, datos.MotivoIngreso, datos.Diagnostico!, datos.FechaAutorizacionClienteUtc, datos.Kilometraje, datos.Combustible, datos.DescripcionEstado, datos.DejaLlaves, datos.DejaDocumentos, datos.DaniosInspeccion, datos.EvidenciasInspeccion, datos.Evidencias, datos.Detalles, datos.Detalles.Sum(item => item.Subtotal))
+        {
+            DejaLlantaRepuesto = datos.DejaLlantaRepuesto,
+            DejaTrianguloSeguridad = datos.DejaTrianguloSeguridad,
+            DejaGata = datos.DejaGata,
+            DejaLlaveRuedas = datos.DejaLlaveRuedas,
+            DejaGanchoRemolque = datos.DejaGanchoRemolque,
+            DejaExtintor = datos.DejaExtintor,
+            DejaBotiquin = datos.DejaBotiquin,
+            DejaChalecoReflectante = datos.DejaChalecoReflectante,
+            OtrosElementos = datos.OtrosElementos,
+            AceptaPruebaRuta = datos.AceptaPruebaRuta
+        };
     }
 
     private static string? FormatearDireccion(params string?[] partes)

@@ -6,7 +6,8 @@ Sistema web tablet-first para gestionar el flujo operativo de un taller automotr
 
 El frontal vive en `src/Talleres.Web` y está diseñado primero para tablet horizontal y vertical. Incluye:
 
-- Panel operativo con métricas, bahías, agenda y decisiones pendientes.
+- Panel operativo con métricas, bahías y decisiones pendientes.
+- Las órdenes listas para entregar permanecen 36 horas en el panel de inicio y luego continúan disponibles únicamente en el listado general de órdenes.
 - Navegación lateral para tablet horizontal y navegación inferior para formato vertical.
 - Gestión visual de órdenes, clientes, vehículos e inventario.
 - Flujo interactivo para crear órdenes y registrar la recepción del vehículo.
@@ -15,8 +16,9 @@ El frontal vive en `src/Talleres.Web` y está diseñado primero para tablet hori
 - Enlace público no predecible para consultar el diagnóstico y autorizar la continuación desde móvil o WhatsApp.
 - Registro táctil de productos de inventario, compras externas, mano de obra y otros cargos durante la reparación.
 - Total calculado y visible desde el detalle de la orden y la preparación de la entrega.
+- Estado de cuenta por cliente con cargos de todas sus órdenes no canceladas, abonos globales y saldo pendiente o a favor.
 - Inspección visual táctil por zonas, tipo y severidad del daño, con fotografías públicas en Amazon S3 que pueden consultarse desde el detalle de la orden.
-- Descripción editable para cada daño y observaciones generales de la recepción.
+- Descripción editable para cada daño y observaciones generales opcionales de la recepción, con confirmación al guardar sin ellas.
 - Consulta y edición posterior de los hallazgos visuales dentro del detalle de la orden.
 - Órdenes, recepción e inspección en páginas de trabajo completas; no utilizan paneles laterales ni modales estrechos.
 - Distribución de dos columnas en tablet horizontal y computador, y flujo secuencial en tablet vertical.
@@ -30,11 +32,15 @@ El frontal vive en `src/Talleres.Web` y está diseñado primero para tablet hori
 - Registro, actualización, consulta y listado de clientes.
 - Registro y consulta de vehículos asociados a clientes.
 - Catálogo privado por empresa de marcas y modelos dependientes, reutilizado al registrar vehículos.
+- Catálogo de técnicos y mecánicos por empresa con una casilla para indicar el predeterminado al registrarlo o cambiarlo después. El primero queda predeterminado automáticamente y cada orden permite elegir o reasignar un responsable.
+- Al crear una orden, omitir `tecnicoTallerId` utiliza el técnico predeterminado activo; si aún no hay técnicos, la orden queda pendiente de asignación.
 - Creación y consulta de órdenes de servicio.
 - Recepción física del vehículo y avance automático a diagnóstico.
 - Diagnóstico obligatorio antes de solicitar autorización; el presupuesto y sus evidencias permanecen opcionales.
 - Transiciones controladas del estado de las órdenes.
 - Detalles de reparación persistidos con precio, cantidad, subtotal, origen y total de la orden.
+- Pagos registrados directamente al cliente, sin asignación a una orden. Solo el monto es obligatorio; la forma de pago y la referencia son opcionales. Los pagos anulados se conservan en el historial y dejan de reducir el saldo.
+- El saldo se calcula con los cargos actuales de órdenes no canceladas menos pagos vigentes. Los cargos de órdenes en reparación pueden variar hasta terminar el trabajo; los cobros anteriores que no estén registrados en Talleres deben incorporarse para reflejar un saldo histórico correcto.
 - Descuento auditable de inventario mediante una salida de consumo interno de SMART TPV NOVA cuando hay existencia suficiente; los faltantes se conservan como cargos sin alterar stock.
 - Historial de estados.
 - Aislamiento multitenant por `EmpresaId` en consultas y escrituras.
@@ -64,7 +70,7 @@ Los controladores delegan el trabajo a servicios. La aplicación depende de `ITa
 - SDK de .NET 9.
 - Node.js 22.13 o superior.
 - Una instancia remota de SQL Server accesible y configurada con TLS 1.2 o posterior.
-- Acceso de lectura a catálogos y existencias de SMART TPV NOVA, y permiso para ejecutar `dbo.sp_RegistrarSalida` al consumir inventario.
+- Acceso de lectura a catálogos y existencias de SMART TPV NOVA, y permiso para ejecutar `dbo.sp_RegistrarSalida` al consumir inventario y `dbo.sp_AnularSalida` al devolverlo desde una orden.
 - Herramienta `dotnet-ef` 9.x para administrar migraciones.
 - Acceso de escritura al bucket de Amazon S3 cuando se usarán evidencias fotográficas.
 
@@ -135,7 +141,7 @@ La preparación del entorno se realiza una única vez:
 Copy-Item .env.example .env
 ```
 
-Edite `.env` y reemplace `TALLERES_CONNECTION_STRING` y `SMART_NOVA_CONNECTION_STRING` por las cadenas reales. La cuenta de NOVA debe limitarse a las consultas indicadas y a ejecutar el procedimiento oficial de salida de inventario. El archivo `.env` está excluido de Git y no debe subirse al repositorio.
+Edite `.env` y reemplace `TALLERES_CONNECTION_STRING` y `SMART_NOVA_CONNECTION_STRING` por las cadenas reales. La cuenta de NOVA debe limitarse a las consultas indicadas y a ejecutar los procedimientos oficiales de salida y anulación de inventario. La corrección aislada que registra una anulación como movimiento `ENTRADA` está versionada en `src/Talleres.Infraestructura/Integraciones/SmartNova/Sql/Talleres/20260921_CorregirTipoMovimientoAnulacionSalida.sql`. El archivo `.env` está excluido de Git y no debe subirse al repositorio.
 
 `TALLERES_APLICAR_MIGRACIONES` permanece en `false` por defecto. Cámbielo a `true` únicamente cuando la API tenga autorización para aplicar las migraciones de EF Core sobre esa base.
 
@@ -177,7 +183,7 @@ Configure estas variables en la sección **Environment Variables** de Coolify:
 | Variable | Requerida | Valor recomendado |
 |---|---:|---|
 | `TALLERES_CONNECTION_STRING` | Sí | Cadena secreta de la base propia de Talleres |
-| `SMART_NOVA_CONNECTION_STRING` | Sí | Cadena secreta de SMART TPV NOVA con lectura de catálogos y ejecución de salidas de inventario |
+| `SMART_NOVA_CONNECTION_STRING` | Sí | Cadena secreta de SMART TPV NOVA con lectura de catálogos y ejecución y anulación de salidas de inventario |
 | `TALLERES_APLICAR_MIGRACIONES` | No | `false`; habilitarla solo deliberadamente |
 | `TALLERES_COOKIE_SEGURA` | No | `true` cuando el dominio use exclusivamente HTTPS |
 | `TALLERES_URL_PUBLICA` | Sí para OAuth externo | Origen público del frontal, por ejemplo `https://talleres.example.com`, sin barra final |
@@ -217,6 +223,9 @@ Si la API queda `unhealthy`, revise los logs del servicio `api`: `/salud` compru
 | `POST` | `/api/clientes` | Crea un cliente |
 | `GET` | `/api/clientes/{id}` | Obtiene un cliente |
 | `PUT` | `/api/clientes/{id}` | Actualiza un cliente |
+| `GET` | `/api/clientes/{id}/estado-cuenta` | Consulta órdenes, pagos y saldo global del cliente |
+| `POST` | `/api/clientes/{id}/pagos` | Registra un abono al cliente; `monto` es el único dato obligatorio |
+| `POST` | `/api/clientes/{id}/pagos/{pagoId}/anular` | Anula un pago conservando el registro |
 | `POST` | `/api/vehiculos` | Crea un vehículo |
 | `GET` | `/api/vehiculos` | Lista vehículos |
 | `GET` | `/api/vehiculos/{id}` | Obtiene un vehículo |
@@ -234,12 +243,18 @@ Si la API queda `unhealthy`, revise los logs del servicio `api`: `/salud` compru
 | `POST` | `/api/ordenes-servicio/{id}/detalles/inventario` | Agrega un producto y descuenta existencia cuando está disponible |
 | `POST` | `/api/ordenes-servicio/{id}/detalles/manual` | Agrega mano de obra, una compra externa u otro cargo manual |
 | `DELETE` | `/api/ordenes-servicio/{id}/detalles/{detalleId}` | Elimina un cargo que no haya generado una salida de inventario |
-| `POST` | `/api/ordenes-servicio/{id}/recepcion` | Registra la recepción |
+| `GET` / `POST` / `PUT` | `/api/ordenes-servicio/{id}/recepcion` | Consulta, registra o corrige la recepción e inspección |
 | `POST` | `/api/ordenes-servicio/{id}/recepcion/evidencias` | Carga fotografías JPEG, PNG o WebP a S3 |
 | `GET` | `/api/ordenes-servicio/{id}/recepcion/evidencias/{evidenciaId}/contenido` | Valida la empresa y redirige a la URL pública permanente de la evidencia |
 | `DELETE` | `/api/ordenes-servicio/{id}/recepcion/evidencias/{evidenciaId}` | Elimina la fotografía de S3 y de la inspección |
 
 ## Verificación
+
+La recepción registra llaves, documentos, llanta de repuesto, triángulo de seguridad, gata, llave de ruedas, gancho de remolque, extintor, botiquín y chaleco reflectante. `otrosElementos` permite describir herramientas o accesorios adicionales (máximo 500 caracteres). `aceptaPruebaRuta` conserva la aceptación de la prueba de ruta. Estos datos se guardan junto con la inspección, se cargan al editarla y se muestran en el detalle y en el enlace público del cliente. Al actualizar se envía el conjunto completo de datos y hallazgos. Las solicitudes de ejemplo están en `src/Talleres.Api/Talleres.Api.http`.
+
+La observación general (`descripcionEstado`) es opcional al registrar y actualizar la inspección, con un máximo de 2000 caracteres. La API admite omitirla, enviarla como `null` o vacía y conserva la ausencia de observaciones como texto vacío. La web solicita confirmación antes de guardar cuando el campo está vacío o solo contiene espacios; permite volver a completarlo o continuar sin observaciones. Este ajuste no requiere cambios en el esquema de la base de datos.
+
+Para habilitar estos campos en un entorno existente, aplique deliberadamente la migración `AgregarElementosRecepcionVehiculo` antes de ejecutar la API actualizada. Los campos nuevos quedan desmarcados y `otrosElementos` vacío en las recepciones anteriores; la aceptación histórica de la prueba de ruta no se puede recuperar porque no se persistía. Las migraciones automáticas continúan desactivadas por defecto.
 
 ```powershell
 dotnet build Talleres.sln

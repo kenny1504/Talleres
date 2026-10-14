@@ -1,23 +1,23 @@
 "use client";
 
 import { use, useEffect, useState } from "react";
-import { Building2, CalendarDays, Camera, CarFront, Check, ChevronLeft, ChevronRight, CircleCheck, ClipboardList, FileText, Fuel, KeyRound, MapPin, Phone, RotateCcw, Wrench, X, ZoomIn, ZoomOut } from "lucide-react";
+import { Building2, CalendarDays, Camera, CarFront, Check, CircleCheck, ClipboardList, FileText, Fuel, KeyRound, MapPin, Phone, Wrench, ZoomIn } from "lucide-react";
 import { useCargadorPantalla } from "../../componentes/ProveedorCargadorPantalla";
+import { VisorFotografias, type EstadoVisor, type ImagenVisor } from "../../componentes/VisorFotografias";
 import { formatearFechaHoraOrden } from "../../fechaHoraOrden";
+import { describirElementosEntregados, type ElementosRecepcion } from "../../elementosRecepcion";
 
 interface EvidenciaPublica { id: number; nombreArchivo: string; }
 interface DanioInspeccionPublico { id: number; zona: string; tipo: string; severidad: string; observacion: string | null; }
 interface DetallePublico { id: number; descripcion: string; cantidad: number; unidadMedida: string | null; precioUnitario: number; subtotal: number; }
 interface TallerPublico { nombre: string; direccion: string | null; telefono: string | null; logo: string | null; }
-interface ImagenVisor { direccion: string; descripcion: string; }
-interface EstadoVisor { imagenes: ImagenVisor[]; indice: number; }
-interface OrdenPublica {
+interface OrdenPublica extends ElementosRecepcion {
   taller: TallerPublico;
   numero: string; estado: string; fechaIngreso: string; nombreCliente: string; placa: string;
   marca: string; modelo: string; anio: number; color: string | null; numeroVin: string | null;
   motivoIngreso: string | null; diagnostico: string; fechaAutorizacionClienteUtc: string | null;
   kilometraje: number | null; porcentajeCombustible: number | null; descripcionEstado: string | null;
-  dejaLlaves: boolean; dejaDocumentos: boolean; daniosInspeccion: DanioInspeccionPublico[];
+  daniosInspeccion: DanioInspeccionPublico[];
   evidenciasInspeccion: EvidenciaPublica[]; evidenciasDiagnostico: EvidenciaPublica[];
   detalles: DetallePublico[]; total: number;
 }
@@ -28,7 +28,6 @@ export default function OrdenPublicaPagina({ params }: { params: Promise<{ token
   const [orden, setOrden] = useState<OrdenPublica | null>(null);
   const [error, setError] = useState("");
   const [visor, setVisor] = useState<EstadoVisor | null>(null);
-  const [zoom, setZoom] = useState(1);
   const [imagenesInvalidas, setImagenesInvalidas] = useState<Set<string>>(() => new Set());
 
   useEffect(() => {
@@ -38,28 +37,6 @@ export default function OrdenPublicaPagina({ params }: { params: Promise<{ token
       .catch((motivo) => { if (!controlador.signal.aborted) setError(motivo instanceof Error ? motivo.message : "No fue posible consultar la orden."); });
     return () => controlador.abort();
   }, [ejecutarConCargadorPantalla, token]);
-
-  useEffect(() => {
-    if (!visor) return;
-    const desplazamientoAnterior = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    const alPresionarTecla = (evento: KeyboardEvent) => {
-      if (evento.key === "Escape") setVisor(null);
-      if (evento.key === "ArrowLeft") {
-        setZoom(1);
-        setVisor((actual) => actual ? { ...actual, indice: (actual.indice - 1 + actual.imagenes.length) % actual.imagenes.length } : null);
-      }
-      if (evento.key === "ArrowRight") {
-        setZoom(1);
-        setVisor((actual) => actual ? { ...actual, indice: (actual.indice + 1) % actual.imagenes.length } : null);
-      }
-    };
-    window.addEventListener("keydown", alPresionarTecla);
-    return () => {
-      document.body.style.overflow = desplazamientoAnterior;
-      window.removeEventListener("keydown", alPresionarTecla);
-    };
-  }, [visor]);
 
   async function autorizar() {
     setError("");
@@ -71,13 +48,7 @@ export default function OrdenPublicaPagina({ params }: { params: Promise<{ token
   }
 
   function abrirVisor(imagenes: ImagenVisor[], indice: number) {
-    setZoom(1);
     setVisor({ imagenes, indice });
-  }
-
-  function cambiarImagen(desplazamiento: number) {
-    setZoom(1);
-    setVisor((actual) => actual ? { ...actual, indice: (actual.indice + desplazamiento + actual.imagenes.length) % actual.imagenes.length } : null);
   }
 
   if (error) return <main className="pagina-publica-orden"><section className="estado-publico-error"><ClipboardList size={34} /><h1>No pudimos mostrar esta orden</h1><p>{error}</p></section></main>;
@@ -125,7 +96,7 @@ export default function OrdenPublicaPagina({ params }: { params: Promise<{ token
         <div className="datos-inspeccion-publica">
           {orden.kilometraje !== null && <article><CarFront size={20} /><span><small>Kilometraje</small><strong>{orden.kilometraje.toLocaleString("es-NI")} km</strong></span></article>}
           {orden.porcentajeCombustible !== null && <article><Fuel size={20} /><span><small>Combustible</small><strong>{etiquetaCombustible(orden.porcentajeCombustible)}</strong></span></article>}
-          <article><KeyRound size={20} /><span><small>Elementos entregados</small><strong>{elementosEntregados(orden)}</strong></span></article>
+          <article className="elementos-entregados-publicos"><KeyRound size={20} /><span><small>Elementos entregados</small><strong>{describirElementosEntregados(orden)}</strong></span></article>
         </div>
         {orden.descripcionEstado && <div className="observacion-publica"><FileText size={20} /><span><small>Observaciones generales</small><p>{orden.descripcionEstado}</p></span></div>}
         {daniosInspeccion.length > 0 && (
@@ -181,28 +152,11 @@ export default function OrdenPublicaPagina({ params }: { params: Promise<{ token
         <span>Sistema desarrollado por <a href="https://www.ksoftech.com/" target="_blank" rel="noreferrer">www.ksoftech.com</a></span>
       </footer>
       {visor && (
-        <div className="fondo-visor-imagen" role="dialog" aria-modal="true" aria-label="Visor de fotografías" onClick={() => setVisor(null)}>
-          <section className="visor-imagen-publica" onClick={(evento) => evento.stopPropagation()}>
-            <header>
-              <strong>{visor.imagenes[visor.indice].descripcion}</strong>
-              <span>{visor.indice + 1} de {visor.imagenes.length}</span>
-              <button type="button" aria-label="Cerrar visor" onClick={() => setVisor(null)}><X size={24} /></button>
-            </header>
-            <div className="contenido-visor-imagen">
-              <button type="button" className="navegacion-visor anterior" aria-label="Fotografía anterior" disabled={visor.imagenes.length < 2} onClick={() => cambiarImagen(-1)}><ChevronLeft size={30} /></button>
-              <div className="lienzo-visor-imagen">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={visor.imagenes[visor.indice].direccion} alt={visor.imagenes[visor.indice].descripcion} style={{ width: `${zoom * 100}%` }} onError={() => { setImagenesInvalidas((actuales) => new Set(actuales).add(visor.imagenes[visor.indice].direccion)); setVisor(null); }} />
-              </div>
-              <button type="button" className="navegacion-visor siguiente" aria-label="Fotografía siguiente" disabled={visor.imagenes.length < 2} onClick={() => cambiarImagen(1)}><ChevronRight size={30} /></button>
-            </div>
-            <footer>
-              <button type="button" aria-label="Alejar imagen" disabled={zoom <= 1} onClick={() => setZoom((actual) => Math.max(1, actual - .5))}><ZoomOut size={21} /></button>
-              <button type="button" className="nivel-zoom" onClick={() => setZoom(1)}><RotateCcw size={18} />{Math.round(zoom * 100)}%</button>
-              <button type="button" aria-label="Acercar imagen" disabled={zoom >= 3} onClick={() => setZoom((actual) => Math.min(3, actual + .5))}><ZoomIn size={21} /></button>
-            </footer>
-          </section>
-        </div>
+        <VisorFotografias
+          seleccion={visor}
+          alCerrar={() => setVisor(null)}
+          alImagenInvalida={(direccion) => setImagenesInvalidas((actuales) => new Set(actuales).add(direccion))}
+        />
       )}
     </main>
   );
@@ -224,6 +178,5 @@ async function autorizarOrden(token: string): Promise<OrdenPublica> {
 function moneda(valor: number) { return new Intl.NumberFormat("es-NI", { style: "currency", currency: "NIO" }).format(valor); }
 function etiquetaEstado(estado: string) { return ({ Recepcion: "Recepción", Diagnostico: "Diagnóstico", Cotizacion: "Cotización", PendienteAprobacion: "Por autorizar", PreparacionReparacion: "Preparación de reparación", Reparacion: "En reparación", ControlCalidad: "Control de calidad", ListaParaEntrega: "Lista para entregar", Entregada: "Entregada", Cerrada: "Cerrada", Cancelada: "Cancelada" } as Record<string, string>)[estado] ?? estado; }
 function etiquetaCombustible(porcentaje: number) { return porcentaje >= 88 ? "Tanque lleno" : porcentaje >= 63 ? "3/4 de tanque" : porcentaje >= 38 ? "Medio tanque" : porcentaje >= 13 ? "1/4 de tanque" : "Reserva"; }
-function elementosEntregados(orden: OrdenPublica) { const elementos = [orden.dejaLlaves ? "Llaves" : "", orden.dejaDocumentos ? "Documentos" : ""].filter(Boolean); return elementos.length > 0 ? elementos.join(" y ") : "Ninguno registrado"; }
 function etiquetaTipoDanio(tipo: string) { return tipo === "Rayon" ? "Rayón" : tipo; }
 function etiquetaZona(zona: string) { return zona.replace(/([a-záéíóúñ])([A-ZÁÉÍÓÚÑ])/g, "$1 $2").toLocaleLowerCase("es").replace(/^./, (letra) => letra.toLocaleUpperCase("es")); }

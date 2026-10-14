@@ -21,6 +21,26 @@ public sealed class RecepcionVehiculo : IEntidadEmpresa
 
     public bool DejaDocumentos { get; set; }
 
+    public bool DejaLlantaRepuesto { get; set; }
+
+    public bool DejaTrianguloSeguridad { get; set; }
+
+    public bool DejaGata { get; set; }
+
+    public bool DejaLlaveRuedas { get; set; }
+
+    public bool DejaGanchoRemolque { get; set; }
+
+    public bool DejaExtintor { get; set; }
+
+    public bool DejaBotiquin { get; set; }
+
+    public bool DejaChalecoReflectante { get; set; }
+
+    public string? OtrosElementos { get; set; }
+
+    public bool AceptaPruebaRuta { get; set; }
+
     public DateTime FechaRecepcion { get; set; }
 
     public OrdenServicio OrdenServicio { get; set; } = null!;

@@ -482,10 +482,37 @@ namespace Talleres.Infraestructura.Persistencia.Migraciones
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
 
+                    b.Property<bool>("AceptaPruebaRuta")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("DejaBotiquin")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("DejaChalecoReflectante")
+                        .HasColumnType("bit");
+
                     b.Property<bool>("DejaDocumentos")
                         .HasColumnType("bit");
 
+                    b.Property<bool>("DejaExtintor")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("DejaGanchoRemolque")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("DejaGata")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("DejaLlantaRepuesto")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("DejaLlaveRuedas")
+                        .HasColumnType("bit");
+
                     b.Property<bool>("DejaLlaves")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("DejaTrianguloSeguridad")
                         .HasColumnType("bit");
 
                     b.Property<string>("DescripcionEstado")
@@ -505,6 +532,10 @@ namespace Talleres.Infraestructura.Persistencia.Migraciones
 
                     b.Property<long>("OrdenServicioId")
                         .HasColumnType("bigint");
+
+                    b.Property<string>("OtrosElementos")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
 
                     b.Property<byte>("PorcentajeCombustible")
                         .HasColumnType("tinyint");

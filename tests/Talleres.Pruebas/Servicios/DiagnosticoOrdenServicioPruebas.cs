@@ -109,7 +109,17 @@ public sealed class DiagnosticoOrdenServicioPruebas
             PorcentajeCombustible = 100,
             DescripcionEstado = "Estado documentado",
             DejaLlaves = true,
-            DejaDocumentos = true
+            DejaDocumentos = true,
+            DejaLlantaRepuesto = true,
+            DejaTrianguloSeguridad = true,
+            DejaGata = true,
+            DejaLlaveRuedas = true,
+            DejaGanchoRemolque = true,
+            DejaExtintor = true,
+            DejaBotiquin = true,
+            DejaChalecoReflectante = true,
+            OtrosElementos = "Cables de arranque",
+            AceptaPruebaRuta = true
         };
         recepcion.Danios.Add(new DanioVehiculo
         {
@@ -137,6 +147,16 @@ public sealed class DiagnosticoOrdenServicioPruebas
         Assert.Equal((byte)100, resultado.PorcentajeCombustible);
         Assert.True(resultado.DejaLlaves);
         Assert.True(resultado.DejaDocumentos);
+        Assert.True(resultado.DejaLlantaRepuesto);
+        Assert.True(resultado.DejaTrianguloSeguridad);
+        Assert.True(resultado.DejaGata);
+        Assert.True(resultado.DejaLlaveRuedas);
+        Assert.True(resultado.DejaGanchoRemolque);
+        Assert.True(resultado.DejaExtintor);
+        Assert.True(resultado.DejaBotiquin);
+        Assert.True(resultado.DejaChalecoReflectante);
+        Assert.True(resultado.AceptaPruebaRuta);
+        Assert.Equal("Cables de arranque", resultado.OtrosElementos);
         Assert.Single(resultado.DaniosInspeccion);
         Assert.Equal("Golpe en defensa", resultado.DaniosInspeccion.Single().Observacion);
         Assert.Single(resultado.EvidenciasInspeccion);

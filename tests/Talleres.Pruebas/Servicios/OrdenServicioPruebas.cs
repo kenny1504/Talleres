@@ -119,6 +119,16 @@ public sealed class OrdenServicioPruebas
                 PorcentajeCombustible = 50,
                 DescripcionEstado = "RayÃ³n leve en puerta derecha",
                 DejaLlaves = true,
+                DejaLlantaRepuesto = true,
+                DejaTrianguloSeguridad = true,
+                DejaGata = true,
+                DejaLlaveRuedas = true,
+                DejaGanchoRemolque = true,
+                DejaExtintor = true,
+                DejaBotiquin = true,
+                DejaChalecoReflectante = true,
+                OtrosElementos = "  Llave de seguridad de ruedas  ",
+                AceptaPruebaRuta = true,
                 Danios =
                 [
                     new RegistrarDanioVehiculoSolicitud
@@ -145,6 +155,19 @@ public sealed class OrdenServicioPruebas
         var ordenes = await ordenServicio.ListarAsync(CancellationToken.None);
         Assert.Equal(orden.Id, Assert.Single(ordenes).Id);
 
+        dbContext.ChangeTracker.Clear();
+        var recepcionConsultada = await recepcionServicio.ObtenerPorOrdenAsync(orden.Id);
+        Assert.True(recepcionConsultada.DejaLlantaRepuesto);
+        Assert.True(recepcionConsultada.DejaTrianguloSeguridad);
+        Assert.True(recepcionConsultada.DejaGata);
+        Assert.True(recepcionConsultada.DejaLlaveRuedas);
+        Assert.True(recepcionConsultada.DejaGanchoRemolque);
+        Assert.True(recepcionConsultada.DejaExtintor);
+        Assert.True(recepcionConsultada.DejaBotiquin);
+        Assert.True(recepcionConsultada.DejaChalecoReflectante);
+        Assert.True(recepcionConsultada.AceptaPruebaRuta);
+        Assert.Equal("Llave de seguridad de ruedas", recepcionConsultada.OtrosElementos);
+
         var recepcionActualizada = await recepcionServicio.ActualizarInspeccionAsync(
             orden.Id,
             new ActualizarRecepcionVehiculoSolicitud
@@ -153,6 +176,9 @@ public sealed class OrdenServicioPruebas
                 PorcentajeCombustible = 50,
                 DescripcionEstado = "Observación general corregida después de revisar con el cliente.",
                 DejaLlaves = true,
+                DejaLlantaRepuesto = true,
+                DejaLlaveRuedas = true,
+                OtrosElementos = "  ",
                 Danios =
                 [
                     new RegistrarDanioVehiculoSolicitud
@@ -170,6 +196,20 @@ public sealed class OrdenServicioPruebas
         Assert.Equal(
             "El rayón también alcanza el borde de la puerta.",
             Assert.Single(recepcionActualizada.Danios).Observacion);
+
+        dbContext.ChangeTracker.Clear();
+        recepcionConsultada = await recepcionServicio.ObtenerPorOrdenAsync(orden.Id);
+        Assert.True(recepcionConsultada.DejaLlantaRepuesto);
+        Assert.True(recepcionConsultada.DejaLlaveRuedas);
+        Assert.False(recepcionConsultada.DejaTrianguloSeguridad);
+        Assert.False(recepcionConsultada.DejaGata);
+        Assert.False(recepcionConsultada.DejaGanchoRemolque);
+        Assert.False(recepcionConsultada.DejaExtintor);
+        Assert.False(recepcionConsultada.DejaBotiquin);
+        Assert.False(recepcionConsultada.DejaChalecoReflectante);
+        Assert.False(recepcionConsultada.AceptaPruebaRuta);
+        Assert.Null(recepcionConsultada.OtrosElementos);
+        Assert.Single(recepcionConsultada.Danios);
     }
 
     [Fact]

@@ -7,7 +7,10 @@ import {
   useCargadorPantalla,
 } from "./componentes/ProveedorCargadorPantalla";
 import { EstadoCuentaCliente } from "./componentes/EstadoCuentaCliente";
+import { ModalCatalogoVehiculo } from "./componentes/ModalCatalogoVehiculo";
+import { VisorFotografias, type EstadoVisor } from "./componentes/VisorFotografias";
 import { formatearFechaHoraOrden } from "./fechaHoraOrden";
+import { describirElementosEntregados, elementosRecepcion, type ElementosRecepcion } from "./elementosRecepcion";
 import {
   ArrowLeft,
   Bell,
@@ -99,12 +102,10 @@ interface DanioVisual {
   observacion: string;
 }
 
-interface InspeccionVisual {
+interface InspeccionVisual extends ElementosRecepcion {
   kilometraje: number;
   porcentajeCombustible: number;
   descripcionEstado: string;
-  dejaLlaves: boolean;
-  dejaDocumentos: boolean;
   danios: DanioVisual[];
   evidencias: EvidenciaInspeccion[];
 }
@@ -148,6 +149,24 @@ interface ReconocimientoVoz {
 }
 
 type ConstructorReconocimientoVoz = new () => ReconocimientoVoz;
+
+function configurarReconocimientoVoz(reconocimiento: ReconocimientoVoz) {
+  reconocimiento.lang = "es-NI";
+  // Chrome en Android puede marcar las revisiones parciales como definitivas en modo continuo.
+  // Las tablets en modo escritorio pueden ocultar Android; también comprobamos la pantalla táctil.
+  reconocimiento.continuous = !(/Android/i.test(navigator.userAgent) || navigator.maxTouchPoints > 0);
+  reconocimiento.interimResults = true;
+}
+
+function obtenerTranscripcionVoz(evento: EventoReconocimientoVoz, continuo: boolean): string {
+  // Una sesión por frase conserva la última revisión completa, aunque Android repita resultados.
+  const inicio = continuo ? 0 : Math.max(0, evento.results.length - 1);
+  const fragmentos: string[] = [];
+  for (let indice = inicio; indice < evento.results.length; indice += 1) {
+    fragmentos.push(evento.results[indice][0].transcript.trim());
+  }
+  return fragmentos.filter(Boolean).join(" ");
+}
 
 interface OrdenServicioApi {
   id: number;
@@ -290,12 +309,10 @@ interface DanioVehiculoApi {
   observacion: string | null;
 }
 
-interface RecepcionVehiculoApi {
+interface RecepcionVehiculoApi extends ElementosRecepcion {
   kilometraje: number;
   porcentajeCombustible: number;
   descripcionEstado: string;
-  dejaLlaves: boolean;
-  dejaDocumentos: boolean;
   danios: DanioVehiculoApi[];
   evidencias: EvidenciaInspeccion[];
 }
@@ -393,6 +410,13 @@ export default function PaginaPrincipal() {
   const [mostrarRecepcion, setMostrarRecepcion] = useState(false);
   const [aviso, setAviso] = useState("");
   const [inspecciones, setInspecciones] = useState<Record<number, InspeccionVisual>>({});
+  const vehiculoDetalle = vehiculos.find((vehiculo) => vehiculo.id === ordenDetalle?.vehiculoId);
+  const ordenDetalleVisible = ordenDetalle && vehiculoDetalle
+    ? {
+        ...ordenDetalle,
+        vehiculo: `${vehiculoDetalle.marca} ${vehiculoDetalle.modelo} · ${vehiculoDetalle.anio}`,
+      }
+    : ordenDetalle;
   const procesoActivo =
     mostrarNuevaOrden || mostrarNuevoCliente || mostrarFormularioVehiculo ||
     clienteEstadoCuenta !== null || ordenDetalle !== null;
@@ -464,9 +488,19 @@ export default function PaginaPrincipal() {
     if (procesoActivo) window.scrollTo({ top: 0, behavior: "smooth" });
   }, [procesoActivo, mostrarRecepcion]);
 
+  const ordenesConVehiculo = useMemo(() => {
+    const vehiculosPorId = new Map(vehiculos.map((vehiculo) => [vehiculo.id, vehiculo]));
+    return ordenes.map((orden) => {
+      const vehiculo = vehiculosPorId.get(orden.vehiculoId);
+      return vehiculo
+        ? { ...orden, vehiculo: `${vehiculo.nombre} · ${vehiculo.anio}` }
+        : orden;
+    });
+  }, [ordenes, vehiculos]);
+
   const ordenesFiltradas = useMemo(() => {
     const termino = busqueda.trim().toLocaleLowerCase("es");
-    return ordenes.filter((orden) => {
+    return ordenesConVehiculo.filter((orden) => {
       const coincideEstado = filtroEstado === "Todas" || orden.estado === filtroEstado;
       const coincideHistorial = !filtroHistorialOrdenes ||
         (filtroHistorialOrdenes.tipo === "cliente"
@@ -480,7 +514,7 @@ export default function PaginaPrincipal() {
           .includes(termino);
       return coincideEstado && coincideHistorial && coincideBusqueda;
     });
-  }, [busqueda, filtroEstado, filtroHistorialOrdenes, ordenes]);
+  }, [busqueda, filtroEstado, filtroHistorialOrdenes, ordenesConVehiculo]);
 
   function navegar(nuevaVista: Vista) {
     setMostrarAdministracion(false);
@@ -876,18 +910,26 @@ export default function PaginaPrincipal() {
     }
   }
 
-  async function registrarRecepcion(evento: FormEvent<HTMLFormElement>) {
-    evento.preventDefault();
+  async function registrarRecepcion(datos: FormData) {
     if (!ordenDetalle) return;
-    const datos = new FormData(evento.currentTarget);
     const danios = JSON.parse(String(datos.get("danios") || "[]")) as DanioVisual[];
     const esActualizacion = ordenDetalle.estado !== "Recepción";
     const inspeccion: InspeccionVisual = {
       kilometraje: Number(datos.get("kilometraje")),
       porcentajeCombustible: Number(datos.get("combustible")),
-      descripcionEstado: String(datos.get("estado")),
+      descripcionEstado: String(datos.get("estado") || "").trim(),
       dejaLlaves: datos.has("dejaLlaves"),
       dejaDocumentos: datos.has("dejaDocumentos"),
+      dejaLlantaRepuesto: datos.has("dejaLlantaRepuesto"),
+      dejaTrianguloSeguridad: datos.has("dejaTrianguloSeguridad"),
+      dejaGata: datos.has("dejaGata"),
+      dejaLlaveRuedas: datos.has("dejaLlaveRuedas"),
+      dejaGanchoRemolque: datos.has("dejaGanchoRemolque"),
+      dejaExtintor: datos.has("dejaExtintor"),
+      dejaBotiquin: datos.has("dejaBotiquin"),
+      dejaChalecoReflectante: datos.has("dejaChalecoReflectante"),
+      otrosElementos: String(datos.get("otrosElementos") || "").trim() || null,
+      aceptaPruebaRuta: datos.has("aceptaPruebaRuta"),
       danios,
       evidencias: inspecciones[ordenDetalle.id]?.evidencias || [],
     };
@@ -1175,33 +1217,33 @@ export default function PaginaPrincipal() {
                 />
               </div>
             </PaginaProceso>
-          ) : ordenDetalle ? (
+          ) : ordenDetalleVisible ? (
             <PaginaProceso
               titulo={mostrarRecepcion
-                ? ordenDetalle.estado === "Recepción"
+                ? ordenDetalleVisible.estado === "Recepción"
                   ? "Recepción e inspección"
                   : "Editar inspección"
-                : ordenDetalle.numero}
+                : ordenDetalleVisible.numero}
               descripcion={mostrarRecepcion
-                ? `${ordenDetalle.vehiculo} · ${ordenDetalle.placa}`
-                : `${ordenDetalle.cliente} · ${ordenDetalle.vehiculo}`}
+                ? `${ordenDetalleVisible.vehiculo} · ${ordenDetalleVisible.placa}`
+                : `${ordenDetalleVisible.cliente} · ${ordenDetalleVisible.vehiculo} · ${ordenDetalleVisible.placa}`}
               alRegresar={regresarDesdeProceso}
               etiquetaRegreso={etiquetaRegresoProceso}
             >
               {mostrarRecepcion ? (
                 <FormularioRecepcion
-                  orden={ordenDetalle}
-                  inspeccionInicial={inspecciones[ordenDetalle.id]}
+                  orden={ordenDetalleVisible}
+                  inspeccionInicial={inspecciones[ordenDetalleVisible.id]}
                   alEnviar={registrarRecepcion}
                   alEliminarEvidencia={eliminarEvidenciaOrden}
                   alMostrarAviso={mostrarAviso}
                 />
               ) : (
                 <DetalleOrden
-                  orden={ordenDetalle}
+                  orden={ordenDetalleVisible}
                   tecnicosTaller={tecnicosTaller}
-                  cliente={clientes.find((cliente) => cliente.id === ordenDetalle.clienteId)}
-                  inspeccion={inspecciones[ordenDetalle.id]}
+                  cliente={clientes.find((cliente) => cliente.id === ordenDetalleVisible.clienteId)}
+                  inspeccion={inspecciones[ordenDetalleVisible.id]}
                   alRecibir={() => setMostrarRecepcion(true)}
                   alActualizarOrden={actualizarOrdenEnPantalla}
                   alMostrarAviso={mostrarAviso}
@@ -1209,8 +1251,9 @@ export default function PaginaPrincipal() {
               )}
             </PaginaProceso>
           ) : vista === "inicio" ? (
-            <VistaInicio
-              ordenes={ordenes.filter((orden) => orden.visibleEnInicio)}
+              <VistaInicio
+                ordenes={ordenes.filter((orden) => orden.visibleEnInicio)}
+                vehiculos={vehiculos}
               nombreUsuario={sesion.nombreUsuario}
               taller={sesion.taller}
               cargando={cargandoDatos}
@@ -1680,6 +1723,7 @@ function NavegacionInferior({ vista, alNavegar }: { vista: Vista; alNavegar: (vi
 
 function VistaInicio({
   ordenes,
+  vehiculos,
   nombreUsuario,
   taller,
   cargando,
@@ -1689,6 +1733,7 @@ function VistaInicio({
   alVerOrdenes,
 }: {
   ordenes: OrdenTaller[];
+  vehiculos: VehiculoTaller[];
   nombreUsuario: string;
   taller: TallerSesionApi;
   cargando: boolean;
@@ -1697,6 +1742,7 @@ function VistaInicio({
   alAbrirOrden: (orden: OrdenTaller) => void;
   alVerOrdenes: () => void;
 }) {
+  const vehiculosPorId = new Map(vehiculos.map((vehiculo) => [vehiculo.id, vehiculo]));
   const ordenesEnTaller = ordenes.filter((orden) => orden.estado !== "Lista para entregar");
   const ordenesPorAprobar = ordenes.filter((orden) => orden.estado === "Por aprobar");
   const ordenesListas = ordenes.filter((orden) => orden.estado === "Lista para entregar");
@@ -1768,25 +1814,29 @@ function VistaInicio({
           </div>
 
           <div className="lista-bahias">
-            {ordenes.slice(0, 4).map((orden, indice) => (
-              <button className="tarjeta-bahia" key={orden.id} onClick={() => alAbrirOrden(orden)}>
-                <span className="numero-bahia">B{indice + 1}</span>
-                <span className="datos-bahia">
-                  <span className="fila-orden">
-                    <strong>{orden.vehiculo.split(" · ")[0]}</strong>
-                    <small>{orden.numero}</small>
+            {ordenes.slice(0, 4).map((orden, indice) => {
+              const vehiculo = vehiculosPorId.get(orden.vehiculoId);
+              return (
+                <button className="tarjeta-bahia" key={orden.id} onClick={() => alAbrirOrden(orden)}>
+                  <span className="numero-bahia">B{indice + 1}</span>
+                  <span className="datos-bahia">
+                    <span className="identificacion-vehiculo-inicio">
+                      <strong>{orden.placa}</strong>
+                      <span>{vehiculo?.nombre ?? "Marca y modelo sin registrar"}</span>
+                    </span>
+                    <span className="propietario-bahia">Dueño: {vehiculo?.cliente ?? orden.cliente}</span>
+                    <span className="detalle-orden">Técnico: {orden.tecnico}</span>
+                    <span className="progreso" aria-label={`${orden.progreso}% completado`}>
+                      <span style={{ width: `${orden.progreso}%`, background: orden.color }} />
+                    </span>
                   </span>
-                  <span className="detalle-orden">{orden.placa} · {orden.tecnico}</span>
-                  <span className="progreso" aria-label={`${orden.progreso}% completado`}>
-                    <span style={{ width: `${orden.progreso}%`, background: orden.color }} />
+                  <span className={`etiqueta-estado estado-${normalizarClase(orden.estado)}`}>
+                    {orden.estado}
                   </span>
-                </span>
-                <span className={`etiqueta-estado estado-${normalizarClase(orden.estado)}`}>
-                  {orden.estado}
-                </span>
-                <ChevronRight className="flecha-tarjeta" size={20} />
-              </button>
-            ))}
+                  <ChevronRight className="flecha-tarjeta" size={20} />
+                </button>
+              );
+            })}
             {!cargando && ordenes.length === 0 && (
               <EstadoVacio
                 icono={ClipboardList}
@@ -1810,13 +1860,20 @@ function VistaInicio({
           <span className="contador">{ordenesPorAprobar.length}</span>
         </div>
         <div className="rejilla-decisiones">
-          {ordenesPorAprobar.map((orden) => (
-            <button key={orden.id} onClick={() => alAbrirOrden(orden)}>
-              <span className="icono-decision ambar"><ClipboardCheck size={22} /></span>
-              <span><strong>{orden.numero}</strong><small>Esperando aprobación de {orden.cliente}</small></span>
-              <ChevronRight size={19} />
-            </button>
-          ))}
+          {ordenesPorAprobar.map((orden) => {
+            const vehiculo = vehiculosPorId.get(orden.vehiculoId);
+            return (
+              <button key={orden.id} onClick={() => alAbrirOrden(orden)}>
+                <span className="icono-decision ambar"><ClipboardCheck size={22} /></span>
+                <span className="datos-decision">
+                  <strong>{orden.placa} · {vehiculo?.nombre ?? "Marca y modelo sin registrar"}</strong>
+                  <small>Dueño: {vehiculo?.cliente ?? orden.cliente}</small>
+                  <small>Esperando aprobación de {orden.cliente}</small>
+                </span>
+                <ChevronRight size={19} />
+              </button>
+            );
+          })}
           {!cargando && ordenesPorAprobar.length === 0 && (
             <EstadoVacio
               icono={CircleCheck}
@@ -2017,11 +2074,11 @@ function VistaOrdenes({
         <div className="cabecera-tabla"><span>Orden y vehículo</span><span>Cliente</span><span>Estado</span><span>Responsable</span><span /></div>
         {ordenesVisibles.map((orden) => (
           <button className="fila-tabla" key={orden.id} onClick={() => alAbrirOrden(orden)}>
-            <span className="celda-vehiculo"><span className="mini-auto"><CarFront size={21} /></span><span><strong>{orden.vehiculo}</strong><small>{orden.numero} · {orden.placa}</small><small>Ingreso: {orden.fechaHoraIngreso}</small></span></span>
+            <span className="celda-vehiculo"><span className="mini-auto"><CarFront size={21} /></span><span><strong>{orden.vehiculo}</strong><small>Placa: {orden.placa} · {orden.numero}</small><small>Ingreso: {orden.fechaHoraIngreso}</small></span></span>
             <span className="cliente-tabla"><strong>{orden.cliente}</strong><small>{orden.motivo}</small></span>
-            <span><span className={`etiqueta-estado estado-${normalizarClase(orden.estado)}`}>{orden.estado}</span></span>
-            <span><strong>{orden.tecnico}</strong></span>
-            <ChevronRight size={20} />
+            <span className="estado-tabla"><span className={`etiqueta-estado estado-${normalizarClase(orden.estado)}`}>{orden.estado}</span></span>
+            <span className="responsable-tabla"><strong>{orden.tecnico}</strong></span>
+            <ChevronRight className="abrir-orden-tabla" size={20} />
           </button>
         ))}
         {!cargando && ordenes.length === 0 && (
@@ -2370,8 +2427,8 @@ function FormularioNuevaOrden({
   }, []);
 
   function alternarDictado() {
-    if (dictando) {
-      reconocimientoVoz.current?.stop();
+    if (reconocimientoVoz.current) {
+      reconocimientoVoz.current.stop();
       return;
     }
 
@@ -2391,14 +2448,9 @@ function FormularioNuevaOrden({
     const motivoAntesDeDictar = motivo.trim();
     let dictadoConError = false;
     setDictadoCompatible(true);
-    reconocimiento.lang = "es-NI";
-    reconocimiento.continuous = true;
-    reconocimiento.interimResults = true;
+    configurarReconocimientoVoz(reconocimiento);
     reconocimiento.onresult = (evento) => {
-      let transcripcion = "";
-      for (let indice = 0; indice < evento.results.length; indice += 1) {
-        transcripcion += evento.results[indice][0].transcript;
-      }
+      const transcripcion = obtenerTranscripcionVoz(evento, reconocimiento.continuous);
       setMotivo([motivoAntesDeDictar, transcripcion.trim()].filter(Boolean).join(" "));
     };
     reconocimiento.onerror = (evento) => {
@@ -2415,7 +2467,7 @@ function FormularioNuevaOrden({
       setDictando(false);
       reconocimientoVoz.current = null;
       if (!dictadoConError) {
-        setMensajeDictado("Dictado finalizado. Revisa o corrige la descripción si es necesario.");
+        setMensajeDictado("Dictado finalizado. Puedes dictar otra frase o corregir la descripción.");
       }
     };
 
@@ -2680,11 +2732,8 @@ function FormularioVehiculo({
       modelos.find((modelo) => modelo.marcaVehiculoId === marcaInicialId && modelo.activo)?.id ??
       0,
   );
-  const [nombreNuevaMarca, setNombreNuevaMarca] = useState("");
-  const [nombreNuevoModelo, setNombreNuevoModelo] = useState("");
-  const [mostrandoAltaMarca, setMostrandoAltaMarca] = useState(false);
-  const [mostrandoAltaModelo, setMostrandoAltaModelo] = useState(false);
-  const [guardandoCatalogo, setGuardandoCatalogo] = useState(false);
+  const [altaCatalogo, setAltaCatalogo] = useState<"marca" | "modelo" | null>(null);
+  const botonAperturaCatalogo = useRef<HTMLButtonElement | null>(null);
   const modelosMarca = modelos.filter(
     (modelo) => modelo.marcaVehiculoId === marcaVehiculoId &&
       (modelo.activo || modelo.id === vehiculo?.modeloVehiculoId),
@@ -2692,129 +2741,113 @@ function FormularioVehiculo({
   const formularioDisponible = clientes.length > 0 && modeloVehiculoId > 0;
   const anioActual = new Date().getFullYear();
 
-  async function crearMarca() {
-    if (nombreNuevaMarca.trim().length < 2) return;
-    setGuardandoCatalogo(true);
-    try {
-      const marca = await alCrearMarca(nombreNuevaMarca.trim());
-      setMarcaVehiculoId(marca.id);
-      setModeloVehiculoId(0);
-      setNombreNuevaMarca("");
-      setMostrandoAltaMarca(false);
-    } finally {
-      setGuardandoCatalogo(false);
-    }
+  function abrirCatalogo(tipo: "marca" | "modelo", boton: HTMLButtonElement) {
+    botonAperturaCatalogo.current = boton;
+    setAltaCatalogo(tipo);
   }
 
-  async function crearModelo() {
-    if (!marcaVehiculoId || !nombreNuevoModelo.trim()) return;
-    setGuardandoCatalogo(true);
-    try {
-      const modelo = await alCrearModelo(marcaVehiculoId, nombreNuevoModelo.trim());
-      setModeloVehiculoId(modelo.id);
-      setNombreNuevoModelo("");
-      setMostrandoAltaModelo(false);
-    } finally {
-      setGuardandoCatalogo(false);
-    }
+  async function crearMarca(nombre: string) {
+    const marca = await alCrearMarca(nombre);
+    setMarcaVehiculoId(marca.id);
+    setModeloVehiculoId(0);
+  }
+
+  async function crearModelo(nombre: string) {
+    const modelo = await alCrearModelo(marcaVehiculoId, nombre);
+    setModeloVehiculoId(modelo.id);
   }
 
   return (
-    <form className="formulario" onSubmit={alEnviar}>
-      <div className="paso-formulario">
-        <span>1</span>
-        <div><strong>Propietario e identificación</strong><small>Selecciona el cliente y registra la placa</small></div>
-      </div>
-      <label>
-        Propietario
-        <select name="clienteId" required defaultValue={vehiculo?.clienteId ?? clienteInicialId ?? clientes[0]?.id ?? ""} disabled={!formularioDisponible}>
-          {!formularioDisponible && <option value="">Primero registra un cliente</option>}
-          {clientes.map((cliente) => <option key={cliente.id} value={cliente.id}>{cliente.nombre}</option>)}
-        </select>
-      </label>
-      <label>
-        Placa
-        <input name="placa" type="text" required minLength={2} maxLength={15} defaultValue={vehiculo?.placa ?? ""} autoComplete="off" placeholder="Ej. M 245-781" />
-      </label>
-      <label>
-        Número VIN <small>(opcional)</small>
-        <input name="numeroVin" type="text" maxLength={50} defaultValue={vehiculo?.numeroVin ?? ""} autoComplete="off" placeholder="Número de identificación vehicular" />
-      </label>
-      <div className="separador-formulario" />
-      <div className="paso-formulario">
-        <span>2</span>
-        <div><strong>Características</strong><small>Datos básicos para reconocer la unidad</small></div>
-      </div>
-      <div className="campo-con-accion">
+    <>
+      <form className="formulario" onSubmit={alEnviar} inert={altaCatalogo !== null ? true : undefined}>
+        <div className="paso-formulario">
+          <span>1</span>
+          <div><strong>Propietario e identificación</strong><small>Selecciona el cliente y registra la placa</small></div>
+        </div>
         <label>
-          Marca
-          <select
-            required
-            value={marcaVehiculoId || ""}
-            onChange={(evento) => {
-              const marcaId = Number(evento.target.value);
-              setMarcaVehiculoId(marcaId);
-              setModeloVehiculoId(
-                modelos.find((modelo) => modelo.marcaVehiculoId === marcaId && modelo.activo)?.id ?? 0,
-              );
-            }}
-          >
-            <option value="">Selecciona una marca</option>
-            {marcas
-              .filter((marca) => marca.activa || marca.id === vehiculo?.marcaVehiculoId)
-              .map((marca) => <option key={marca.id} value={marca.id}>{marca.nombre}</option>)}
+          Propietario
+          <select name="clienteId" required defaultValue={vehiculo?.clienteId ?? clienteInicialId ?? clientes[0]?.id ?? ""} disabled={!formularioDisponible}>
+            {!formularioDisponible && <option value="">Primero registra un cliente</option>}
+            {clientes.map((cliente) => <option key={cliente.id} value={cliente.id}>{cliente.nombre}</option>)}
           </select>
         </label>
-        <button className="boton-alta-rapida" type="button" aria-label="Agregar una marca al catálogo" aria-controls="alta-marca" aria-expanded={mostrandoAltaMarca} onClick={() => setMostrandoAltaMarca((visible) => !visible)}>
-          <Plus size={19} />
-        </button>
-      </div>
-      {mostrandoAltaMarca && (
-        <div className="alta-catalogo" id="alta-marca">
-        <div className="campo-con-accion">
-          <input aria-label="Nombre de la nueva marca" value={nombreNuevaMarca} onChange={(evento) => setNombreNuevaMarca(evento.target.value)} minLength={2} maxLength={80} placeholder="Ej. Toyota" />
-          <button type="button" className="boton-secundario" disabled={guardandoCatalogo || nombreNuevaMarca.trim().length < 2} onClick={crearMarca}><Plus size={18} />Agregar</button>
-        </div>
-        </div>
-      )}
-      <div className="campo-con-accion">
         <label>
-          Modelo
-          <select name="modeloVehiculoId" required value={modeloVehiculoId || ""} onChange={(evento) => setModeloVehiculoId(Number(evento.target.value))} disabled={!marcaVehiculoId}>
-            <option value="">{marcaVehiculoId ? "Selecciona un modelo" : "Primero selecciona una marca"}</option>
-            {modelosMarca.map((modelo) => <option key={modelo.id} value={modelo.id}>{modelo.nombre}</option>)}
-          </select>
+          Placa
+          <input name="placa" type="text" required minLength={2} maxLength={15} defaultValue={vehiculo?.placa ?? ""} autoComplete="off" placeholder="Ej. M 245-781" />
         </label>
-        <button className="boton-alta-rapida" type="button" aria-label="Agregar un modelo a esta marca" aria-controls="alta-modelo" aria-expanded={mostrandoAltaModelo} disabled={!marcaVehiculoId} onClick={() => setMostrandoAltaModelo((visible) => !visible)}>
-          <Plus size={19} />
-        </button>
-      </div>
-      {mostrandoAltaModelo && (
-        <div className="alta-catalogo" id="alta-modelo">
+        <label>
+          Número VIN <small>(opcional)</small>
+          <input name="numeroVin" type="text" maxLength={50} defaultValue={vehiculo?.numeroVin ?? ""} autoComplete="off" placeholder="Número de identificación vehicular" />
+        </label>
+        <div className="separador-formulario" />
+        <div className="paso-formulario">
+          <span>2</span>
+          <div><strong>Características</strong><small>Datos básicos para reconocer la unidad</small></div>
+        </div>
         <div className="campo-con-accion">
-          <input aria-label="Nombre del nuevo modelo" value={nombreNuevoModelo} onChange={(evento) => setNombreNuevoModelo(evento.target.value)} maxLength={80} disabled={!marcaVehiculoId} placeholder="Ej. Hilux" />
-          <button type="button" className="boton-secundario" disabled={guardandoCatalogo || !marcaVehiculoId || !nombreNuevoModelo.trim()} onClick={crearModelo}><Plus size={18} />Agregar</button>
+          <label>
+            Marca
+            <select
+              required
+              value={marcaVehiculoId || ""}
+              onChange={(evento) => {
+                const marcaId = Number(evento.target.value);
+                setMarcaVehiculoId(marcaId);
+                setModeloVehiculoId(
+                  modelos.find((modelo) => modelo.marcaVehiculoId === marcaId && modelo.activo)?.id ?? 0,
+                );
+              }}
+            >
+              <option value="">Selecciona una marca</option>
+              {marcas
+                .filter((marca) => marca.activa || marca.id === vehiculo?.marcaVehiculoId)
+                .map((marca) => <option key={marca.id} value={marca.id}>{marca.nombre}</option>)}
+            </select>
+          </label>
+          <button className="boton-alta-rapida boton-alta-catalogo" type="button" aria-haspopup="dialog" onClick={(evento) => abrirCatalogo("marca", evento.currentTarget)}>
+            <Plus size={19} />Nueva marca
+          </button>
         </div>
+        <div className="campo-con-accion">
+          <label>
+            Modelo
+            <select name="modeloVehiculoId" required value={modeloVehiculoId || ""} onChange={(evento) => setModeloVehiculoId(Number(evento.target.value))} disabled={!marcaVehiculoId}>
+              <option value="">{marcaVehiculoId ? "Selecciona un modelo" : "Primero selecciona una marca"}</option>
+              {modelosMarca.map((modelo) => <option key={modelo.id} value={modelo.id}>{modelo.nombre}</option>)}
+            </select>
+          </label>
+          <button className="boton-alta-rapida boton-alta-catalogo" type="button" aria-haspopup="dialog" disabled={!marcaVehiculoId} onClick={(evento) => abrirCatalogo("modelo", evento.currentTarget)}>
+            <Plus size={19} />Nuevo modelo
+          </button>
         </div>
-      )}
-      <label>
-        Año
-        <input name="anio" type="number" required min={1900} max={2100} defaultValue={vehiculo?.anio ?? anioActual} inputMode="numeric" />
-      </label>
-      <label>
-        Color <small>(opcional)</small>
-        <input name="color" type="text" maxLength={40} defaultValue={vehiculo?.color ?? ""} autoComplete="off" placeholder="Ej. Blanco" />
-      </label>
-      {vehiculo && (
-        <label className="opcion-estado-vehiculo">
-          <input name="activo" type="checkbox" defaultChecked={vehiculo.activo} />
-          Vehículo activo y disponible para nuevas órdenes
+        <label>
+          Año
+          <input name="anio" type="number" required min={1900} max={2100} defaultValue={vehiculo?.anio ?? anioActual} inputMode="numeric" />
         </label>
+        <label>
+          Color <small>(opcional)</small>
+          <input name="color" type="text" maxLength={40} defaultValue={vehiculo?.color ?? ""} autoComplete="off" placeholder="Ej. Blanco" />
+        </label>
+        {vehiculo && (
+          <label className="opcion-estado-vehiculo">
+            <input name="activo" type="checkbox" defaultChecked={vehiculo.activo} />
+            Vehículo activo y disponible para nuevas órdenes
+          </label>
+        )}
+        <button className="boton-primario boton-ancho" type="submit" disabled={!formularioDisponible || guardando}>
+          <Check size={20} />{vehiculo ? "Guardar cambios" : "Registrar vehículo"}
+        </button>
+      </form>
+      {altaCatalogo && (
+        <ModalCatalogoVehiculo
+          tipo={altaCatalogo}
+          botonApertura={botonAperturaCatalogo}
+          nombreMarca={marcas.find((marca) => marca.id === marcaVehiculoId)?.nombre}
+          alGuardar={altaCatalogo === "marca" ? crearMarca : crearModelo}
+          alCerrar={() => setAltaCatalogo(null)}
+        />
       )}
-      <button className="boton-primario boton-ancho" type="submit" disabled={!formularioDisponible || guardando}>
-        <Check size={20} />{vehiculo ? "Guardar cambios" : "Registrar vehículo"}
-      </button>
-    </form>
+    </>
   );
 }
 
@@ -3228,7 +3261,7 @@ function DetalleOrden({
                     <div><Boxes size={21} /><span><strong>Agregar desde inventario</strong><small>Busca el producto y luego indica la cantidad</small></span></div>
                     <div className="controles-productos-inventario">
                       <label>Bodega<select value={bodegaId ?? ""} required onChange={(evento) => { setBodegaId(Number(evento.target.value)); setProductoId(null); setBusquedaProducto(""); setArticulos([]); setBuscandoProductos(false); }}>{bodegas.map((bodega) => <option key={bodega.id} value={bodega.id}>{bodega.nombre}{bodega.esPrincipal ? " · Principal" : ""}</option>)}</select></label>
-                      <label className="campo-busqueda-producto"><Search size={18} aria-hidden="true" /><span className="texto-solo-lectores">Buscar producto</span><input value={busquedaProducto} onChange={(evento) => { const siguienteBusqueda = evento.target.value; setBusquedaProducto(siguienteBusqueda); setProductoId(null); setArticulos([]); setBuscandoProductos(siguienteBusqueda.trim().length >= 2); }} placeholder="Busca por nombre o código" /></label>
+                      <label className="campo-busqueda-producto"><span>Buscar producto</span><Search size={18} aria-hidden="true" /><input value={busquedaProducto} onChange={(evento) => { const siguienteBusqueda = evento.target.value; setBusquedaProducto(siguienteBusqueda); setProductoId(null); setArticulos([]); setBuscandoProductos(siguienteBusqueda.trim().length >= 2); }} placeholder="Busca por nombre o código" /></label>
                     </div>
                     {!articuloSeleccionado && terminoBusquedaProducto.length < 2 && <p className="ayuda-busqueda-producto">Escribe al menos 2 caracteres para buscar un producto.</p>}
                     {!articuloSeleccionado && terminoBusquedaProducto.length >= 2 && <div className="selector-productos-inventario" role="group" aria-label="Resultados de productos">
@@ -3317,6 +3350,8 @@ function ModalConfirmacion({
   descripcion,
   detalle,
   etiquetaConfirmar,
+  etiquetaCancelar = "Cancelar",
+  esDestructiva = true,
   procesando,
   mensajeError,
   alCancelar,
@@ -3326,6 +3361,8 @@ function ModalConfirmacion({
   descripcion: string;
   detalle: string;
   etiquetaConfirmar: string;
+  etiquetaCancelar?: string;
+  esDestructiva?: boolean;
   procesando: boolean;
   mensajeError?: string;
   alCancelar: () => void;
@@ -3358,9 +3395,9 @@ function ModalConfirmacion({
           <p>{descripcion}</p>
           <div id="detalle-modal-confirmacion" className="detalle-modal-confirmacion"><TriangleAlert size={20} aria-hidden="true" /><span>{detalle}</span></div>
           {mensajeError && <div className="estado-datos estado-datos-error" role="alert">{mensajeError}</div>}
-          <div className="acciones-modal-confirmacion">
-            <button ref={botonCancelarRef} className="boton-secundario" type="button" disabled={procesando} onClick={alCancelar}>Cancelar</button>
-            <button className="boton-eliminar-confirmacion" type="button" disabled={procesando} onClick={() => void alConfirmar()}><Trash2 size={18} />{etiquetaConfirmar}</button>
+          <div className={`acciones-modal-confirmacion${esDestructiva ? "" : " acciones-confirmacion-guardado"}`}>
+            <button ref={botonCancelarRef} className="boton-secundario" type="button" disabled={procesando} onClick={alCancelar}>{etiquetaCancelar}</button>
+            <button className={esDestructiva ? "boton-eliminar-confirmacion" : "boton-primario"} type="button" disabled={procesando} onClick={() => void alConfirmar()}>{esDestructiva ? <Trash2 size={18} /> : <Check size={18} />}{etiquetaConfirmar}</button>
           </div>
         </div>
       </section>
@@ -3395,7 +3432,6 @@ function FormularioDiagnostico({
   const [dictadoCompatible, setDictadoCompatible] = useState<boolean | null>(null);
   const reconocimiento = useRef<ReconocimientoVoz | null>(null);
   const entradaFotos = useRef<HTMLInputElement | null>(null);
-  const textoBaseDictado = useRef("");
   const vistasPrevias = useMemo(
     () => fotografias.map((fotografia) => ({
       nombre: fotografia.name,
@@ -3413,8 +3449,8 @@ function FormularioDiagnostico({
   );
 
   function alternarDictado() {
-    if (dictando) {
-      reconocimiento.current?.stop();
+    if (reconocimiento.current) {
+      reconocimiento.current.stop();
       return;
     }
     const ventana = window as typeof window & {
@@ -3430,19 +3466,16 @@ function FormularioDiagnostico({
     const instancia = new Constructor();
     setDictadoCompatible(true);
     reconocimiento.current = instancia;
-    textoBaseDictado.current = texto.trim();
-    instancia.lang = "es-NI";
-    instancia.continuous = true;
-    instancia.interimResults = true;
+    const textoAntesDeDictar = texto.trim();
+    let dictadoConError = false;
+    configurarReconocimientoVoz(instancia);
     instancia.onresult = (evento) => {
-      let transcripcion = "";
-      for (let indice = 0; indice < evento.results.length; indice += 1) {
-        transcripcion += `${evento.results[indice][0].transcript} `;
-      }
-      setTexto(`${textoBaseDictado.current}${textoBaseDictado.current ? " " : ""}${transcripcion.trim()}`);
+      const transcripcion = obtenerTranscripcionVoz(evento, instancia.continuous);
+      setTexto([textoAntesDeDictar, transcripcion].filter(Boolean).join(" "));
       setMensajeDictado("Escuchando… revisa el texto antes de guardarlo.");
     };
     instancia.onerror = (evento) => {
+      dictadoConError = true;
       const mensajes: Record<string, string> = {
         "not-allowed": "Permite el acceso al micrófono para usar el dictado.",
         "no-speech": "No se detectó voz. Toca el micrófono para intentarlo nuevamente.",
@@ -3452,12 +3485,17 @@ function FormularioDiagnostico({
     instancia.onend = () => {
       setDictando(false);
       reconocimiento.current = null;
+      if (!dictadoConError) {
+        setMensajeDictado("Dictado finalizado. Puedes dictar otra frase o corregir el diagnóstico.");
+      }
     };
     try {
       instancia.start();
       setDictando(true);
       setMensajeDictado("Escuchando… habla con claridad.");
     } catch {
+      reconocimiento.current = null;
+      setDictando(false);
       setMensajeDictado("No fue posible iniciar el dictado. Inténtalo nuevamente.");
     }
   }
@@ -3645,7 +3683,7 @@ function FormularioRecepcion({
 }: {
   orden: OrdenTaller;
   inspeccionInicial?: InspeccionVisual;
-  alEnviar: (evento: FormEvent<HTMLFormElement>) => Promise<void>;
+  alEnviar: (datos: FormData) => Promise<void>;
   alEliminarEvidencia: (evidenciaId: number) => Promise<void>;
   alMostrarAviso: (mensaje: string) => void;
 }) {
@@ -3661,6 +3699,8 @@ function FormularioRecepcion({
   const [evidenciaPorEliminar, setEvidenciaPorEliminar] = useState<EvidenciaInspeccion | null>(null);
   const [evidenciaEliminandoId, setEvidenciaEliminandoId] = useState<number | null>(null);
   const [guardando, setGuardando] = useState(false);
+  const [datosPorConfirmar, setDatosPorConfirmar] = useState<FormData | null>(null);
+  const observacionGeneralRef = useRef<HTMLTextAreaElement | null>(null);
   const vistasPrevias = useMemo(
     () => fotografias.map((fotografia) => ({
       nombre: fotografia.name,
@@ -3734,6 +3774,16 @@ function FormularioRecepcion({
       : "Hallazgo guardado correctamente");
   }
 
+  async function guardarInspeccion(datos: FormData) {
+    if (guardando) return;
+    setGuardando(true);
+    try {
+      await alEnviar(datos);
+    } finally {
+      setGuardando(false);
+    }
+  }
+
   async function eliminarEvidenciaConfirmada() {
     if (!evidenciaPorEliminar) return;
     setEvidenciaEliminandoId(evidenciaPorEliminar.id);
@@ -3758,18 +3808,18 @@ function FormularioRecepcion({
       className="formulario formulario-recepcion-pagina"
       aria-busy={guardando}
       onSubmit={async (evento) => {
+        evento.preventDefault();
         if (guardando) return;
         if (danioEditando) {
-          evento.preventDefault();
           guardarDanio();
           return;
         }
-        setGuardando(true);
-        try {
-          await alEnviar(evento);
-        } finally {
-          setGuardando(false);
+        const datos = new FormData(evento.currentTarget);
+        if (!String(datos.get("estado") || "").trim()) {
+          setDatosPorConfirmar(datos);
+          return;
         }
+        await guardarInspeccion(datos);
       }}
     >
       <div className="resumen-recepcion"><span className="icono-auto-grande"><CarFront size={28} /></span><div><strong>{orden.vehiculo}</strong><small>{orden.placa} · {orden.cliente}</small></div></div>
@@ -3939,7 +3989,7 @@ function FormularioRecepcion({
       )}
 
       <input type="hidden" name="danios" value={JSON.stringify(danios)} />
-      <label>Observaciones generales<textarea name="estado" rows={4} required defaultValue={inspeccionInicial?.descripcionEstado || ""} placeholder="Describe el estado interior, accesorios o cualquier detalle adicional..." /></label>
+      <label>Observaciones generales (opcional)<textarea ref={observacionGeneralRef} name="estado" rows={4} maxLength={2000} defaultValue={inspeccionInicial?.descripcionEstado || ""} placeholder="Describe el estado interior, accesorios o cualquier detalle adicional..." /></label>
       <div className="bloque-carga-fotos">
       <label className="zona-fotos">
         <input
@@ -4025,7 +4075,25 @@ function FormularioRecepcion({
         </div>
       )}
       </div>
-      <div className="lista-comprobacion"><label><input type="checkbox" name="dejaLlaves" defaultChecked={inspeccionInicial?.dejaLlaves} />Deja llaves</label><label><input type="checkbox" name="dejaDocumentos" defaultChecked={inspeccionInicial?.dejaDocumentos} />Deja documentos</label><label><input type="checkbox" name="aceptaPruebaRuta" />Acepta prueba de ruta</label></div>
+      <fieldset className="elementos-recepcion">
+        <legend className="sobrelinea">Elementos entregados</legend>
+        <p>Marca los elementos que quedan en el vehículo.</p>
+        <div className="lista-comprobacion">
+          {elementosRecepcion.map(({ campo, etiqueta }) => (
+            <label key={campo}>
+              <input type="checkbox" name={campo} defaultChecked={inspeccionInicial?.[campo]} />
+              {etiqueta}
+            </label>
+          ))}
+        </div>
+        <label>
+          Otros elementos o herramientas (opcional)
+          <input name="otrosElementos" maxLength={500} defaultValue={inspeccionInicial?.otrosElementos || ""} placeholder="Ej.: llave de seguridad de ruedas, cables de arranque…" />
+        </label>
+        <div className="lista-comprobacion permiso-prueba-ruta">
+          <label><input type="checkbox" name="aceptaPruebaRuta" defaultChecked={inspeccionInicial?.aceptaPruebaRuta} />Acepta prueba de ruta</label>
+        </div>
+      </fieldset>
       <button className="boton-primario boton-ancho" type="submit" disabled={guardando}>
         <Sparkles size={20} />
         {inspeccionInicial
@@ -4033,6 +4101,26 @@ function FormularioRecepcion({
           : "Guardar y pasar a diagnóstico"}
       </button>
     </form>
+    {datosPorConfirmar && (
+      <ModalConfirmacion
+        titulo="Guardar sin observaciones"
+        descripcion="No has ingresado una observación general del vehículo."
+        detalle="Puedes volver para completarla o guardar la inspección sin observaciones generales."
+        etiquetaConfirmar="Guardar sin observaciones"
+        etiquetaCancelar="Volver y completar"
+        esDestructiva={false}
+        procesando={guardando}
+        alCancelar={() => {
+          setDatosPorConfirmar(null);
+          observacionGeneralRef.current?.focus();
+        }}
+        alConfirmar={async () => {
+          const datos = datosPorConfirmar;
+          setDatosPorConfirmar(null);
+          await guardarInspeccion(datos);
+        }}
+      />
+    )}
     {evidenciaPorEliminar && (
       <ModalConfirmacion
         titulo="Eliminar fotografía"
@@ -4103,7 +4191,12 @@ function ResumenInspeccion({
   inspeccion?: InspeccionVisual;
   alEditar: () => void;
 }) {
+  const [visor, setVisor] = useState<EstadoVisor | null>(null);
   const danios = inspeccion?.danios || [];
+  const imagenes = (inspeccion?.evidencias ?? []).map((evidencia) => ({
+    direccion: direccionEvidencia(ordenServicioId, evidencia.id),
+    descripcion: `Evidencia de inspección ${evidencia.nombreArchivo}`,
+  }));
   return (
     <section className="resumen-inspeccion">
       <div className="encabezado-inspeccion">
@@ -4118,7 +4211,13 @@ function ResumenInspeccion({
         <div className="datos-inspeccion">
           <span><small>Kilometraje</small><strong>{inspeccion.kilometraje.toLocaleString("es-NI")} km</strong></span>
           <span><small>Combustible</small><strong>{inspeccion.porcentajeCombustible}%</strong></span>
-          <span><small>Elementos</small><strong>{inspeccion.dejaLlaves ? "Con llaves" : "Sin llaves"}</strong></span>
+          <span><small>Prueba de ruta</small><strong>{inspeccion.aceptaPruebaRuta ? "Aceptada" : "Sin aceptación registrada"}</strong></span>
+        </div>
+      )}
+      {inspeccion && (
+        <div className="observacion-inspeccion">
+          <span className="sobrelinea">Elementos entregados</span>
+          <p>{describirElementosEntregados(inspeccion)}</p>
         </div>
       )}
       <MapaInspeccion danios={danios} compacto />
@@ -4129,13 +4228,13 @@ function ResumenInspeccion({
             <strong>{inspeccion.evidencias.length} fotografías</strong>
           </div>
           <div className="galeria-evidencias">
-            {inspeccion.evidencias.map((evidencia) => (
-              <a
+            {inspeccion.evidencias.map((evidencia, indice) => (
+              <button
+                type="button"
                 key={evidencia.id}
-                href={direccionEvidencia(ordenServicioId, evidencia.id)}
-                target="_blank"
-                rel="noreferrer"
-                aria-label={`Abrir ${evidencia.nombreArchivo}`}
+                className="miniatura-evidencia"
+                onClick={() => setVisor({ imagenes, indice })}
+                aria-label={`Ampliar ${evidencia.nombreArchivo}`}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
@@ -4143,7 +4242,7 @@ function ResumenInspeccion({
                   alt={`Evidencia de inspección ${evidencia.nombreArchivo}`}
                   loading="lazy"
                 />
-              </a>
+              </button>
             ))}
           </div>
         </div>
@@ -4168,6 +4267,7 @@ function ResumenInspeccion({
       <button className="boton-secundario boton-ancho" type="button" onClick={alEditar}>
         <Pencil size={18} /> Editar inspección y observaciones
       </button>
+      {visor && <VisorFotografias seleccion={visor} alCerrar={() => setVisor(null)} />}
     </section>
   );
 }
@@ -4747,6 +4847,16 @@ async function guardarRecepcionApi(
         descripcionEstado: inspeccion.descripcionEstado,
         dejaLlaves: inspeccion.dejaLlaves,
         dejaDocumentos: inspeccion.dejaDocumentos,
+        dejaLlantaRepuesto: inspeccion.dejaLlantaRepuesto,
+        dejaTrianguloSeguridad: inspeccion.dejaTrianguloSeguridad,
+        dejaGata: inspeccion.dejaGata,
+        dejaLlaveRuedas: inspeccion.dejaLlaveRuedas,
+        dejaGanchoRemolque: inspeccion.dejaGanchoRemolque,
+        dejaExtintor: inspeccion.dejaExtintor,
+        dejaBotiquin: inspeccion.dejaBotiquin,
+        dejaChalecoReflectante: inspeccion.dejaChalecoReflectante,
+        otrosElementos: inspeccion.otrosElementos,
+        aceptaPruebaRuta: inspeccion.aceptaPruebaRuta,
         danios: inspeccion.danios.map((danio) => ({
           zona: zonaParaApi(danio.zona),
           tipo: danio.tipo === "Rayón" ? "Rayon" : danio.tipo,
@@ -4824,6 +4934,16 @@ function convertirRecepcionApi(
     descripcionEstado: recepcion.descripcionEstado,
     dejaLlaves: recepcion.dejaLlaves,
     dejaDocumentos: recepcion.dejaDocumentos,
+    dejaLlantaRepuesto: recepcion.dejaLlantaRepuesto,
+    dejaTrianguloSeguridad: recepcion.dejaTrianguloSeguridad,
+    dejaGata: recepcion.dejaGata,
+    dejaLlaveRuedas: recepcion.dejaLlaveRuedas,
+    dejaGanchoRemolque: recepcion.dejaGanchoRemolque,
+    dejaExtintor: recepcion.dejaExtintor,
+    dejaBotiquin: recepcion.dejaBotiquin,
+    dejaChalecoReflectante: recepcion.dejaChalecoReflectante,
+    otrosElementos: recepcion.otrosElementos,
+    aceptaPruebaRuta: recepcion.aceptaPruebaRuta,
     danios: recepcion.danios.map((danio, indice) => ({
       id: `api-${ordenServicioId}-${indice}`,
       zona: zonaDesdeApi(danio.zona),

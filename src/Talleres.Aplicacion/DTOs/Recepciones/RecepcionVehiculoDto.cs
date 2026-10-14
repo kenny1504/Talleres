@@ -10,4 +10,16 @@ public sealed record RecepcionVehiculoDto(
     bool DejaDocumentos,
     DateTime FechaRecepcion,
     IReadOnlyCollection<DanioVehiculoDto> Danios,
-    IReadOnlyCollection<EvidenciaInspeccionDto> Evidencias);
+    IReadOnlyCollection<EvidenciaInspeccionDto> Evidencias)
+{
+    public bool DejaLlantaRepuesto { get; init; }
+    public bool DejaTrianguloSeguridad { get; init; }
+    public bool DejaGata { get; init; }
+    public bool DejaLlaveRuedas { get; init; }
+    public bool DejaGanchoRemolque { get; init; }
+    public bool DejaExtintor { get; init; }
+    public bool DejaBotiquin { get; init; }
+    public bool DejaChalecoReflectante { get; init; }
+    public string? OtrosElementos { get; init; }
+    public bool AceptaPruebaRuta { get; init; }
+}

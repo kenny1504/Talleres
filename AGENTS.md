@@ -100,6 +100,7 @@ tests/
 - Las acciones principales deben permanecer accesibles sin tapar contenido. Los controles táctiles tienen un área mínima recomendada de 44 × 44 px y separación suficiente.
 - No depender de `hover`, clic derecho ni precisión de puntero. Toda interacción debe funcionar con tacto, teclado y mouse.
 - Formularios y botones deben mostrar estados de carga, éxito, error, deshabilitado y validación. Evitar envíos dobles.
+- Las acciones críticas o bloqueantes que esperan una respuesta de la API deben usar el componente global `CargadorPantalla`, con un mensaje específico en español. No colocar spinners ni reemplazar el contenido dentro de botones; estos conservan su etiqueta, pueden quedar deshabilitados como protección secundaria y el cargador debe cubrir toda la pantalla hasta que la operación finalice, incluso ante errores.
 - Mantener foco visible, etiquetas accesibles, contraste suficiente y orden de tabulación lógico.
 - Probar al menos anchos representativos de tablet vertical, tablet horizontal y escritorio antes de cerrar un cambio visual.
 

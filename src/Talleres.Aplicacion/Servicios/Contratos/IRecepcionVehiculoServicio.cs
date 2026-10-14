@@ -11,7 +11,7 @@ public interface IRecepcionVehiculoServicio
     /// Registra la recepción de una orden en estado de recepción y la avanza a diagnóstico.
     /// </summary>
     /// <param name="ordenServicioId">Identificador de la orden que recibe el vehículo.</param>
-    /// <param name="solicitud">Estado físico, kilometraje, combustible y objetos entregados.</param>
+    /// <param name="solicitud">Estado físico con observación general opcional, kilometraje, combustible y objetos entregados.</param>
     /// <param name="cancellationToken">Token para cancelar la operación.</param>
     /// <returns>La recepción creada.</returns>
     Task<RecepcionVehiculoDto> RegistrarAsync(
@@ -23,7 +23,7 @@ public interface IRecepcionVehiculoServicio
     /// Actualiza los datos y hallazgos de una recepción mientras la orden siga activa en el taller.
     /// </summary>
     /// <param name="ordenServicioId">Identificador de la orden cuya inspección será corregida.</param>
-    /// <param name="solicitud">Kilometraje, combustible, observación general y daños actualizados.</param>
+    /// <param name="solicitud">Kilometraje, combustible, elementos entregados, permiso de prueba de ruta, observación general opcional y daños actualizados.</param>
     /// <param name="cancellationToken">Token para cancelar la operación.</param>
     /// <returns>La recepción con la inspección visual actualizada.</returns>
     Task<RecepcionVehiculoDto> ActualizarInspeccionAsync(

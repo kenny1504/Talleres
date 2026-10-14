@@ -51,9 +51,19 @@ public sealed class RecepcionVehiculoServicio(
             OrdenServicioId = orden.Id,
             Kilometraje = solicitud.Kilometraje,
             PorcentajeCombustible = solicitud.PorcentajeCombustible,
-            DescripcionEstado = solicitud.DescripcionEstado.Trim(),
+            DescripcionEstado = solicitud.DescripcionEstado?.Trim() ?? string.Empty,
             DejaLlaves = solicitud.DejaLlaves,
             DejaDocumentos = solicitud.DejaDocumentos,
+            DejaLlantaRepuesto = solicitud.DejaLlantaRepuesto,
+            DejaTrianguloSeguridad = solicitud.DejaTrianguloSeguridad,
+            DejaGata = solicitud.DejaGata,
+            DejaLlaveRuedas = solicitud.DejaLlaveRuedas,
+            DejaGanchoRemolque = solicitud.DejaGanchoRemolque,
+            DejaExtintor = solicitud.DejaExtintor,
+            DejaBotiquin = solicitud.DejaBotiquin,
+            DejaChalecoReflectante = solicitud.DejaChalecoReflectante,
+            OtrosElementos = LimpiarOpcional(solicitud.OtrosElementos),
+            AceptaPruebaRuta = solicitud.AceptaPruebaRuta,
             FechaRecepcion = fechaActual
         };
 
@@ -116,9 +126,19 @@ public sealed class RecepcionVehiculoServicio(
 
         recepcion.Kilometraje = solicitud.Kilometraje;
         recepcion.PorcentajeCombustible = solicitud.PorcentajeCombustible;
-        recepcion.DescripcionEstado = solicitud.DescripcionEstado.Trim();
+        recepcion.DescripcionEstado = solicitud.DescripcionEstado?.Trim() ?? string.Empty;
         recepcion.DejaLlaves = solicitud.DejaLlaves;
         recepcion.DejaDocumentos = solicitud.DejaDocumentos;
+        recepcion.DejaLlantaRepuesto = solicitud.DejaLlantaRepuesto;
+        recepcion.DejaTrianguloSeguridad = solicitud.DejaTrianguloSeguridad;
+        recepcion.DejaGata = solicitud.DejaGata;
+        recepcion.DejaLlaveRuedas = solicitud.DejaLlaveRuedas;
+        recepcion.DejaGanchoRemolque = solicitud.DejaGanchoRemolque;
+        recepcion.DejaExtintor = solicitud.DejaExtintor;
+        recepcion.DejaBotiquin = solicitud.DejaBotiquin;
+        recepcion.DejaChalecoReflectante = solicitud.DejaChalecoReflectante;
+        recepcion.OtrosElementos = LimpiarOpcional(solicitud.OtrosElementos);
+        recepcion.AceptaPruebaRuta = solicitud.AceptaPruebaRuta;
         recepcion.Danios.Clear();
 
         foreach (var danio in solicitud.Danios)
@@ -171,7 +191,19 @@ public sealed class RecepcionVehiculoServicio(
                                evidencia.TipoContenido,
                                evidencia.Longitud,
                                evidencia.FechaCargaUtc))
-                           .ToArray()))
+                           .ToArray())
+                   {
+                       DejaLlantaRepuesto = recepcion.DejaLlantaRepuesto,
+                       DejaTrianguloSeguridad = recepcion.DejaTrianguloSeguridad,
+                       DejaGata = recepcion.DejaGata,
+                       DejaLlaveRuedas = recepcion.DejaLlaveRuedas,
+                       DejaGanchoRemolque = recepcion.DejaGanchoRemolque,
+                       DejaExtintor = recepcion.DejaExtintor,
+                       DejaBotiquin = recepcion.DejaBotiquin,
+                       DejaChalecoReflectante = recepcion.DejaChalecoReflectante,
+                       OtrosElementos = recepcion.OtrosElementos,
+                       AceptaPruebaRuta = recepcion.AceptaPruebaRuta
+                   })
                    .SingleOrDefaultAsync(cancellationToken)
                ?? throw new RecursoNoEncontradoException(
                    "La orden no tiene una recepción registrada.");
@@ -202,7 +234,19 @@ public sealed class RecepcionVehiculoServicio(
                 evidencia.TipoContenido,
                 evidencia.Longitud,
                 evidencia.FechaCargaUtc))
-            .ToArray());
+            .ToArray())
+    {
+        DejaLlantaRepuesto = recepcion.DejaLlantaRepuesto,
+        DejaTrianguloSeguridad = recepcion.DejaTrianguloSeguridad,
+        DejaGata = recepcion.DejaGata,
+        DejaLlaveRuedas = recepcion.DejaLlaveRuedas,
+        DejaGanchoRemolque = recepcion.DejaGanchoRemolque,
+        DejaExtintor = recepcion.DejaExtintor,
+        DejaBotiquin = recepcion.DejaBotiquin,
+        DejaChalecoReflectante = recepcion.DejaChalecoReflectante,
+        OtrosElementos = recepcion.OtrosElementos,
+        AceptaPruebaRuta = recepcion.AceptaPruebaRuta
+    };
 
     private static string? LimpiarOpcional(string? valor) =>
         string.IsNullOrWhiteSpace(valor) ? null : valor.Trim();

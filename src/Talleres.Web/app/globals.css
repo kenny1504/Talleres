@@ -1207,7 +1207,7 @@ textarea:focus-visible {
   min-height: 76px;
   padding: 9px 10px;
   display: grid;
-  grid-template-columns: 46px minmax(180px, 1fr) auto 20px;
+  grid-template-columns: 46px minmax(0, 1fr) auto 20px;
   align-items: center;
   gap: 13px;
   border-radius: 15px;
@@ -1237,22 +1237,33 @@ textarea:focus-visible {
 }
 
 .datos-bahia,
-.fila-orden,
 .datos-bahia > span {
   display: block;
 }
 
-.fila-orden {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
+.datos-bahia,
+.datos-decision {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
-.fila-orden strong {
+.datos-bahia > .identificacion-vehiculo-inicio {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 8px;
+  font-size: 13px;
+}
+
+.identificacion-vehiculo-inicio strong {
   font-size: 14px;
 }
 
-.fila-orden small,
+.propietario-bahia {
+  margin-top: 3px;
+  font-size: 12px;
+}
+
 .detalle-orden {
   color: var(--tinta-suave);
   font-size: 11px;
@@ -1456,6 +1467,10 @@ textarea:focus-visible {
   align-items: center;
   gap: 11px;
 }
+
+.celda-vehiculo > span:last-child { min-width: 0; }
+.fila-tabla .celda-vehiculo strong,
+.fila-tabla .cliente-tabla strong { white-space: normal; overflow-wrap: anywhere; }
 
 .mini-auto {
   width: 41px;
@@ -1979,6 +1994,9 @@ textarea:focus-visible {
   gap: 10px;
 }
 
+.acciones-confirmacion-guardado { grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); }
+.acciones-confirmacion-guardado > button { min-width: 0; padding: 10px 12px; white-space: normal; }
+
 .boton-eliminar-confirmacion {
   min-height: 49px;
   padding: 0 18px;
@@ -2020,7 +2038,7 @@ textarea:focus-visible {
 .formulario-recepcion-pagina > input[type="hidden"] { display: none; }
 .formulario-recepcion-pagina > label:not(.zona-fotos) { grid-area: observaciones; }
 .formulario-recepcion-pagina > .bloque-carga-fotos { grid-area: fotos; }
-.formulario-recepcion-pagina > .lista-comprobacion { grid-area: lista; }
+.formulario-recepcion-pagina > .elementos-recepcion { grid-area: lista; }
 .formulario-recepcion-pagina > .boton-primario {
   grid-area: accion;
   width: min(480px, 100%);
@@ -2150,6 +2168,23 @@ textarea:focus-visible {
   min-height: 17px;
   accent-color: var(--verde);
 }
+
+.elementos-recepcion {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+  border: 0;
+}
+
+.elementos-recepcion legend { margin-bottom: 8px; }
+.elementos-recepcion > p { margin: 0; color: var(--tinta-suave); font-size: 12px; }
+.elementos-recepcion > label { display: grid; gap: 7px; color: #4e5b55; font-size: 11px; font-weight: 750; }
+.lista-comprobacion label { padding-block: 7px; }
+.lista-comprobacion label:focus-within { border-color: var(--verde); box-shadow: 0 0 0 2px var(--menta); }
+.lista-comprobacion input { flex-shrink: 0; }
+.permiso-prueba-ruta { grid-template-columns: 1fr; }
 
 .formulario > .opcion-estado-vehiculo {
   min-height: 50px;
@@ -2295,7 +2330,7 @@ textarea:focus-visible {
 .formularios-cargos {
   margin-top: 20px;
   display: grid;
-  grid-template-columns: minmax(0, 1.25fr) minmax(280px, .75fr);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
   gap: 12px;
 }
 
@@ -2366,6 +2401,7 @@ textarea:focus-visible {
 .acciones-modal-cargo button { min-height: 46px; }
 
 .formulario-cargo label {
+  min-width: 0;
   display: grid;
   gap: 6px;
   color: var(--tinta-suave);
@@ -2376,6 +2412,7 @@ textarea:focus-visible {
 .formulario-cargo input,
 .formulario-cargo select {
   width: 100%;
+  min-width: 0;
   min-height: 46px;
   padding: 9px 11px;
   border: 1px solid var(--borde);
@@ -2387,7 +2424,8 @@ textarea:focus-visible {
 
 .controles-productos-inventario {
   display: grid;
-  grid-template-columns: minmax(150px, .7fr) minmax(210px, 1.3fr);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+  align-items: end;
   gap: 9px;
 }
 
@@ -2438,7 +2476,7 @@ textarea:focus-visible {
 
 .accion-producto-inventario {
   display: grid;
-  grid-template-columns: minmax(110px, .4fr) minmax(190px, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr));
   align-items: end;
   gap: 9px;
 }
@@ -3285,7 +3323,7 @@ textarea:focus-visible {
   gap: 8px;
 }
 
-.galeria-evidencias a,
+.galeria-evidencias .miniatura-evidencia,
 .galeria-evidencias figure {
   position: relative;
   min-width: 0;
@@ -3303,9 +3341,11 @@ textarea:focus-visible {
   object-fit: cover;
 }
 
-.galeria-evidencias a {
+.galeria-evidencias .miniatura-evidencia {
   min-height: 72px;
   display: block;
+  padding: 0;
+  cursor: zoom-in;
 }
 
 .galeria-edicion { margin-top: 0; }
@@ -3398,7 +3438,7 @@ textarea:focus-visible {
   .estado-sede { min-height: 48px; width: 48px; display: grid; place-items: center; }
   .rejilla-decisiones { grid-template-columns: 1fr; }
   .decisiones .rejilla-decisiones button { min-height: 65px; }
-  .tarjeta-bahia { grid-template-columns: 45px minmax(150px, 1fr) 20px; }
+  .tarjeta-bahia { grid-template-columns: 45px minmax(0, 1fr) 20px; }
   .tarjeta-bahia .etiqueta-estado { display: none; }
   .metricas { grid-template-columns: repeat(2, 1fr); }
   .tarjeta-metrica { min-height: 108px; }
@@ -3478,8 +3518,18 @@ textarea:focus-visible {
   .navegacion-inferior .menu-mas-navegacion button:focus-visible { outline: 3px solid var(--verde-profundo); outline-offset: -3px; }
   .tablero-principal { grid-template-columns: 1fr; }
   .cabecera-tabla { display: none; }
-  .fila-tabla { grid-template-columns: 1.3fr 1fr auto 20px; min-height: 90px; }
-  .fila-tabla .cliente-tabla { display: none; }
+  .fila-tabla {
+    grid-template-columns: minmax(0, 1fr) auto 20px;
+    grid-template-areas: "vehiculo estado abrir" "cliente responsable abrir";
+    gap: 8px 16px;
+    padding-block: 14px;
+  }
+  .fila-tabla .celda-vehiculo { grid-area: vehiculo; }
+  .fila-tabla .cliente-tabla { grid-area: cliente; padding-left: 52px; }
+  .fila-tabla .cliente-tabla small { max-width: none; }
+  .fila-tabla .estado-tabla { grid-area: estado; justify-self: end; }
+  .fila-tabla .responsable-tabla { grid-area: responsable; justify-self: end; }
+  .fila-tabla .abrir-orden-tabla { grid-area: abrir; }
   .fila-vehiculo { grid-template-columns: 48px 1.2fr 1fr auto auto; }
 }
 
@@ -3530,16 +3580,15 @@ textarea:focus-visible {
   .tarjeta-metrica div > strong { font-size: 25px; }
   .panel-operacion,
   .decisiones { padding: 16px; }
-  .tarjeta-bahia { grid-template-columns: 42px 1fr 18px; padding-inline: 7px; }
-  .fila-orden { display: block; }
-  .fila-orden small { display: none; }
+  .tarjeta-bahia { grid-template-columns: 42px minmax(0, 1fr) 18px; padding-inline: 7px; }
   .fila-cliente { grid-template-columns: 44px minmax(0, 1fr) auto; padding-inline: 13px; gap: 10px; }
   .fila-cliente .datos-cliente { grid-column: 2 / -1; }
   .fila-cliente .estado-cliente-inactivo { display: none; }
   .acciones-cliente .boton-icono { width: 44px; padding: 0; }
   .acciones-cliente .boton-primario { min-width: 0; }
-  .fila-tabla { grid-template-columns: 1fr auto 18px; padding-inline: 13px; }
-  .fila-tabla > span:nth-child(4) { display: none; }
+  .fila-tabla { grid-template-columns: minmax(0, 1fr) auto 18px; padding-inline: 13px; gap: 8px; }
+  .fila-tabla .mini-auto { display: none; }
+  .fila-tabla .cliente-tabla { padding-left: 0; }
   .acciones-cliente { grid-column: 1 / -1; justify-self: stretch; }
   .acciones-cliente .boton-historial,
   .acciones-cliente .boton-primario { flex: 1; justify-content: center; }
@@ -3600,10 +3649,13 @@ textarea:focus-visible {
 .cabecera-seccion-publica { display: flex; justify-content: space-between; align-items: start; gap: 16px; }
 .cabecera-seccion-publica h2 { margin-bottom: 0; }
 .resumen-hallazgos { padding: 8px 11px; border-radius: 999px; background: var(--verde-claro); color: var(--verde); font-size: 12px; font-weight: 800; white-space: nowrap; }
-.datos-inspeccion-publica { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.datos-inspeccion-publica { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .datos-inspeccion-publica article { min-height: 76px; padding: 14px; display: flex; align-items: center; gap: 11px; border: 1px solid var(--borde); border-radius: 13px; background: var(--superficie); color: var(--verde); }
 .datos-inspeccion-publica span, .observacion-publica span { display: grid; gap: 3px; color: var(--tinta); }
 .datos-inspeccion-publica small, .observacion-publica small { color: var(--tinta-suave); }
+.datos-inspeccion-publica .elementos-entregados-publicos { grid-column: 1 / -1; }
+.elementos-entregados-publicos span { min-width: 0; }
+.elementos-entregados-publicos strong, .observacion-inspeccion p { overflow-wrap: anywhere; }
 .observacion-publica { padding: 15px; display: flex; align-items: start; gap: 11px; border-radius: 13px; background: var(--superficie); color: var(--verde); }
 .observacion-publica p { margin: 2px 0 0; color: var(--tinta); line-height: 1.55; white-space: pre-wrap; }
 .hallazgos-publicos { display: grid; gap: 9px; }
@@ -3634,8 +3686,8 @@ textarea:focus-visible {
 .pie-publico { padding: 8px; display: grid; gap: 6px; color: var(--tinta-suave); text-align: center; font-size: 13px; }
 .pie-publico a { color: var(--verde); font-weight: 800; }
 .estado-publico-error { margin: 15vh auto; max-width: 540px; padding: 30px; text-align: center; border: 1px solid var(--borde); border-radius: 18px; background: white; }
-.fondo-visor-imagen { position: fixed; z-index: 1000; inset: 0; padding: 18px; display: grid; place-items: center; background: rgba(10,23,19,.88); backdrop-filter: blur(5px); }
-.visor-imagen-publica { width: min(1100px, 100%); height: min(820px, calc(100dvh - 36px)); display: grid; grid-template-rows: auto minmax(0, 1fr) auto; overflow: hidden; border-radius: 18px; background: #111a17; color: white; box-shadow: 0 24px 70px rgba(0,0,0,.42); }
+.fondo-visor-imagen { position: fixed; z-index: 1000; inset: 0; width: 100%; max-width: none; height: 100dvh; max-height: none; margin: 0; border: 0; padding: 18px; display: grid; place-items: center; background: rgba(10,23,19,.88); backdrop-filter: blur(5px); }
+.visor-imagen-publica { position: relative; width: min(1100px, 100%); height: min(820px, calc(100dvh - 36px)); display: grid; grid-template-rows: auto minmax(0, 1fr) auto; overflow: hidden; border-radius: 18px; background: #111a17; color: white; box-shadow: 0 24px 70px rgba(0,0,0,.42); }
 .visor-imagen-publica > header { min-height: 64px; padding: 10px 12px 10px 18px; display: grid; grid-template-columns: minmax(0, 1fr) auto 48px; align-items: center; gap: 14px; border-bottom: 1px solid rgba(255,255,255,.15); }
 .visor-imagen-publica > header span { color: rgba(255,255,255,.72); font-size: 13px; }
 .visor-imagen-publica button { min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid rgba(255,255,255,.18); border-radius: 12px; background: rgba(255,255,255,.09); color: white; cursor: pointer; }
@@ -3671,9 +3723,12 @@ textarea:focus-visible {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
 
+@media (max-width: 900px) {
+  .formularios-cargos { grid-template-columns: minmax(0, 1fr); }
+}
+
 @media (max-width: 680px) {
   .cabecera-trabajo-reparacion { align-items: flex-start; flex-direction: column; gap: 8px; }
-  .formularios-cargos { grid-template-columns: 1fr; }
   .controles-productos-inventario { grid-template-columns: 1fr; }
   .cabecera-cargos { display: none; }
   .resumen-cargos article {
@@ -3690,12 +3745,27 @@ textarea:focus-visible {
   .total-cargos { justify-content: space-between; }
 }
 
-.alta-catalogo {
-  margin-top: -6px;
+.boton-alta-catalogo {
+  width: auto;
+  padding-inline: 12px;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
 }
 
-.alta-catalogo .campo-con-accion {
-  margin-top: 2px;
+.fondo-modal-catalogo { z-index: 140; }
+.modal-catalogo-vehiculo { width: min(460px, 100%); }
+.marca-modelo-catalogo { margin: 0; color: var(--tinta-suave); font-size: 13px; overflow-wrap: anywhere; }
+.marca-modelo-catalogo strong { color: var(--tinta); }
+.acciones-modal-catalogo { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 10px; margin-top: 4px; }
+.acciones-modal-catalogo > button { min-height: 44px; }
+
+@media (max-width: 620px) {
+  .fondo-modal-catalogo { align-items: center; }
+  .acciones-modal-catalogo > button { flex: 1; }
 }
 
 .formulario-diagnostico {
