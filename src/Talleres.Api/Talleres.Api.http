@@ -3,6 +3,13 @@
 @ContrasenaNova = cambie-esta-clave
 @OrdenServicioId = 1
 
+### Estado del negocio (requiere la cookie de sesión del taller activo).
+# Fechas locales inclusivas; 360 corresponde a UTC-6. Máximo 366 días.
+# agrupacion admite Dia, Semana o Mes. La cartera siempre muestra el saldo actual completo.
+GET {{Talleres_Api_HostAddress}}/api/estado-negocio?desde=2026-10-01&hasta=2026-10-14&desfaseHorarioMinutos=360&agrupacion=Dia
+
+###
+
 GET {{Talleres_Api_HostAddress}}/salud
 Accept: application/json
 
@@ -40,6 +47,7 @@ Accept: application/json
 
 ###
 
+# Cada orden incluye placaVehiculo, marcaVehiculo, modeloVehiculo y anioVehiculo.
 GET {{Talleres_Api_HostAddress}}/api/clientes/1/estado-cuenta
 Accept: application/json
 

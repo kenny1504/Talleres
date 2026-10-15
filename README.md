@@ -16,7 +16,7 @@ El frontal vive en `src/Talleres.Web` y está diseñado primero para tablet hori
 - Enlace público no predecible para consultar el diagnóstico y autorizar la continuación desde móvil o WhatsApp.
 - Registro táctil de productos de inventario, compras externas, mano de obra y otros cargos durante la reparación.
 - Total calculado y visible desde el detalle de la orden y la preparación de la entrega.
-- Estado de cuenta por cliente con cargos de todas sus órdenes no canceladas, abonos globales y saldo pendiente o a favor.
+- Estado de cuenta por cliente con cargos de todas sus órdenes no canceladas, placa, marca, modelo y año del vehículo atendido en cada orden, abonos globales y saldo pendiente o a favor.
 - Inspección visual táctil por zonas, tipo y severidad del daño, con fotografías públicas en Amazon S3 que pueden consultarse desde el detalle de la orden.
 - Descripción editable para cada daño y observaciones generales opcionales de la recepción, con confirmación al guardar sin ellas.
 - Consulta y edición posterior de los hallazgos visuales dentro del detalle de la orden.
@@ -49,6 +49,17 @@ El frontal vive en `src/Talleres.Web` y está diseñado primero para tablet hori
 - Validaciones estructurales mediante Data Annotations.
 - Excepciones de negocio convertidas a `ProblemDetails` por middleware global.
 - Evidencias de inspección aisladas por empresa, con metadatos en SQL Server y objetos públicos en Amazon S3.
+
+## Estado del negocio
+
+La sección **Estado del negocio** está disponible en la navegación principal y en **Más** en tablet vertical y móvil. Presenta cobros, importe de trabajos, cartera actual de clientes, principales clientes por importe y vehículos, marcas y modelos con más visitas. No incluye gastos, ganancia ni obligaciones con proveedores.
+
+- El período inicial comprende desde el primer día del mes hasta hoy. Permite seleccionar hoy, esta semana, este mes o un rango de hasta 366 días y agrupar los cobros por día, semana (lunes a domingo) o mes.
+- Los cobros son abonos vigentes cuya fecha de registro pertenece al período. El importe de trabajos suma los cargos actuales, redondeados por orden, de órdenes no canceladas **ingresadas** en el período; incluye trabajos en proceso y no equivale a dinero cobrado ni a facturación definitiva.
+- La cartera consulta todo el historial actual registrado, independientemente del período. Excluye órdenes canceladas y pagos anulados; muestra cuentas con cargos o abonos, incluso de clientes inactivos. Los saldos a favor se muestran separados y nunca compensan deudas de otros clientes. Un cliente sin movimientos no cuenta como liquidado.
+- Los pagos continúan siendo globales por cliente; no se identifica ninguna orden como pagada. Abrir una cuenta conserva el período del tablero y vuelve a consultar los indicadores al regresar. Los vehículos permiten abrir su historial completo.
+- `GET /api/estado-negocio?desde=2026-10-01&hasta=2026-10-14&desfaseHorarioMinutos=360&agrupacion=Dia` es una consulta autenticada de solo lectura, aislada por `EmpresaId`. Las fechas son inclusivas y el desfase enviado por el navegador sigue `getTimezoneOffset` (UTC menos hora local); la agrupación admite `Dia`, `Semana` y `Mes`. No requiere migraciones ni cambios en SMART TPV NOVA.
+- Los importes solo reflejan cargos y abonos registrados en Talleres. Ante una consulta fallida se muestra el error y la opción de reintentar, sin sustituir datos por ejemplos.
 
 ## Arquitectura
 

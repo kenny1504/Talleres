@@ -37,6 +37,10 @@ public sealed class EstadoCuentaClienteServicio(
                 orden.Numero,
                 orden.Estado,
                 orden.FechaIngreso,
+                PlacaVehiculo = orden.Vehiculo.Placa,
+                MarcaVehiculo = orden.Vehiculo.Modelo.Marca.Nombre,
+                ModeloVehiculo = orden.Vehiculo.Modelo.Nombre,
+                AnioVehiculo = orden.Vehiculo.Anio,
                 Total = orden.Detalles.Sum(detalle =>
                     (decimal?)(detalle.Cantidad * detalle.PrecioUnitario)) ?? 0m
             })
@@ -46,7 +50,11 @@ public sealed class EstadoCuentaClienteServicio(
             orden.Numero,
             orden.Estado,
             orden.FechaIngreso,
-            decimal.Round(orden.Total, 2, MidpointRounding.AwayFromZero))).ToArray();
+            decimal.Round(orden.Total, 2, MidpointRounding.AwayFromZero),
+            orden.PlacaVehiculo,
+            orden.MarcaVehiculo,
+            orden.ModeloVehiculo,
+            orden.AnioVehiculo)).ToArray();
 
         var pagos = await dbContext.PagosClientes.AsNoTracking()
             .Where(pago => pago.EmpresaId == empresaId && pago.ClienteId == clienteId)

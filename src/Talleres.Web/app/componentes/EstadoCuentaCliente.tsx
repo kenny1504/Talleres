@@ -10,6 +10,10 @@ interface OrdenEstadoCuenta {
   estado: string;
   fechaIngreso: string;
   total: number;
+  placaVehiculo: string;
+  marcaVehiculo: string;
+  modeloVehiculo: string;
+  anioVehiculo: number;
 }
 
 interface PagoCliente {
@@ -151,7 +155,11 @@ export function EstadoCuentaCliente({
             {cuenta.ordenes.length === 0 ? <p className="estado-cuenta-vacio">Este cliente todavía no tiene órdenes no canceladas.</p> :
               <div className="estado-cuenta-lista">
                 {cuenta.ordenes.map((orden) => <article key={orden.id} className="estado-cuenta-fila">
-                  <div><strong>{orden.numero}</strong><small>{fecha(orden.fechaIngreso)} · {etiquetaEstado(orden.estado)}</small></div>
+                  <div>
+                    <strong>{orden.numero}</strong>
+                    <span className="estado-cuenta-vehiculo">{orden.placaVehiculo} · {orden.marcaVehiculo} {orden.modeloVehiculo} {orden.anioVehiculo}</span>
+                    <small>{fecha(orden.fechaIngreso)} · {etiquetaEstado(orden.estado)}</small>
+                  </div>
                   <strong>{moneda(orden.total)}</strong>
                 </article>)}
               </div>}

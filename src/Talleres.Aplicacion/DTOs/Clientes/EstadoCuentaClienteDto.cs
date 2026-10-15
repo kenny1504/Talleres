@@ -7,7 +7,11 @@ public sealed record OrdenEstadoCuentaClienteDto(
     string Numero,
     EstadoOrdenServicio Estado,
     DateTime FechaIngreso,
-    decimal Total);
+    decimal Total,
+    string PlacaVehiculo,
+    string MarcaVehiculo,
+    string ModeloVehiculo,
+    int AnioVehiculo);
 
 public sealed record PagoClienteDto(
     long Id,

@@ -156,6 +156,7 @@ builder.Services.AddScoped<IInventarioSmartNova, InventarioSmartNova>();
 
 builder.Services.AddScoped<IClienteServicio, ClienteServicio>();
 builder.Services.AddScoped<IEstadoCuentaClienteServicio, EstadoCuentaClienteServicio>();
+builder.Services.AddScoped<IEstadoNegocioServicio, EstadoNegocioServicio>();
 builder.Services.AddScoped<IVehiculoServicio, VehiculoServicio>();
 builder.Services.AddScoped<ICatalogoVehiculoServicio, CatalogoVehiculoServicio>();
 builder.Services.AddScoped<IOrdenServicioServicio, OrdenServicioServicio>();

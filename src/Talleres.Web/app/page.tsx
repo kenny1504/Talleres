@@ -7,6 +7,7 @@ import {
   useCargadorPantalla,
 } from "./componentes/ProveedorCargadorPantalla";
 import { EstadoCuentaCliente } from "./componentes/EstadoCuentaCliente";
+import { EstadoNegocio, crearFiltroEstadoNegocio } from "./componentes/EstadoNegocio";
 import { ModalCatalogoVehiculo } from "./componentes/ModalCatalogoVehiculo";
 import { VisorFotografias, type EstadoVisor } from "./componentes/VisorFotografias";
 import { formatearFechaHoraOrden } from "./fechaHoraOrden";
@@ -17,6 +18,7 @@ import {
   Boxes,
   Camera,
   CarFront,
+  ChartNoAxesCombined,
   Check,
   ChevronRight,
   CircleCheck,
@@ -52,7 +54,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-type Vista = "inicio" | "ordenes" | "clientes" | "vehiculos" | "tecnicos" | "inventario";
+type Vista = "inicio" | "ordenes" | "clientes" | "vehiculos" | "tecnicos" | "inventario" | "negocio";
 type EstadoOrden =
   | "Recepción"
   | "Diagnóstico"
@@ -365,6 +367,7 @@ const navegacion: NavegacionItem[] = [
   { id: "vehiculos", etiqueta: "Vehículos", icono: CarFront },
   { id: "tecnicos", etiqueta: "Técnicos", icono: Wrench },
   { id: "inventario", etiqueta: "Inventario", icono: Boxes },
+  { id: "negocio", etiqueta: "Estado del negocio", icono: ChartNoAxesCombined },
 ];
 
 const zonasVehiculo: Array<{ id: ZonaVehiculo; etiqueta: string }> = [
@@ -402,7 +405,8 @@ export default function PaginaPrincipal() {
   const [mostrarNuevaOrden, setMostrarNuevaOrden] = useState(false);
   const [mostrarNuevoCliente, setMostrarNuevoCliente] = useState(false);
   const [clienteEditando, setClienteEditando] = useState<ClienteTaller | null>(null);
-  const [clienteEstadoCuenta, setClienteEstadoCuenta] = useState<ClienteTaller | null>(null);
+  const [clienteEstadoCuenta, setClienteEstadoCuenta] = useState<Pick<ClienteTaller, "id" | "nombre"> | null>(null);
+  const [filtroNegocio, setFiltroNegocio] = useState(crearFiltroEstadoNegocio);
   const [mostrarFormularioVehiculo, setMostrarFormularioVehiculo] = useState(false);
   const [vehiculoEditando, setVehiculoEditando] = useState<VehiculoTaller | null>(null);
   const [clienteInicialNuevaOrdenId, setClienteInicialNuevaOrdenId] = useState<number | null>(null);
@@ -1172,7 +1176,7 @@ export default function PaginaPrincipal() {
               titulo={`Estado de cuenta · ${clienteEstadoCuenta.nombre}`}
               descripcion="Consulta los cargos de sus órdenes y registra abonos directamente al cliente."
               alRegresar={regresarDesdeProceso}
-              etiquetaRegreso="Volver a clientes"
+              etiquetaRegreso={vista === "negocio" ? "Volver al estado del negocio" : "Volver a clientes"}
               mostrarIndicadorGuardado={false}
             >
               <EstadoCuentaCliente
@@ -1293,6 +1297,18 @@ export default function PaginaPrincipal() {
               alCrear={() => abrirFormularioVehiculo()}
               alEditar={abrirFormularioVehiculo}
               alVerHistorial={abrirHistorialVehiculo}
+            />
+          ) : vista === "negocio" ? (
+            <EstadoNegocio
+              direccionApi={obtenerDireccionApi()}
+              filtro={filtroNegocio}
+              alConsultar={setFiltroNegocio}
+              alVerCuenta={(cliente) => setClienteEstadoCuenta({ id: cliente.clienteId, nombre: cliente.nombre })}
+              alVerVehiculo={(vehiculo) => {
+                navegar("ordenes");
+                setFiltroEstado("Todas");
+                setFiltroHistorialOrdenes({ tipo: "vehiculo", id: vehiculo.vehiculoId, nombre: `${vehiculo.marca} ${vehiculo.modelo} · ${vehiculo.placa}` });
+              }}
             />
           ) : vista === "tecnicos" ? (
             <VistaTecnicos tecnicos={tecnicosTaller} alActualizar={setTecnicosTaller} />
@@ -1696,7 +1712,7 @@ function NavegacionInferior({ vista, alNavegar }: { vista: Vista; alNavegar: (vi
         })}
         <button
           type="button"
-          className={mostrarMas || vista === "inventario" || vista === "tecnicos" ? "navegacion-activa" : ""}
+          className={mostrarMas || navegacion.slice(4).some((item) => item.id === vista) ? "navegacion-activa" : ""}
           aria-expanded={mostrarMas}
           aria-controls="opciones-mas-navegacion"
           onClick={() => setMostrarMas((visible) => !visible)}
@@ -2141,14 +2157,20 @@ function VistaClientes({
         {clientesVisibles.map((cliente) => (
           <article className={`fila-cliente ${cliente.activo ? "" : "cliente-inactivo"}`} key={cliente.id}>
             <span className="avatar avatar-cliente">{cliente.iniciales}</span>
-            <span className="resumen-cliente"><strong>{cliente.nombre}</strong><small>{cliente.telefono}</small></span>
-            <span className="datos-cliente"><span><CarFront size={16} />{cliente.cantidadVehiculos} vehículos</span><span><ClipboardList size={16} />{cliente.ordenActiva || "Sin orden activa"}</span></span>
-            {!cliente.activo && <span className="estado-cliente-inactivo">Inactivo</span>}
+            <span className="resumen-cliente">
+              <strong>{cliente.nombre}</strong>
+              <small>{cliente.telefono}</small>
+              <span className="datos-cliente">
+                <span><CarFront size={16} />{cliente.cantidadVehiculos} vehículos</span>
+                <span title={cliente.ordenActiva || "Sin orden activa"}><ClipboardList size={16} /><span className="orden-cliente">{cliente.ordenActiva || "Sin orden activa"}</span></span>
+                {!cliente.activo && <span className="estado-cliente-inactivo">Inactivo</span>}
+              </span>
+            </span>
             <span className="acciones-cliente">
-              <button className="boton-icono" type="button" onClick={() => alEditarCliente(cliente)} aria-label={`Editar cliente ${cliente.nombre}`}><Pencil size={18} /></button>
               <button className="boton-secundario boton-historial" type="button" onClick={() => alVerHistorial(cliente)}><History size={18} />Historial</button>
               <button className="boton-secundario boton-estado-cuenta" type="button" onClick={() => alVerEstadoCuenta(cliente)}>Estado de cuenta</button>
               <button className="boton-primario" type="button" disabled={!cliente.activo} onClick={() => alCrearOrden(cliente.id)}>Crear orden</button>
+              <button className="boton-icono" type="button" onClick={() => alEditarCliente(cliente)} aria-label={`Editar cliente ${cliente.nombre}`}><Pencil size={18} /></button>
             </span>
           </article>
         ))}
@@ -2388,12 +2410,9 @@ function FormularioNuevaOrden({
   const [clienteId, setClienteId] = useState(
     clienteInicialId && clientes.some((cliente) => cliente.id === clienteInicialId)
       ? clienteInicialId
-      : clientes[0]?.id ?? 0,
+      : 0,
   );
-  const [vehiculoId, setVehiculoId] = useState(
-    vehiculos.find((vehiculo) =>
-      vehiculo.clienteId === (clienteInicialId ?? clientes[0]?.id))?.id ?? 0,
-  );
+  const [vehiculoId, setVehiculoId] = useState(0);
   const [altaVisible, setAltaVisible] = useState<"cliente" | "vehiculo" | null>(null);
   const [motivo, setMotivo] = useState("");
   const [dictando, setDictando] = useState(false);
@@ -2519,14 +2538,11 @@ function FormularioNuevaOrden({
               required
               value={clienteId || ""}
               onChange={(evento) => {
-                const siguienteClienteId = Number(evento.target.value);
-                setClienteId(siguienteClienteId);
-                setVehiculoId(
-                  vehiculos.find((vehiculo) => vehiculo.clienteId === siguienteClienteId)?.id ?? 0,
-                );
+                setClienteId(Number(evento.target.value));
+                setVehiculoId(0);
               }}
             >
-              {clientes.length === 0 && <option value="">No hay clientes registrados</option>}
+              <option value="">{clientes.length === 0 ? "No hay clientes registrados" : "Selecciona un cliente"}</option>
               {clientes.map((cliente) => <option key={cliente.id} value={cliente.id}>{cliente.nombre}</option>)}
             </select>
           </label>
@@ -2550,7 +2566,11 @@ function FormularioNuevaOrden({
               value={vehiculoId || ""}
               onChange={(evento) => setVehiculoId(Number(evento.target.value))}
             >
-              {vehiculosCliente.length === 0 && <option value="">El cliente no tiene vehículos</option>}
+              <option value="">{!clienteId
+                ? "Selecciona un cliente primero"
+                : vehiculosCliente.length === 0
+                  ? "El cliente no tiene vehículos"
+                  : "Selecciona un vehículo"}</option>
               {vehiculosCliente.map((vehiculo) => (
                 <option key={vehiculo.id} value={vehiculo.id}>{vehiculo.nombre} · {vehiculo.placa}</option>
               ))}
@@ -2612,7 +2632,7 @@ function FormularioNuevaOrden({
           <small>Se asignará el predeterminado si no eliges otro técnico.</small>
         </label>
         <div className="opciones-prioridad"><label><input type="radio" name="prioridad" defaultChecked />Normal</label><label><input type="radio" name="prioridad" />Prioritaria</label></div>
-        <button className="boton-primario boton-ancho" type="submit" disabled={!formularioDisponible || guardando}>
+        <button className="boton-primario boton-ancho" type="submit" disabled={!formularioDisponible || !vehiculoId || guardando}>
           <Check size={20} />Crear orden de servicio
         </button>
       </form>

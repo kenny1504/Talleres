@@ -12,7 +12,7 @@ public interface IEstadoCuentaClienteServicio
     /// </summary>
     /// <param name="clienteId">Cliente cuya cuenta se consulta.</param>
     /// <param name="cancellationToken">Token para cancelar la consulta.</param>
-    /// <returns>Órdenes, pagos y saldo global del cliente.</returns>
+    /// <returns>Órdenes con placa, marca, modelo y año del vehículo atendido, pagos y saldo global del cliente.</returns>
     Task<EstadoCuentaClienteDto> ObtenerAsync(long clienteId, CancellationToken cancellationToken = default);
 
     /// <summary>
