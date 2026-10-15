@@ -530,6 +530,10 @@ namespace Talleres.Infraestructura.Persistencia.Migraciones
                     b.Property<int>("Kilometraje")
                         .HasColumnType("int");
 
+                    b.Property<string>("ObservacionRevisionOperativa")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
                     b.Property<long>("OrdenServicioId")
                         .HasColumnType("bigint");
 
@@ -552,6 +556,36 @@ namespace Talleres.Infraestructura.Persistencia.Migraciones
                         {
                             t.HasCheckConstraint("CK_RecepcionesVehiculo_PorcentajeCombustible", "[PorcentajeCombustible] >= 0 AND [PorcentajeCombustible] <= 100");
                         });
+                });
+
+            modelBuilder.Entity("Talleres.Dominio.Entidades.ResultadoRevisionOperativa", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<int>("Actividad")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("Correcto")
+                        .HasColumnType("bit");
+
+                    b.Property<long>("EmpresaId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("RecepcionVehiculoId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RecepcionVehiculoId");
+
+                    b.HasIndex("EmpresaId", "RecepcionVehiculoId", "Actividad")
+                        .IsUnique();
+
+                    b.ToTable("ResultadosRevisionOperativa", (string)null);
                 });
 
             modelBuilder.Entity("Talleres.Dominio.Entidades.TallerSincronizado", b =>
@@ -793,6 +827,17 @@ namespace Talleres.Infraestructura.Persistencia.Migraciones
                     b.Navigation("OrdenServicio");
                 });
 
+            modelBuilder.Entity("Talleres.Dominio.Entidades.ResultadoRevisionOperativa", b =>
+                {
+                    b.HasOne("Talleres.Dominio.Entidades.RecepcionVehiculo", "RecepcionVehiculo")
+                        .WithMany("RevisionOperativa")
+                        .HasForeignKey("RecepcionVehiculoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("RecepcionVehiculo");
+                });
+
             modelBuilder.Entity("Talleres.Dominio.Entidades.Vehiculo", b =>
                 {
                     b.HasOne("Talleres.Dominio.Entidades.Cliente", "Cliente")
@@ -848,6 +893,8 @@ namespace Talleres.Infraestructura.Persistencia.Migraciones
                     b.Navigation("Danios");
 
                     b.Navigation("Evidencias");
+
+                    b.Navigation("RevisionOperativa");
                 });
 
             modelBuilder.Entity("Talleres.Dominio.Entidades.TecnicoTaller", b =>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { CircleCheck, CreditCard, ReceiptText, TriangleAlert } from "lucide-react";
+import { ChevronRight, CircleCheck, CreditCard, ReceiptText, TriangleAlert } from "lucide-react";
 import { useCargadorPantalla } from "./ProveedorCargadorPantalla";
 
 interface OrdenEstadoCuenta {
@@ -38,9 +38,11 @@ interface EstadoCuenta {
 export function EstadoCuentaCliente({
   clienteId,
   direccionApi,
+  alAbrirOrden,
 }: {
   clienteId: number;
   direccionApi: string;
+  alAbrirOrden: (ordenId: number) => void;
 }) {
   const { iniciarCargaPantalla, finalizarCargaPantalla, ejecutarConCargadorPantalla } = useCargadorPantalla();
   const [cuenta, setCuenta] = useState<EstadoCuenta | null>(null);
@@ -154,14 +156,22 @@ export function EstadoCuentaCliente({
             <header><ReceiptText size={21} /><div><h2>Órdenes</h2><p>{cuenta.ordenes.length} no canceladas</p></div></header>
             {cuenta.ordenes.length === 0 ? <p className="estado-cuenta-vacio">Este cliente todavía no tiene órdenes no canceladas.</p> :
               <div className="estado-cuenta-lista">
-                {cuenta.ordenes.map((orden) => <article key={orden.id} className="estado-cuenta-fila">
-                  <div>
+                {cuenta.ordenes.map((orden) => <button
+                  key={orden.id}
+                  type="button"
+                  className="estado-cuenta-fila estado-cuenta-orden"
+                  onClick={() => alAbrirOrden(orden.id)}
+                  disabled={procesando}
+                  aria-label={`Abrir orden ${orden.numero} · ${orden.placaVehiculo}`}
+                >
+                  <span>
                     <strong>{orden.numero}</strong>
                     <span className="estado-cuenta-vehiculo">{orden.placaVehiculo} · {orden.marcaVehiculo} {orden.modeloVehiculo} {orden.anioVehiculo}</span>
                     <small>{fecha(orden.fechaIngreso)} · {etiquetaEstado(orden.estado)}</small>
-                  </div>
+                  </span>
                   <strong>{moneda(orden.total)}</strong>
-                </article>)}
+                  <ChevronRight size={18} aria-hidden="true" />
+                </button>)}
               </div>}
           </section>
           <div className="estado-cuenta-pagos">

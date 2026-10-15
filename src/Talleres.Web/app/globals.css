@@ -1736,13 +1736,19 @@ button.negocio-fila:hover { background: var(--superficie); }
 .estado-cuenta-vacio { margin: 3px 0 0; color: var(--tinta-suave); font-size: 12px; }
 .estado-cuenta-lista { display: grid; }
 .estado-cuenta-fila { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 0; padding: 12px 0; border-top: 1px solid var(--borde); }
-.estado-cuenta-fila > div:first-child { min-width: 0; }
+.estado-cuenta-fila > :first-child { min-width: 0; }
 .estado-cuenta-fila strong,
 .estado-cuenta-fila small { display: block; overflow-wrap: anywhere; }
 .estado-cuenta-fila strong { color: var(--tinta); font-size: 13px; }
 .estado-cuenta-fila small { margin-top: 3px; color: var(--tinta-suave); font-size: 11px; }
 .estado-cuenta-vehiculo { display: block; margin-top: 4px; overflow-wrap: anywhere; color: var(--tinta); font-size: 12px; }
 .estado-cuenta-fila > strong { flex: none; white-space: nowrap; }
+.estado-cuenta-orden { width: 100%; min-height: 44px; border-inline: 0; border-bottom: 0; background: transparent; text-align: left; font: inherit; cursor: pointer; }
+.estado-cuenta-orden > :first-child { flex: 1; }
+.estado-cuenta-orden > svg { flex: none; color: var(--tinta-suave); }
+.estado-cuenta-orden:hover { background: var(--verde-claro); }
+.estado-cuenta-orden:focus-visible { outline: 3px solid #79a593; outline-offset: 2px; }
+.estado-cuenta-orden:disabled { cursor: wait; }
 .estado-cuenta-pago-anulado { opacity: .66; }
 .estado-cuenta-formulario { display: grid; gap: 9px; }
 .estado-cuenta-formulario label { color: var(--tinta); font-size: 12px; font-weight: 700; }
@@ -2118,6 +2124,7 @@ button.negocio-fila:hover { background: var(--superficie); }
     "observaciones inspeccion"
     "fotos inspeccion"
     "lista inspeccion"
+    "revision revision"
     "accion accion";
   align-items: start;
   gap: 15px clamp(18px, 2.4vw, 34px);
@@ -2125,6 +2132,7 @@ button.negocio-fila:hover { background: var(--superficie); }
 
 .formulario-recepcion-pagina > .resumen-recepcion { grid-area: resumen; }
 .formulario-recepcion-pagina > .fila-formulario { grid-area: datos; }
+.formulario-recepcion-pagina > .revision-operativa-recepcion { grid-area: revision; }
 .formulario-recepcion-pagina > .inspeccion-visual {
   grid-area: inspeccion;
   padding: clamp(18px, 2.5vw, 27px);
@@ -2274,6 +2282,41 @@ button.negocio-fila:hover { background: var(--superficie); }
 }
 
 .elementos-recepcion legend { margin-bottom: 8px; }
+
+.revision-operativa-recepcion {
+  min-width: 0;
+  margin: 0;
+  padding: 14px;
+  display: grid;
+  gap: 10px;
+  border: 1px solid var(--borde);
+  border-radius: 14px;
+  background: var(--panel);
+  color: var(--tinta);
+}
+.revision-operativa-recepcion legend { padding: 0 5px; font-size: 14px; font-weight: 750; }
+.revision-operativa-recepcion > p { margin: 0; color: var(--tinta-suave); font-size: 12px; line-height: 1.5; }
+.contador-revision-operativa { color: var(--tinta-suave); font-size: 12px; }
+.lista-revision-operativa { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 3px 24px; }
+.fila-revision-operativa { min-width: 0; padding: 4px 0; display: grid; grid-template-columns: minmax(0, 1fr) 44px 44px; align-items: center; gap: 8px; border-bottom: 1px solid var(--borde); }
+.fila-revision-operativa > span { font-size: 13px; line-height: 1.4; overflow-wrap: anywhere; }
+.opcion-revision { min-width: 44px; min-height: 44px; display: grid; place-items: center; border: 1px solid var(--borde); border-radius: 9px; background: var(--panel); color: var(--tinta-suave); }
+.opcion-revision.correcto.seleccionada { border-color: var(--verde); background: var(--verde-claro); color: var(--tinta); }
+.opcion-revision.problema.seleccionada { border-color: var(--rojo); background: var(--rojo-claro); color: var(--tinta); }
+.opcion-revision:focus-visible { outline: 2px solid var(--verde); outline-offset: 2px; }
+.revision-operativa-recepcion > label { font-size: 12px; font-weight: 700; }
+.revision-operativa-recepcion > textarea { width: 100%; min-width: 0; }
+.revision-operativa-recepcion .controles-dictado { align-items: center; }
+.revision-operativa-recepcion .boton-dictado { flex-shrink: 0; }
+.resumen-revision-operativa { min-width: 0; margin: 16px 0; padding-top: 14px; border-top: 1px solid var(--borde); }
+.resumen-revision-operativa h4 { margin: 0 0 10px; font-size: 14px; }
+.resumen-revision-operativa ul { margin: 0; padding: 0; display: grid; list-style: none; }
+.resumen-revision-operativa li { padding: 8px 0; display: flex; justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--borde); font-size: 12px; }
+.resumen-revision-operativa li > span:last-child { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.resultado-correcto svg { color: var(--verde); }
+.resultado-problema svg { color: var(--rojo); }
+.resultado-pendiente { color: var(--tinta-suave); }
+.resumen-revision-operativa .observacion-inspeccion p { white-space: pre-wrap; }
 .elementos-recepcion > p { margin: 0; color: var(--tinta-suave); font-size: 12px; }
 .elementos-recepcion > label { display: grid; gap: 7px; color: #4e5b55; font-size: 11px; font-weight: 750; }
 .lista-comprobacion label { padding-block: 7px; }
@@ -3582,11 +3625,13 @@ button.negocio-fila:hover { background: var(--superficie); }
       "observaciones"
       "fotos"
       "lista"
+      "revision"
       "accion";
   }
   .formulario-recepcion-pagina > .boton-primario {
     bottom: 14px;
   }
+  .lista-revision-operativa { grid-template-columns: 1fr; }
   .navegacion-inferior {
     position: fixed;
     right: 14px;
@@ -3745,9 +3790,16 @@ button.negocio-fila:hover { background: var(--superficie); }
 .datos-inspeccion-publica article { min-height: 76px; padding: 14px; display: flex; align-items: center; gap: 11px; border: 1px solid var(--borde); border-radius: 13px; background: var(--superficie); color: var(--verde); }
 .datos-inspeccion-publica span, .observacion-publica span { display: grid; gap: 3px; color: var(--tinta); }
 .datos-inspeccion-publica small, .observacion-publica small { color: var(--tinta-suave); }
-.datos-inspeccion-publica .elementos-entregados-publicos { grid-column: 1 / -1; }
-.elementos-entregados-publicos span { min-width: 0; }
-.elementos-entregados-publicos strong, .observacion-inspeccion p { overflow-wrap: anywhere; }
+.datos-inspeccion-publica .elementos-entregados-publicos { grid-column: 1 / -1; min-width: 0; min-height: 0; display: grid; align-items: start; gap: 10px; }
+.cabecera-elementos-publicos { display: flex; align-items: center; gap: 8px; }
+.cabecera-elementos-publicos h3 { margin: 0; color: var(--tinta); font-size: 14px; font-weight: 600; }
+.lista-elementos-publicos { margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 7px; list-style: none; }
+.lista-elementos-publicos li { max-width: 100%; min-width: 0; padding: 7px 10px; display: flex; align-items: center; gap: 7px; border: 1px solid var(--borde); border-radius: 8px; background: var(--panel); color: var(--tinta); font-size: 13px; line-height: 1.4; overflow-wrap: anywhere; }
+.lista-elementos-publicos svg, .cabecera-elementos-publicos svg { flex-shrink: 0; color: var(--verde); }
+.otros-elementos-publicos { min-width: 0; padding-top: 9px; border-top: 1px solid var(--borde); }
+.otros-elementos-publicos p { margin: 3px 0 0; color: var(--tinta); font-size: 14px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+.elementos-publicos-vacios { margin: 0; color: var(--tinta-suave); font-size: 14px; }
+.observacion-inspeccion p { overflow-wrap: anywhere; }
 .observacion-publica { padding: 15px; display: flex; align-items: start; gap: 11px; border-radius: 13px; background: var(--superficie); color: var(--verde); }
 .observacion-publica p { margin: 2px 0 0; color: var(--tinta); line-height: 1.55; white-space: pre-wrap; }
 .hallazgos-publicos { display: grid; gap: 9px; }

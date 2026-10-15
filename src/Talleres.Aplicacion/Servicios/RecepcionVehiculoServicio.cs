@@ -22,7 +22,9 @@ public sealed class RecepcionVehiculoServicio(
         var empresaId = contextoEmpresa.ObtenerEmpresaIdRequerido();
         var orden = await dbContext.OrdenesServicio
                         .Include(item => item.Recepcion)
-                        .SingleOrDefaultAsync(item => item.Id == ordenServicioId, cancellationToken)
+                        .SingleOrDefaultAsync(
+                            item => item.Id == ordenServicioId && item.EmpresaId == empresaId,
+                            cancellationToken)
                     ?? throw new RecursoNoEncontradoException(
                         "La orden de servicio solicitada no existe.");
 
@@ -67,6 +69,9 @@ public sealed class RecepcionVehiculoServicio(
             FechaRecepcion = fechaActual
         };
 
+        ActualizarRevisionOperativa(
+            recepcion, solicitud.RevisionOperativa, solicitud.ObservacionRevisionOperativa, empresaId);
+
         foreach (var danio in solicitud.Danios)
         {
             recepcion.Danios.Add(new DanioVehiculo
@@ -102,10 +107,13 @@ public sealed class RecepcionVehiculoServicio(
         var empresaId = contextoEmpresa.ObtenerEmpresaIdRequerido();
         var recepcion = await dbContext.RecepcionesVehiculo
                             .Include(item => item.Danios)
+                            .Include(item => item.RevisionOperativa)
                             .Include(item => item.Evidencias)
                             .Include(item => item.OrdenServicio)
                             .SingleOrDefaultAsync(
-                                item => item.OrdenServicioId == ordenServicioId,
+                                item => item.OrdenServicioId == ordenServicioId
+                                    && item.EmpresaId == empresaId
+                                    && item.OrdenServicio.EmpresaId == empresaId,
                                 cancellationToken)
                         ?? throw new RecursoNoEncontradoException(
                             "La orden no tiene una recepción registrada.");
@@ -139,6 +147,8 @@ public sealed class RecepcionVehiculoServicio(
         recepcion.DejaChalecoReflectante = solicitud.DejaChalecoReflectante;
         recepcion.OtrosElementos = LimpiarOpcional(solicitud.OtrosElementos);
         recepcion.AceptaPruebaRuta = solicitud.AceptaPruebaRuta;
+        ActualizarRevisionOperativa(
+            recepcion, solicitud.RevisionOperativa, solicitud.ObservacionRevisionOperativa, empresaId);
         recepcion.Danios.Clear();
 
         foreach (var danio in solicitud.Danios)
@@ -161,10 +171,12 @@ public sealed class RecepcionVehiculoServicio(
         long ordenServicioId,
         CancellationToken cancellationToken = default)
     {
-        contextoEmpresa.ObtenerEmpresaIdRequerido();
+        var empresaId = contextoEmpresa.ObtenerEmpresaIdRequerido();
         return await dbContext.RecepcionesVehiculo
                    .AsNoTracking()
-                   .Where(recepcion => recepcion.OrdenServicioId == ordenServicioId)
+                   .Where(recepcion => recepcion.OrdenServicioId == ordenServicioId
+                       && recepcion.EmpresaId == empresaId
+                       && recepcion.OrdenServicio.EmpresaId == empresaId)
                    .Select(recepcion => new RecepcionVehiculoDto(
                        recepcion.Id,
                        recepcion.OrdenServicioId,
@@ -193,6 +205,14 @@ public sealed class RecepcionVehiculoServicio(
                                evidencia.FechaCargaUtc))
                            .ToArray())
                    {
+                       RevisionOperativa = recepcion.RevisionOperativa
+                           .OrderBy(resultado => resultado.Actividad)
+                           .Select(resultado => new ResultadoRevisionOperativaDto
+                           {
+                               Actividad = resultado.Actividad,
+                               Correcto = resultado.Correcto
+                           }).ToArray(),
+                       ObservacionRevisionOperativa = recepcion.ObservacionRevisionOperativa,
                        DejaLlantaRepuesto = recepcion.DejaLlantaRepuesto,
                        DejaTrianguloSeguridad = recepcion.DejaTrianguloSeguridad,
                        DejaGata = recepcion.DejaGata,
@@ -236,6 +256,14 @@ public sealed class RecepcionVehiculoServicio(
                 evidencia.FechaCargaUtc))
             .ToArray())
     {
+        RevisionOperativa = recepcion.RevisionOperativa
+            .OrderBy(resultado => resultado.Actividad)
+            .Select(resultado => new ResultadoRevisionOperativaDto
+            {
+                Actividad = resultado.Actividad,
+                Correcto = resultado.Correcto
+            }).ToArray(),
+        ObservacionRevisionOperativa = recepcion.ObservacionRevisionOperativa,
         DejaLlantaRepuesto = recepcion.DejaLlantaRepuesto,
         DejaTrianguloSeguridad = recepcion.DejaTrianguloSeguridad,
         DejaGata = recepcion.DejaGata,
@@ -247,6 +275,56 @@ public sealed class RecepcionVehiculoServicio(
         OtrosElementos = recepcion.OtrosElementos,
         AceptaPruebaRuta = recepcion.AceptaPruebaRuta
     };
+
+    private static void ActualizarRevisionOperativa(
+        RecepcionVehiculo recepcion,
+        IReadOnlyCollection<ResultadoRevisionOperativaDto>? resultados,
+        string? observacion,
+        long empresaId)
+    {
+        // Los clientes anteriores que omiten la revisión conservan los resultados ya registrados.
+        if (resultados is null) return;
+
+        if (resultados.Count > 14
+            || resultados.Any(resultado => resultado is null || !Enum.IsDefined(resultado.Actividad))
+            || resultados.Select(resultado => resultado.Actividad).Distinct().Count() != resultados.Count)
+        {
+            throw new ReglaNegocioException(
+                "La revisión operativa debe contener actividades válidas, sin repetirlas.");
+        }
+
+        if (observacion?.Length > 2000)
+        {
+            throw new ReglaNegocioException(
+                "La observación de la revisión operativa no puede superar los 2000 caracteres.");
+        }
+
+        var resultadosPorActividad = resultados.ToDictionary(resultado => resultado.Actividad);
+        foreach (var existente in recepcion.RevisionOperativa.ToArray())
+        {
+            if (resultadosPorActividad.TryGetValue(existente.Actividad, out var resultado))
+            {
+                existente.Correcto = resultado.Correcto;
+                resultadosPorActividad.Remove(existente.Actividad);
+            }
+            else
+            {
+                recepcion.RevisionOperativa.Remove(existente);
+            }
+        }
+
+        foreach (var resultado in resultadosPorActividad.Values)
+        {
+            recepcion.RevisionOperativa.Add(new ResultadoRevisionOperativa
+            {
+                EmpresaId = empresaId,
+                Actividad = resultado.Actividad,
+                Correcto = resultado.Correcto
+            });
+        }
+
+        recepcion.ObservacionRevisionOperativa = LimpiarOpcional(observacion);
+    }
 
     private static string? LimpiarOpcional(string? valor) =>
         string.IsNullOrWhiteSpace(valor) ? null : valor.Trim();

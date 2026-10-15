@@ -119,20 +119,15 @@ public sealed class OrdenServicioServicio(
                 $"No se permite cambiar la orden de {orden.Estado} a {solicitud.Estado}.");
         }
 
-        if (orden.Estado == EstadoOrdenServicio.Diagnostico &&
-            solicitud.Estado == EstadoOrdenServicio.PendienteAprobacion &&
+        var iniciaReparacion = solicitud.Estado == EstadoOrdenServicio.Reparacion &&
+                               orden.Estado != EstadoOrdenServicio.ControlCalidad;
+        if ((solicitud.Estado == EstadoOrdenServicio.PendienteAprobacion || iniciaReparacion) &&
             string.IsNullOrWhiteSpace(orden.Diagnostico))
         {
             throw new ReglaNegocioException(
-                "Debe guardar el diagnóstico antes de enviarlo para autorización.");
-        }
-
-        if (orden.Estado == EstadoOrdenServicio.PendienteAprobacion &&
-            solicitud.Estado == EstadoOrdenServicio.Reparacion &&
-            orden.FechaAutorizacionClienteUtc is null)
-        {
-            throw new ReglaNegocioException(
-                "El cliente todavía no ha autorizado continuar con la reparación.");
+                iniciaReparacion
+                    ? "Debe guardar el diagnóstico antes de iniciar la reparación."
+                    : "Debe guardar el diagnóstico antes de enviarlo para autorización.");
         }
 
         var estadoAnterior = orden.Estado;
@@ -143,7 +138,11 @@ public sealed class OrdenServicioServicio(
             EmpresaId = empresaId,
             EstadoAnterior = estadoAnterior,
             EstadoNuevo = solicitud.Estado,
-            Descripcion = solicitud.Descripcion.Trim(),
+            Descripcion = iniciaReparacion
+                ? orden.FechaAutorizacionClienteUtc.HasValue
+                    ? "Reparación iniciada desde el taller con autorización digital del cliente registrada."
+                    : "Reparación iniciada desde el taller sin autorización digital del cliente."
+                : solicitud.Descripcion.Trim(),
             Fecha = fechaCambioEstado
         });
 
@@ -272,7 +271,9 @@ public sealed class OrdenServicioServicio(
             (EstadoOrdenServicio.Recepcion, EstadoOrdenServicio.Diagnostico) => true,
             (EstadoOrdenServicio.Diagnostico, EstadoOrdenServicio.PendienteAprobacion) => true,
             (EstadoOrdenServicio.Diagnostico, EstadoOrdenServicio.Cotizacion) => true,
+            (EstadoOrdenServicio.Diagnostico, EstadoOrdenServicio.Reparacion) => true,
             (EstadoOrdenServicio.Cotizacion, EstadoOrdenServicio.PendienteAprobacion) => true,
+            (EstadoOrdenServicio.Cotizacion, EstadoOrdenServicio.Reparacion) => true,
             (EstadoOrdenServicio.PendienteAprobacion, EstadoOrdenServicio.Reparacion) => true,
             (EstadoOrdenServicio.PendienteAprobacion, EstadoOrdenServicio.PreparacionReparacion) => true,
             (EstadoOrdenServicio.PreparacionReparacion, EstadoOrdenServicio.Reparacion) => true,

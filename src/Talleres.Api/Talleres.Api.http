@@ -3,6 +3,18 @@
 @ContrasenaNova = cambie-esta-clave
 @OrdenServicioId = 1
 
+### Iniciar reparación desde el taller (requiere sesión y diagnóstico guardado).
+# Admite Diagnostico, Cotizacion, PendienteAprobacion y PreparacionReparacion.
+# No requiere autorización digital ni modifica fechaAutorizacionClienteUtc.
+# El servidor registra en el historial si existía autorización digital del cliente.
+PUT {{Talleres_Api_HostAddress}}/api/ordenes-servicio/{{OrdenServicioId}}/estado
+Content-Type: application/json
+
+{
+  "estado": "Reparacion",
+  "descripcion": "Reparación iniciada desde el taller."
+}
+
 ### Estado del negocio (requiere la cookie de sesión del taller activo).
 # Fechas locales inclusivas; 360 corresponde a UTC-6. Máximo 366 días.
 # agrupacion admite Dia, Semana o Mes. La cartera siempre muestra el saldo actual completo.
@@ -96,6 +108,7 @@ Content-Type: application/json
 
 ### Recepción: usar una orden nueva que aún esté en recepción.
 # descripcionEstado es opcional (máximo 2000 caracteres): se puede omitir, enviar null o "".
+# revisionOperativa incluye solo actividades revisadas; correcto=true equivale a ✓ y false a ✕.
 
 POST {{Talleres_Api_HostAddress}}/api/ordenes-servicio/{{OrdenServicioId}}/recepcion
 Content-Type: application/json
@@ -104,6 +117,11 @@ Content-Type: application/json
   "kilometraje": 65000,
   "porcentajeCombustible": 50,
   "descripcionEstado": "Vehículo recibido para revisión general.",
+  "revisionOperativa": [
+    { "actividad": "LucesDelanteras", "correcto": true },
+    { "actividad": "Bocina", "correcto": false }
+  ],
+  "observacionRevisionOperativa": "La bocina no funciona.",
   "dejaLlaves": true,
   "dejaDocumentos": true,
   "dejaLlantaRepuesto": true,
@@ -126,6 +144,8 @@ Accept: application/json
 
 ### Corregir la inspección: enviar el conjunto completo, incluidos los hallazgos existentes.
 # Para quitar la observación general, enviar descripcionEstado como "" o null.
+# Enviar revisionOperativa completa y su observación para corregirlas; [] deja todos los puntos sin revisar.
+# Omitir revisionOperativa conserva la revisión y su observación anteriores.
 
 PUT {{Talleres_Api_HostAddress}}/api/ordenes-servicio/{{OrdenServicioId}}/recepcion
 Content-Type: application/json
@@ -134,6 +154,11 @@ Content-Type: application/json
   "kilometraje": 65000,
   "porcentajeCombustible": 50,
   "descripcionEstado": "Vehículo recibido para revisión general.",
+  "revisionOperativa": [
+    { "actividad": "LucesDelanteras", "correcto": true },
+    { "actividad": "Bocina", "correcto": true }
+  ],
+  "observacionRevisionOperativa": "Se verificó nuevamente la bocina y funciona correctamente.",
   "dejaLlaves": true,
   "dejaDocumentos": true,
   "dejaLlantaRepuesto": true,

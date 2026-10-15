@@ -37,6 +37,8 @@ public interface IOrdenServicioServicio
 
     /// <summary>
     /// Cambia el estado de una orden cuando la transición está permitida y registra el historial.
+    /// Iniciar la reparación requiere un diagnóstico guardado; la autorización digital del cliente es opcional.
+    /// El historial distingue si existía autorización digital, sin registrarla en nombre del cliente.
     /// </summary>
     /// <param name="ordenServicioId">Identificador de la orden que cambiará de estado.</param>
     /// <param name="solicitud">Nuevo estado y motivo de la transición.</param>

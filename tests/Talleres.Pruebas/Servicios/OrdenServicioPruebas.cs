@@ -278,8 +278,15 @@ public sealed class OrdenServicioPruebas
                 CancellationToken.None));
     }
 
-    [Fact]
-    public async Task CambiarEstadoAsync_FlujoOperativo_AvanzaHastaListaParaEntrega()
+    [Theory]
+    [InlineData(EstadoOrdenServicio.Diagnostico, false)]
+    [InlineData(EstadoOrdenServicio.Cotizacion, false)]
+    [InlineData(EstadoOrdenServicio.PendienteAprobacion, false)]
+    [InlineData(EstadoOrdenServicio.PreparacionReparacion, false)]
+    [InlineData(EstadoOrdenServicio.PendienteAprobacion, true)]
+    public async Task CambiarEstadoAsync_FlujoOperativo_AvanzaHastaListaParaEntrega(
+        EstadoOrdenServicio estadoInicial,
+        bool conAutorizacionDigital)
     {
         var empresa = new ContextoEmpresaPrueba(1);
         await using var dbContext = CrearDbContext(empresa);
@@ -301,23 +308,19 @@ public sealed class OrdenServicioPruebas
             },
             CancellationToken.None);
         var entidad = await dbContext.OrdenesServicio.SingleAsync();
-        entidad.Estado = EstadoOrdenServicio.Diagnostico;
+        entidad.Estado = estadoInicial;
         entidad.Diagnostico = "Se detectó desgaste en el sistema de frenos delantero.";
         entidad.FechaDiagnosticoUtc = DateTime.UtcNow;
+        var fechaAutorizacion = conAutorizacionDigital ? DateTime.UtcNow : (DateTime?)null;
+        entidad.FechaAutorizacionClienteUtc = fechaAutorizacion;
         await dbContext.SaveChangesAsync();
 
         foreach (var estado in new[]
                  {
-                     EstadoOrdenServicio.PendienteAprobacion,
                      EstadoOrdenServicio.Reparacion,
                      EstadoOrdenServicio.ListaParaEntrega
                  })
         {
-            if (estado == EstadoOrdenServicio.Reparacion)
-            {
-                entidad.FechaAutorizacionClienteUtc = DateTime.UtcNow;
-                await dbContext.SaveChangesAsync();
-            }
             orden = await ordenServicio.CambiarEstadoAsync(
                 orden.Id,
                 new CambiarEstadoOrdenServicioSolicitud
@@ -331,6 +334,13 @@ public sealed class OrdenServicioPruebas
         Assert.Equal(EstadoOrdenServicio.ListaParaEntrega, orden.Estado);
         Assert.True(orden.VisibleEnInicio);
         Assert.True(orden.FechaUltimoCambioEstado > orden.FechaIngreso);
+        Assert.Equal(fechaAutorizacion, entidad.FechaAutorizacionClienteUtc);
+        var inicioReparacion = Assert.Single(entidad.Historial,
+            item => item.EstadoNuevo == EstadoOrdenServicio.Reparacion);
+        Assert.Equal(estadoInicial, inicioReparacion.EstadoAnterior);
+        Assert.Equal(conAutorizacionDigital
+            ? "Reparación iniciada desde el taller con autorización digital del cliente registrada."
+            : "Reparación iniciada desde el taller sin autorización digital del cliente.", inicioReparacion.Descripcion);
     }
 
     [Fact]
@@ -370,8 +380,16 @@ public sealed class OrdenServicioPruebas
         Assert.False(orden.VisibleEnInicio);
     }
 
-    [Fact]
-    public async Task CambiarEstadoAsync_SinDiagnostico_NoPermiteEnviarAprobacion()
+    [Theory]
+    [InlineData(EstadoOrdenServicio.Diagnostico, EstadoOrdenServicio.PendienteAprobacion)]
+    [InlineData(EstadoOrdenServicio.Cotizacion, EstadoOrdenServicio.PendienteAprobacion)]
+    [InlineData(EstadoOrdenServicio.Diagnostico, EstadoOrdenServicio.Reparacion)]
+    [InlineData(EstadoOrdenServicio.Cotizacion, EstadoOrdenServicio.Reparacion)]
+    [InlineData(EstadoOrdenServicio.PendienteAprobacion, EstadoOrdenServicio.Reparacion)]
+    [InlineData(EstadoOrdenServicio.PreparacionReparacion, EstadoOrdenServicio.Reparacion)]
+    public async Task CambiarEstadoAsync_SinDiagnostico_NoPermiteEnviarAprobacionNiIniciarReparacion(
+        EstadoOrdenServicio estadoInicial,
+        EstadoOrdenServicio estadoSolicitado)
     {
         var empresa = new ContextoEmpresaPrueba(1);
         await using var dbContext = CrearDbContext(empresa);
@@ -387,17 +405,19 @@ public sealed class OrdenServicioPruebas
             VehiculoId = vehiculo.Id
         });
         var entidad = await dbContext.OrdenesServicio.SingleAsync();
-        entidad.Estado = EstadoOrdenServicio.Diagnostico;
+        entidad.Estado = estadoInicial;
         await dbContext.SaveChangesAsync();
 
         var excepcion = await Assert.ThrowsAsync<ReglaNegocioException>(() =>
             ordenServicio.CambiarEstadoAsync(orden.Id, new CambiarEstadoOrdenServicioSolicitud
             {
-                Estado = EstadoOrdenServicio.PendienteAprobacion,
+                Estado = estadoSolicitado,
                 Descripcion = "Enviar diagnóstico para autorización."
             }));
 
         Assert.Contains("diagnóstico", excepcion.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(estadoInicial, entidad.Estado);
+        Assert.Null(entidad.FechaAutorizacionClienteUtc);
     }
 
     private static TallerDbContext CrearDbContext(ContextoEmpresaPrueba empresa)

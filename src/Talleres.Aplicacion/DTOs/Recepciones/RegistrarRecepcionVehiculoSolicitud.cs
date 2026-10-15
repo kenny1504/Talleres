@@ -13,6 +13,12 @@ public sealed class RegistrarRecepcionVehiculoSolicitud
     [StringLength(2000)]
     public string? DescripcionEstado { get; init; }
 
+    [MaxLength(14)]
+    public IReadOnlyCollection<ResultadoRevisionOperativaDto>? RevisionOperativa { get; init; }
+
+    [StringLength(2000)]
+    public string? ObservacionRevisionOperativa { get; init; }
+
     public bool DejaLlaves { get; init; }
 
     public bool DejaDocumentos { get; init; }

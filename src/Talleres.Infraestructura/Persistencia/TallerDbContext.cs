@@ -78,6 +78,8 @@ public sealed class TallerDbContext(
             .HasQueryFilter(entidad => entidad.EmpresaId == contextoEmpresa.EmpresaId);
         modelBuilder.Entity<DanioVehiculo>()
             .HasQueryFilter(entidad => entidad.EmpresaId == contextoEmpresa.EmpresaId);
+        modelBuilder.Entity<ResultadoRevisionOperativa>()
+            .HasQueryFilter(entidad => entidad.EmpresaId == contextoEmpresa.EmpresaId);
         modelBuilder.Entity<EvidenciaInspeccion>()
             .HasQueryFilter(entidad => entidad.EmpresaId == contextoEmpresa.EmpresaId);
         modelBuilder.Entity<EvidenciaDiagnostico>()

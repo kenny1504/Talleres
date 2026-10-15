@@ -37,6 +37,7 @@ El frontal vive en `src/Talleres.Web` y está diseñado primero para tablet hori
 - Creación y consulta de órdenes de servicio.
 - Recepción física del vehículo y avance automático a diagnóstico.
 - Diagnóstico obligatorio antes de solicitar autorización; el presupuesto y sus evidencias permanecen opcionales.
+- La aprobación digital del cliente es opcional: con el diagnóstico guardado, el taller puede iniciar la reparación directamente desde diagnóstico o desde una orden por aprobar, sin teléfono ni interacción del cliente con el sistema. El historial registra si existía autorización digital y no completa su fecha cuando el inicio lo decide el taller. El enlace público y WhatsApp siguen disponibles para quienes prefieran autorizar por esa vía.
 - Transiciones controladas del estado de las órdenes.
 - Detalles de reparación persistidos con precio, cantidad, subtotal, origen y total de la orden.
 - Pagos registrados directamente al cliente, sin asignación a una orden. Solo el monto es obligatorio; la forma de pago y la referencia son opcionales. Los pagos anulados se conservan en el historial y dejan de reducir el saldo.
@@ -260,6 +261,12 @@ Si la API queda `unhealthy`, revise los logs del servicio `api`: `/salud` compru
 | `DELETE` | `/api/ordenes-servicio/{id}/recepcion/evidencias/{evidenciaId}` | Elimina la fotografía de S3 y de la inspección |
 
 ## Verificación
+
+La recepción incluye una **revisión operativa** independiente de los elementos entregados: luces delanteras, bajas, altas, direccionales y laterales, luz de freno, halógenos, aceite de motor, líquido de frenos, líquido de embrague (clutch), aceite de dirección, refrigerante, recordatorio de aceite y bocina. Cada punto admite ✓ Correcto o ✕ Con problema; sin selección significa sin revisar. Volver a tocar la opción seleccionada la deja sin revisar. La observación de esta revisión es opcional, admite hasta 2000 caracteres y permite dictado en español en navegadores compatibles con acceso al micrófono. El dictado añade texto al existente y permite corregirlo antes de guardar. Debe detenerse antes de enviar la inspección.
+
+`revisionOperativa` contiene únicamente actividades revisadas (`actividad` y `correcto`); no admite actividades desconocidas ni repetidas. `observacionRevisionOperativa` conserva su comentario independiente de `descripcionEstado`. Ambos se guardan atómicamente junto con la recepción y se consultan y editan desde el detalle de la orden. En una actualización se envía el conjunto completo de selecciones; `[]` elimina las selecciones, y omitir `revisionOperativa` conserva la revisión anterior y su observación para mantener compatibilidad con clientes anteriores. Esta revisión no modifica los indicadores de elementos entregados ni agrega cambios a SMART TPV NOVA.
+
+Antes de ejecutar esta versión sobre una base existente debe aplicarse deliberadamente la migración `AgregarRevisionOperativaRecepcion`. Las recepciones anteriores quedan sin actividades revisadas y sin observación de revisión operativa; no se deduce su estado a partir de los elementos entregados. Las migraciones automáticas continúan desactivadas por defecto.
 
 La recepción registra llaves, documentos, llanta de repuesto, triángulo de seguridad, gata, llave de ruedas, gancho de remolque, extintor, botiquín y chaleco reflectante. `otrosElementos` permite describir herramientas o accesorios adicionales (máximo 500 caracteres). `aceptaPruebaRuta` conserva la aceptación de la prueba de ruta. Estos datos se guardan junto con la inspección, se cargan al editarla y se muestran en el detalle y en el enlace público del cliente. Al actualizar se envía el conjunto completo de datos y hallazgos. Las solicitudes de ejemplo están en `src/Talleres.Api/Talleres.Api.http`.
 

@@ -5,7 +5,7 @@ import { Building2, CalendarDays, Camera, CarFront, Check, CircleCheck, Clipboar
 import { useCargadorPantalla } from "../../componentes/ProveedorCargadorPantalla";
 import { VisorFotografias, type EstadoVisor, type ImagenVisor } from "../../componentes/VisorFotografias";
 import { formatearFechaHoraOrden } from "../../fechaHoraOrden";
-import { describirElementosEntregados, type ElementosRecepcion } from "../../elementosRecepcion";
+import { elementosRecepcion, type ElementosRecepcion } from "../../elementosRecepcion";
 
 interface EvidenciaPublica { id: number; nombreArchivo: string; }
 interface DanioInspeccionPublico { id: number; zona: string; tipo: string; severidad: string; observacion: string | null; }
@@ -56,6 +56,8 @@ export default function OrdenPublicaPagina({ params }: { params: Promise<{ token
   const autorizada = Boolean(orden.fechaAutorizacionClienteUtc);
   const daniosInspeccion = orden.daniosInspeccion ?? [];
   const evidenciasInspeccion = orden.evidenciasInspeccion ?? [];
+  const elementosEntregados = elementosRecepcion.filter(({ campo }) => orden[campo]);
+  const otrosElementos = orden.otrosElementos?.trim();
   const taller = orden.taller ?? { nombre: "Taller", direccion: null, telefono: null, logo: null };
   const imagenesInspeccion = evidenciasInspeccion
     .map((evidencia, indice) => ({ direccion: direccionEvidenciaInspeccion(token, evidencia.id), descripcion: `Fotografía ${indice + 1} de la inspección` }))
@@ -96,7 +98,16 @@ export default function OrdenPublicaPagina({ params }: { params: Promise<{ token
         <div className="datos-inspeccion-publica">
           {orden.kilometraje !== null && <article><CarFront size={20} /><span><small>Kilometraje</small><strong>{orden.kilometraje.toLocaleString("es-NI")} km</strong></span></article>}
           {orden.porcentajeCombustible !== null && <article><Fuel size={20} /><span><small>Combustible</small><strong>{etiquetaCombustible(orden.porcentajeCombustible)}</strong></span></article>}
-          <article className="elementos-entregados-publicos"><KeyRound size={20} /><span><small>Elementos entregados</small><strong>{describirElementosEntregados(orden)}</strong></span></article>
+          <article className="elementos-entregados-publicos" aria-labelledby="titulo-elementos-entregados">
+            <div className="cabecera-elementos-publicos"><KeyRound size={18} aria-hidden="true" /><h3 id="titulo-elementos-entregados">Elementos entregados</h3></div>
+            {elementosEntregados.length > 0 && (
+              <ul className="lista-elementos-publicos">
+                {elementosEntregados.map(({ campo, etiqueta }) => <li key={campo}><Check size={16} aria-hidden="true" />{etiqueta}</li>)}
+              </ul>
+            )}
+            {otrosElementos && <div className="otros-elementos-publicos"><small>Otros elementos</small><p>{otrosElementos}</p></div>}
+            {elementosEntregados.length === 0 && !otrosElementos && <p className="elementos-publicos-vacios">Ninguno registrado</p>}
+          </article>
         </div>
         {orden.descripcionEstado && <div className="observacion-publica"><FileText size={20} /><span><small>Observaciones generales</small><p>{orden.descripcionEstado}</p></span></div>}
         {daniosInspeccion.length > 0 && (

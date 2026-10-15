@@ -17,6 +17,10 @@ public sealed class RecepcionVehiculo : IEntidadEmpresa
 
     public required string DescripcionEstado { get; set; }
 
+    public string? ObservacionRevisionOperativa { get; set; }
+
+    public ICollection<ResultadoRevisionOperativa> RevisionOperativa { get; } = [];
+
     public bool DejaLlaves { get; set; }
 
     public bool DejaDocumentos { get; set; }

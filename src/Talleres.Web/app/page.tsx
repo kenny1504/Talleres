@@ -12,6 +12,7 @@ import { ModalCatalogoVehiculo } from "./componentes/ModalCatalogoVehiculo";
 import { VisorFotografias, type EstadoVisor } from "./componentes/VisorFotografias";
 import { formatearFechaHoraOrden } from "./fechaHoraOrden";
 import { describirElementosEntregados, elementosRecepcion, type ElementosRecepcion } from "./elementosRecepcion";
+import { actividadesRevisionOperativa, type ActividadRevisionOperativa, type ResultadoRevisionOperativa } from "./revisionOperativa";
 import {
   ArrowLeft,
   Bell,
@@ -108,6 +109,8 @@ interface InspeccionVisual extends ElementosRecepcion {
   kilometraje: number;
   porcentajeCombustible: number;
   descripcionEstado: string;
+  revisionOperativa: ResultadoRevisionOperativa[];
+  observacionRevisionOperativa: string | null;
   danios: DanioVisual[];
   evidencias: EvidenciaInspeccion[];
 }
@@ -315,6 +318,8 @@ interface RecepcionVehiculoApi extends ElementosRecepcion {
   kilometraje: number;
   porcentajeCombustible: number;
   descripcionEstado: string;
+  revisionOperativa: ResultadoRevisionOperativa[];
+  observacionRevisionOperativa: string | null;
   danios: DanioVehiculoApi[];
   evidencias: EvidenciaInspeccion[];
 }
@@ -490,7 +495,7 @@ export default function PaginaPrincipal() {
 
   useEffect(() => {
     if (procesoActivo) window.scrollTo({ top: 0, behavior: "smooth" });
-  }, [procesoActivo, mostrarRecepcion]);
+  }, [procesoActivo, mostrarRecepcion, clienteEstadoCuenta, ordenDetalle?.id]);
 
   const ordenesConVehiculo = useMemo(() => {
     const vehiculosPorId = new Map(vehiculos.map((vehiculo) => [vehiculo.id, vehiculo]));
@@ -597,9 +602,26 @@ export default function PaginaPrincipal() {
     setOrdenDetalle(orden);
   }
 
+  async function abrirOrdenDesdeCuenta(ordenId: number) {
+    try {
+      const orden = await ejecutarConCargadorPantalla(
+        "Consultando la orden del cliente…",
+        () => obtenerOrdenApi(ordenId),
+      );
+      abrirOrden(orden);
+    } catch (error) {
+      mostrarAviso(error instanceof Error ? error.message : "No fue posible abrir la orden.");
+    }
+  }
+
   function regresarDesdeProceso() {
     if (mostrarRecepcion) {
       setMostrarRecepcion(false);
+      return;
+    }
+
+    if (ordenDetalle && clienteEstadoCuenta) {
+      setOrdenDetalle(null);
       return;
     }
 
@@ -615,9 +637,11 @@ export default function PaginaPrincipal() {
 
   const etiquetaRegresoProceso = mostrarRecepcion
     ? "Volver a la orden"
-    : vista === "inicio"
-      ? "Volver al tablero"
-      : `Volver a ${navegacion.find((item) => item.id === vista)?.etiqueta.toLocaleLowerCase("es") ?? "la sección"}`;
+    : ordenDetalle && clienteEstadoCuenta
+      ? "Volver al estado de cuenta"
+      : vista === "inicio"
+        ? "Volver al tablero"
+        : `Volver a ${navegacion.find((item) => item.id === vista)?.etiqueta.toLocaleLowerCase("es") ?? "la sección"}`;
 
   function iniciarNuevoCliente() {
     setMostrarNuevaOrden(false);
@@ -922,6 +946,8 @@ export default function PaginaPrincipal() {
       kilometraje: Number(datos.get("kilometraje")),
       porcentajeCombustible: Number(datos.get("combustible")),
       descripcionEstado: String(datos.get("estado") || "").trim(),
+      revisionOperativa: JSON.parse(String(datos.get("revisionOperativa") || "[]")) as ResultadoRevisionOperativa[],
+      observacionRevisionOperativa: String(datos.get("observacionRevisionOperativa") || "").trim() || null,
       dejaLlaves: datos.has("dejaLlaves"),
       dejaDocumentos: datos.has("dejaDocumentos"),
       dejaLlantaRepuesto: datos.has("dejaLlantaRepuesto"),
@@ -1171,7 +1197,7 @@ export default function PaginaPrincipal() {
                 />
               </div>
             </PaginaProceso>
-          ) : clienteEstadoCuenta ? (
+          ) : clienteEstadoCuenta && !ordenDetalle ? (
             <PaginaProceso
               titulo={`Estado de cuenta · ${clienteEstadoCuenta.nombre}`}
               descripcion="Consulta los cargos de sus órdenes y registra abonos directamente al cliente."
@@ -1182,6 +1208,7 @@ export default function PaginaPrincipal() {
               <EstadoCuentaCliente
                 clienteId={clienteEstadoCuenta.id}
                 direccionApi={obtenerDireccionApi()}
+                alAbrirOrden={abrirOrdenDesdeCuenta}
               />
             </PaginaProceso>
           ) : mostrarNuevoCliente ? (
@@ -3008,6 +3035,7 @@ function DetalleOrden({
   }, [bodegaId, detallesEditables, terminoBusquedaProducto]);
 
   async function avanzar(estado: "PendienteAprobacion" | "Reparacion" | "ListaParaEntrega", descripcion: string) {
+    if (guardandoProceso) return null;
     setGuardandoProceso(true);
     setErrorProceso("");
     try {
@@ -3024,6 +3052,10 @@ function DetalleOrden({
     } finally {
       setGuardandoProceso(false);
     }
+  }
+
+  async function iniciarReparacion() {
+    await avanzar("Reparacion", "Reparación iniciada desde el taller.");
   }
 
   async function agregarProducto(evento: FormEvent<HTMLFormElement>) {
@@ -3203,7 +3235,7 @@ function DetalleOrden({
           {etapas.map((etapa, indice) => (
             <div key={etapa} className={indice < indiceActual ? "completo" : indice === indiceActual ? "actual" : ""}>
               <span>{indice < indiceActual ? <Check size={14} /> : ""}</span>
-              <div><strong>{etapa}</strong><small>{indice < indiceActual ? "Completado" : indice === indiceActual ? "Etapa actual" : "Pendiente"}</small></div>
+              <div><strong>{etapa === "Por aprobar" ? "Aprobación (opcional)" : etapa}</strong><small>{etapa === "Por aprobar" && indice < indiceActual && !diagnostico?.fechaAutorizacionClienteUtc ? "Continuó desde el taller" : indice < indiceActual ? "Completado" : indice === indiceActual ? "Etapa actual" : "Pendiente"}</small></div>
             </div>
           ))}
         </div>
@@ -3238,6 +3270,7 @@ function DetalleOrden({
                 alGuardar={guardarDiagnostico}
                 alEliminarEvidencia={eliminarEvidenciaDiagnostico}
                 alEnviarAprobacion={orden.estado === "Diagnóstico" ? solicitarAprobacion : undefined}
+                alIniciarReparacion={orden.estado === "Diagnóstico" ? iniciarReparacion : undefined}
               />
             )}
             {orden.estado === "Por aprobar" && !diagnostico?.diagnostico && (
@@ -3255,11 +3288,11 @@ function DetalleOrden({
             {orden.estado === "Por aprobar" && (
               <section className="paso-orden">
                 <span className="icono-llamada"><CircleCheck size={28} /></span>
-                <span className="sobrelinea">Aprobación del cliente</span>
+                <span className="sobrelinea">Continuar desde el taller</span>
                 <h2>Iniciar reparación</h2>
                 <p>{diagnostico?.fechaAutorizacionClienteUtc
                   ? "El cliente autorizó continuar. Ya puedes iniciar la reparación y registrar sus cargos."
-                  : "Comparte el diagnóstico y espera la autorización del cliente antes de iniciar la reparación."}</p>
+                  : "Puedes iniciar la reparación desde el taller. La aprobación digital es opcional; el cliente no necesita usar el teléfono ni el sistema."}</p>
                 {diagnostico?.tokenPublico && (
                   <AccionesEnlacePublico
                     token={diagnostico.tokenPublico}
@@ -3270,7 +3303,8 @@ function DetalleOrden({
                   />
                 )}
                 {!diagnostico?.fechaAutorizacionClienteUtc && <button className="boton-secundario boton-ancho" type="button" disabled={guardandoProceso} onClick={actualizarAutorizacion}><RotateCcw size={18} />Verificar autorización</button>}
-                <button className="boton-primario boton-ancho" disabled={guardandoProceso || !diagnostico?.fechaAutorizacionClienteUtc} onClick={() => avanzar("Reparacion", "Cliente autorizó continuar y la orden inició reparación.")}><Wrench size={20} />Iniciar reparación</button>
+                <button type="button" className="boton-primario boton-ancho" disabled={cargandoProceso || guardandoProceso || !diagnostico?.diagnostico?.trim()} onClick={iniciarReparacion}><Wrench size={20} />Iniciar reparación</button>
+                {!diagnostico?.diagnostico?.trim() && <small className="ayuda-envio-diagnostico">Guarda el diagnóstico antes de iniciar la reparación.</small>}
               </section>
             )}
             {detallesEditables && (
@@ -3434,6 +3468,7 @@ function FormularioDiagnostico({
   alGuardar,
   alEliminarEvidencia,
   alEnviarAprobacion,
+  alIniciarReparacion,
 }: {
   ordenServicioId: number;
   diagnostico: DiagnosticoOrdenServicioApi | null;
@@ -3443,6 +3478,7 @@ function FormularioDiagnostico({
   alGuardar: (texto: string, fotografias: File[]) => Promise<void>;
   alEliminarEvidencia: (evidenciaId: number) => Promise<void>;
   alEnviarAprobacion?: () => Promise<void>;
+  alIniciarReparacion?: () => Promise<void>;
 }) {
   const [texto, setTexto] = useState(diagnostico?.diagnostico ?? "");
   const [fotografias, setFotografias] = useState<File[]>([]);
@@ -3611,6 +3647,8 @@ function FormularioDiagnostico({
         </div>
       )}
       <button type="button" className="boton-secundario boton-ancho" disabled={guardando || texto.trim().length < 5 || !tieneCambios} onClick={async () => { await alGuardar(texto.trim(), fotografias); setFotografias([]); setErrorFotos(""); if (entradaFotos.current) entradaFotos.current.value = ""; }}><Check size={20} />Guardar diagnóstico</button>
+      {alIniciarReparacion && <button type="button" className="boton-primario boton-ancho" disabled={guardando || !diagnosticoGuardado} onClick={alIniciarReparacion}><Wrench size={20} />Iniciar reparación</button>}
+      {alIniciarReparacion && <small className="ayuda-envio-diagnostico">{diagnosticoGuardado ? "La aprobación digital es opcional. Puedes continuar desde el taller sin que el cliente use el teléfono o el sistema." : "Guarda los cambios del diagnóstico antes de iniciar la reparación."}</small>}
       {diagnostico?.tokenPublico && (
         <AccionesEnlacePublico
           token={diagnostico.tokenPublico}
@@ -3619,7 +3657,7 @@ function FormularioDiagnostico({
           numeroOrden={numeroOrden}
         />
       )}
-      {alEnviarAprobacion && <button type="button" className="boton-primario boton-ancho" disabled={guardando || !diagnosticoGuardado} onClick={alEnviarAprobacion}><MessageCircleMore size={20} />Solicitar aprobación por WhatsApp</button>}
+      {alEnviarAprobacion && <button type="button" className="boton-secundario boton-ancho" disabled={guardando || !diagnosticoGuardado} onClick={alEnviarAprobacion}><MessageCircleMore size={20} />Solicitar aprobación por WhatsApp</button>}
       {alEnviarAprobacion && !diagnosticoGuardado && <small className="ayuda-envio-diagnostico">Guarda el diagnóstico antes de enviarlo al cliente.</small>}
     </section>
   );
@@ -3694,6 +3732,131 @@ function ResumenCargosOrden({
   );
 }
 
+function RevisionOperativaRecepcion({
+  resultadosIniciales,
+  observacionInicial,
+  deshabilitado,
+  alCambiarDictado,
+}: {
+  resultadosIniciales: ResultadoRevisionOperativa[];
+  observacionInicial: string;
+  deshabilitado: boolean;
+  alCambiarDictado: (dictando: boolean) => void;
+}) {
+  const [resultados, setResultados] = useState(resultadosIniciales);
+  const [observacion, setObservacion] = useState(observacionInicial);
+  const [dictando, setDictando] = useState(false);
+  const [mensajeDictado, setMensajeDictado] = useState("");
+  const [dictadoCompatible, setDictadoCompatible] = useState<boolean | null>(null);
+  const reconocimiento = useRef<ReconocimientoVoz | null>(null);
+
+  useEffect(() => () => {
+    const instancia = reconocimiento.current;
+    if (instancia) {
+      instancia.onresult = null;
+      instancia.onerror = null;
+      instancia.onend = null;
+      instancia.abort();
+    }
+  }, []);
+
+  function marcarActividad(actividad: ActividadRevisionOperativa, correcto: boolean) {
+    setResultados((actuales) => {
+      const resultado = actuales.find((item) => item.actividad === actividad);
+      const restantes = actuales.filter((item) => item.actividad !== actividad);
+      return resultado?.correcto === correcto ? restantes : [...restantes, { actividad, correcto }];
+    });
+  }
+
+  function alternarDictado() {
+    if (reconocimiento.current) {
+      reconocimiento.current.stop();
+      return;
+    }
+    const ventana = window as typeof window & {
+      SpeechRecognition?: ConstructorReconocimientoVoz;
+      webkitSpeechRecognition?: ConstructorReconocimientoVoz;
+    };
+    const Constructor = ventana.SpeechRecognition ?? ventana.webkitSpeechRecognition;
+    if (!Constructor) {
+      setDictadoCompatible(false);
+      setMensajeDictado("El dictado no está disponible en este navegador. Puedes escribir la observación.");
+      return;
+    }
+
+    const instancia = new Constructor();
+    reconocimiento.current = instancia;
+    configurarReconocimientoVoz(instancia);
+    const textoAnterior = observacion.trim();
+    let huboError = false;
+    instancia.onresult = (evento) => {
+      const texto = [textoAnterior, obtenerTranscripcionVoz(evento, instancia.continuous)].filter(Boolean).join(" ");
+      setObservacion(texto.slice(0, 2000));
+      if (texto.length >= 2000) {
+        huboError = true;
+        setMensajeDictado("Se alcanzó el límite de 2000 caracteres. Revisa la observación antes de guardar.");
+        instancia.stop();
+      }
+    };
+    instancia.onerror = (evento) => {
+      huboError = true;
+      const mensajes: Record<string, string> = {
+        "not-allowed": "Permite el acceso al micrófono para usar el dictado.",
+        "audio-capture": "No se encontró un micrófono disponible.",
+        "no-speech": "No se detectó voz. Puedes intentar dictar nuevamente.",
+      };
+      setMensajeDictado(mensajes[evento.error] ?? "El dictado se interrumpió. Puedes escribir o intentarlo nuevamente.");
+    };
+    instancia.onend = () => {
+      reconocimiento.current = null;
+      setDictando(false);
+      alCambiarDictado(false);
+      if (!huboError) setMensajeDictado("Dictado finalizado. Puedes corregir la observación antes de guardar.");
+    };
+    try {
+      instancia.start();
+      setDictadoCompatible(true);
+      setDictando(true);
+      alCambiarDictado(true);
+      setMensajeDictado("Escuchando… detén el dictado para revisar el texto y guardar.");
+    } catch {
+      reconocimiento.current = null;
+      setDictando(false);
+      alCambiarDictado(false);
+      setMensajeDictado("No fue posible iniciar el dictado. Puedes escribir la observación.");
+    }
+  }
+
+  return (
+    <fieldset className="revision-operativa-recepcion" disabled={deshabilitado}>
+      <legend>Revisión operativa</legend>
+      <p>✓ Correcto · ✕ Con problema. Toca de nuevo la opción marcada para dejarla sin revisar.</p>
+      <small className="contador-revision-operativa">Revisados: {resultados.length}/{actividadesRevisionOperativa.length}</small>
+      <div className="lista-revision-operativa">
+        {actividadesRevisionOperativa.map(({ actividad, etiqueta }) => {
+          const resultado = resultados.find((item) => item.actividad === actividad);
+          return (
+            <div className="fila-revision-operativa" key={actividad} role="group" aria-labelledby={`revision-${actividad}`}>
+              <span id={`revision-${actividad}`}>{etiqueta}</span>
+              <button type="button" className={resultado?.correcto === true ? "opcion-revision correcto seleccionada" : "opcion-revision"} aria-label={`${etiqueta}: correcto`} aria-pressed={resultado?.correcto === true} onClick={() => marcarActividad(actividad, true)}><Check size={20} /></button>
+              <button type="button" className={resultado?.correcto === false ? "opcion-revision problema seleccionada" : "opcion-revision"} aria-label={`${etiqueta}: con problema`} aria-pressed={resultado?.correcto === false} onClick={() => marcarActividad(actividad, false)}><X size={20} /></button>
+            </div>
+          );
+        })}
+      </div>
+      <input type="hidden" name="revisionOperativa" value={JSON.stringify(resultados)} />
+      <label htmlFor="observacion-revision-operativa">Observación de la revisión operativa (opcional)</label>
+      <textarea id="observacion-revision-operativa" name="observacionRevisionOperativa" rows={3} maxLength={2000} value={observacion} readOnly={dictando} onChange={(evento) => setObservacion(evento.target.value)} placeholder="Ej.: La bocina no funciona; las luces están correctas." />
+      <div className="controles-dictado">
+        <button type="button" className={dictando ? "boton-dictado activo" : "boton-dictado"} disabled={dictadoCompatible === false} aria-pressed={dictando} aria-describedby="estado-dictado-revision" onClick={alternarDictado}>
+          <Mic size={17} />{dictando ? "Detener dictado" : "Dictar observación"}
+        </button>
+        <span id="estado-dictado-revision" className={dictando ? "estado-dictado escuchando" : "estado-dictado"} role="status" aria-live="polite">{mensajeDictado || "Puedes dictar o escribir y luego corregir el texto."}</span>
+      </div>
+    </fieldset>
+  );
+}
+
 function FormularioRecepcion({
   orden,
   inspeccionInicial,
@@ -3719,6 +3882,7 @@ function FormularioRecepcion({
   const [evidenciaPorEliminar, setEvidenciaPorEliminar] = useState<EvidenciaInspeccion | null>(null);
   const [evidenciaEliminandoId, setEvidenciaEliminandoId] = useState<number | null>(null);
   const [guardando, setGuardando] = useState(false);
+  const [dictandoRevision, setDictandoRevision] = useState(false);
   const [datosPorConfirmar, setDatosPorConfirmar] = useState<FormData | null>(null);
   const observacionGeneralRef = useRef<HTMLTextAreaElement | null>(null);
   const vistasPrevias = useMemo(
@@ -3829,7 +3993,7 @@ function FormularioRecepcion({
       aria-busy={guardando}
       onSubmit={async (evento) => {
         evento.preventDefault();
-        if (guardando) return;
+        if (guardando || dictandoRevision) return;
         if (danioEditando) {
           guardarDanio();
           return;
@@ -4114,7 +4278,13 @@ function FormularioRecepcion({
           <label><input type="checkbox" name="aceptaPruebaRuta" defaultChecked={inspeccionInicial?.aceptaPruebaRuta} />Acepta prueba de ruta</label>
         </div>
       </fieldset>
-      <button className="boton-primario boton-ancho" type="submit" disabled={guardando}>
+      <RevisionOperativaRecepcion
+        resultadosIniciales={inspeccionInicial?.revisionOperativa ?? []}
+        observacionInicial={inspeccionInicial?.observacionRevisionOperativa ?? ""}
+        deshabilitado={guardando}
+        alCambiarDictado={setDictandoRevision}
+      />
+      <button className="boton-primario boton-ancho" type="submit" disabled={guardando || dictandoRevision}>
         <Sparkles size={20} />
         {inspeccionInicial
           ? "Guardar cambios de inspección"
@@ -4284,6 +4454,29 @@ function ResumenInspeccion({
         <span className="sobrelinea">Observaciones generales</span>
         <p>{inspeccion?.descripcionEstado || "No se registraron observaciones generales durante la recepción."}</p>
       </div>
+      {inspeccion && (
+        <div className="resumen-revision-operativa">
+          <h4>Revisión operativa</h4>
+          <ul>
+            {actividadesRevisionOperativa.map(({ actividad, etiqueta }) => {
+              const resultado = inspeccion.revisionOperativa.find((item) => item.actividad === actividad);
+              return (
+                <li key={actividad}>
+                  <span>{etiqueta}</span>
+                  <span className={resultado ? (resultado.correcto ? "resultado-correcto" : "resultado-problema") : "resultado-pendiente"}>
+                    {resultado ? (resultado.correcto ? <Check size={17} /> : <X size={17} />) : null}
+                    {resultado ? (resultado.correcto ? "Correcto" : "Con problema") : "Sin revisar"}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+          <div className="observacion-inspeccion">
+            <span className="sobrelinea">Observación de la revisión operativa</span>
+            <p>{inspeccion.observacionRevisionOperativa || "Sin observaciones de la revisión operativa."}</p>
+          </div>
+        </div>
+      )}
       <button className="boton-secundario boton-ancho" type="button" onClick={alEditar}>
         <Pencil size={18} /> Editar inspección y observaciones
       </button>
@@ -4615,6 +4808,14 @@ async function cargarDatosApi(senal: AbortSignal): Promise<{
   return { ordenes, clientes, vehiculos, marcasVehiculo, modelosVehiculo, tecnicosTaller };
 }
 
+async function obtenerOrdenApi(ordenId: number): Promise<OrdenTaller> {
+  const respuesta = await fetch(`${obtenerDireccionApi()}/api/ordenes-servicio/${ordenId}`, {
+    credentials: "include",
+  });
+  if (!respuesta.ok) throw new Error(await obtenerMensajeErrorApi(respuesta, "No fue posible consultar la orden."));
+  return convertirOrdenApi(await respuesta.json() as OrdenServicioApi);
+}
+
 async function cargarOrdenesApi(senal: AbortSignal): Promise<OrdenTaller[]> {
   const direccionApi = obtenerDireccionApi();
 
@@ -4865,6 +5066,8 @@ async function guardarRecepcionApi(
         kilometraje: inspeccion.kilometraje,
         porcentajeCombustible: inspeccion.porcentajeCombustible,
         descripcionEstado: inspeccion.descripcionEstado,
+        revisionOperativa: inspeccion.revisionOperativa,
+        observacionRevisionOperativa: inspeccion.observacionRevisionOperativa,
         dejaLlaves: inspeccion.dejaLlaves,
         dejaDocumentos: inspeccion.dejaDocumentos,
         dejaLlantaRepuesto: inspeccion.dejaLlantaRepuesto,
@@ -4952,6 +5155,8 @@ function convertirRecepcionApi(
     kilometraje: recepcion.kilometraje,
     porcentajeCombustible: recepcion.porcentajeCombustible,
     descripcionEstado: recepcion.descripcionEstado,
+    revisionOperativa: recepcion.revisionOperativa ?? [],
+    observacionRevisionOperativa: recepcion.observacionRevisionOperativa ?? null,
     dejaLlaves: recepcion.dejaLlaves,
     dejaDocumentos: recepcion.dejaDocumentos,
     dejaLlantaRepuesto: recepcion.dejaLlantaRepuesto,
