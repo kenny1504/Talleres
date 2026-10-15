@@ -9,6 +9,7 @@ import {
 import { EstadoCuentaCliente } from "./componentes/EstadoCuentaCliente";
 import { EstadoNegocio, crearFiltroEstadoNegocio } from "./componentes/EstadoNegocio";
 import { ModalCatalogoVehiculo } from "./componentes/ModalCatalogoVehiculo";
+import { SelectorCliente } from "./componentes/SelectorCliente";
 import { VisorFotografias, type EstadoVisor } from "./componentes/VisorFotografias";
 import { formatearFechaHoraOrden } from "./fechaHoraOrden";
 import { describirElementosEntregados, elementosRecepcion, type ElementosRecepcion } from "./elementosRecepcion";
@@ -2558,21 +2559,14 @@ function FormularioNuevaOrden({
       <form className="formulario formulario-nueva-orden" onSubmit={alEnviar}>
         <div className="paso-formulario"><span>1</span><div><strong>Cliente y vehículo</strong><small>Selecciona a quién vamos a atender</small></div></div>
         <div className="campo-con-accion">
-          <label>
-            Cliente
-            <select
-              name="clienteId"
-              required
-              value={clienteId || ""}
-              onChange={(evento) => {
-                setClienteId(Number(evento.target.value));
-                setVehiculoId(0);
-              }}
-            >
-              <option value="">{clientes.length === 0 ? "No hay clientes registrados" : "Selecciona un cliente"}</option>
-              {clientes.map((cliente) => <option key={cliente.id} value={cliente.id}>{cliente.nombre}</option>)}
-            </select>
-          </label>
+          <SelectorCliente
+            clientes={clientes}
+            clienteId={clienteId}
+            alSeleccionar={(id) => {
+              setClienteId(id);
+              setVehiculoId(0);
+            }}
+          />
           <button
             className="boton-alta-rapida"
             type="button"
@@ -3732,19 +3726,15 @@ function ResumenCargosOrden({
   );
 }
 
-function RevisionOperativaRecepcion({
-  resultadosIniciales,
-  observacionInicial,
-  deshabilitado,
+function useDictadoObservacion({
+  observacion,
+  alActualizarObservacion,
   alCambiarDictado,
 }: {
-  resultadosIniciales: ResultadoRevisionOperativa[];
-  observacionInicial: string;
-  deshabilitado: boolean;
-  alCambiarDictado: (dictando: boolean) => void;
+  observacion: string;
+  alActualizarObservacion: (texto: string) => void;
+  alCambiarDictado?: (dictando: boolean) => void;
 }) {
-  const [resultados, setResultados] = useState(resultadosIniciales);
-  const [observacion, setObservacion] = useState(observacionInicial);
   const [dictando, setDictando] = useState(false);
   const [mensajeDictado, setMensajeDictado] = useState("");
   const [dictadoCompatible, setDictadoCompatible] = useState<boolean | null>(null);
@@ -3759,14 +3749,6 @@ function RevisionOperativaRecepcion({
       instancia.abort();
     }
   }, []);
-
-  function marcarActividad(actividad: ActividadRevisionOperativa, correcto: boolean) {
-    setResultados((actuales) => {
-      const resultado = actuales.find((item) => item.actividad === actividad);
-      const restantes = actuales.filter((item) => item.actividad !== actividad);
-      return resultado?.correcto === correcto ? restantes : [...restantes, { actividad, correcto }];
-    });
-  }
 
   function alternarDictado() {
     if (reconocimiento.current) {
@@ -3791,7 +3773,7 @@ function RevisionOperativaRecepcion({
     let huboError = false;
     instancia.onresult = (evento) => {
       const texto = [textoAnterior, obtenerTranscripcionVoz(evento, instancia.continuous)].filter(Boolean).join(" ");
-      setObservacion(texto.slice(0, 2000));
+      alActualizarObservacion(texto.slice(0, 2000));
       if (texto.length >= 2000) {
         huboError = true;
         setMensajeDictado("Se alcanzó el límite de 2000 caracteres. Revisa la observación antes de guardar.");
@@ -3810,21 +3792,53 @@ function RevisionOperativaRecepcion({
     instancia.onend = () => {
       reconocimiento.current = null;
       setDictando(false);
-      alCambiarDictado(false);
+      alCambiarDictado?.(false);
       if (!huboError) setMensajeDictado("Dictado finalizado. Puedes corregir la observación antes de guardar.");
     };
     try {
       instancia.start();
       setDictadoCompatible(true);
       setDictando(true);
-      alCambiarDictado(true);
+      alCambiarDictado?.(true);
       setMensajeDictado("Escuchando… detén el dictado para revisar el texto y guardar.");
     } catch {
       reconocimiento.current = null;
       setDictando(false);
-      alCambiarDictado(false);
+      alCambiarDictado?.(false);
       setMensajeDictado("No fue posible iniciar el dictado. Puedes escribir la observación.");
     }
+  }
+
+  return { dictando, mensajeDictado, dictadoCompatible, alternarDictado };
+}
+
+function RevisionOperativaRecepcion({
+  resultadosIniciales,
+  observacionInicial,
+  deshabilitado,
+  dictadoDeshabilitado,
+  alCambiarDictado,
+}: {
+  resultadosIniciales: ResultadoRevisionOperativa[];
+  observacionInicial: string;
+  deshabilitado: boolean;
+  dictadoDeshabilitado: boolean;
+  alCambiarDictado: (dictando: boolean) => void;
+}) {
+  const [resultados, setResultados] = useState(resultadosIniciales);
+  const [observacion, setObservacion] = useState(observacionInicial);
+  const { dictando, mensajeDictado, dictadoCompatible, alternarDictado } = useDictadoObservacion({
+    observacion,
+    alActualizarObservacion: setObservacion,
+    alCambiarDictado,
+  });
+
+  function marcarActividad(actividad: ActividadRevisionOperativa, correcto: boolean) {
+    setResultados((actuales) => {
+      const resultado = actuales.find((item) => item.actividad === actividad);
+      const restantes = actuales.filter((item) => item.actividad !== actividad);
+      return resultado?.correcto === correcto ? restantes : [...restantes, { actividad, correcto }];
+    });
   }
 
   return (
@@ -3848,7 +3862,7 @@ function RevisionOperativaRecepcion({
       <label htmlFor="observacion-revision-operativa">Observación de la revisión operativa (opcional)</label>
       <textarea id="observacion-revision-operativa" name="observacionRevisionOperativa" rows={3} maxLength={2000} value={observacion} readOnly={dictando} onChange={(evento) => setObservacion(evento.target.value)} placeholder="Ej.: La bocina no funciona; las luces están correctas." />
       <div className="controles-dictado">
-        <button type="button" className={dictando ? "boton-dictado activo" : "boton-dictado"} disabled={dictadoCompatible === false} aria-pressed={dictando} aria-describedby="estado-dictado-revision" onClick={alternarDictado}>
+        <button type="button" className={dictando ? "boton-dictado activo" : "boton-dictado"} disabled={dictadoCompatible === false || dictadoDeshabilitado} aria-pressed={dictando} aria-describedby="estado-dictado-revision" onClick={alternarDictado}>
           <Mic size={17} />{dictando ? "Detener dictado" : "Dictar observación"}
         </button>
         <span id="estado-dictado-revision" className={dictando ? "estado-dictado escuchando" : "estado-dictado"} role="status" aria-live="polite">{mensajeDictado || "Puedes dictar o escribir y luego corregir el texto."}</span>
@@ -3883,6 +3897,16 @@ function FormularioRecepcion({
   const [evidenciaEliminandoId, setEvidenciaEliminandoId] = useState<number | null>(null);
   const [guardando, setGuardando] = useState(false);
   const [dictandoRevision, setDictandoRevision] = useState(false);
+  const [observacionGeneral, setObservacionGeneral] = useState(inspeccionInicial?.descripcionEstado ?? "");
+  const {
+    dictando: dictandoObservacionGeneral,
+    mensajeDictado: mensajeDictadoGeneral,
+    dictadoCompatible: dictadoGeneralCompatible,
+    alternarDictado: alternarDictadoGeneral,
+  } = useDictadoObservacion({
+    observacion: observacionGeneral,
+    alActualizarObservacion: setObservacionGeneral,
+  });
   const [datosPorConfirmar, setDatosPorConfirmar] = useState<FormData | null>(null);
   const observacionGeneralRef = useRef<HTMLTextAreaElement | null>(null);
   const vistasPrevias = useMemo(
@@ -3993,7 +4017,7 @@ function FormularioRecepcion({
       aria-busy={guardando}
       onSubmit={async (evento) => {
         evento.preventDefault();
-        if (guardando || dictandoRevision) return;
+        if (guardando || dictandoRevision || dictandoObservacionGeneral) return;
         if (danioEditando) {
           guardarDanio();
           return;
@@ -4173,7 +4197,16 @@ function FormularioRecepcion({
       )}
 
       <input type="hidden" name="danios" value={JSON.stringify(danios)} />
-      <label>Observaciones generales (opcional)<textarea ref={observacionGeneralRef} name="estado" rows={4} maxLength={2000} defaultValue={inspeccionInicial?.descripcionEstado || ""} placeholder="Describe el estado interior, accesorios o cualquier detalle adicional..." /></label>
+      <div className="observaciones-generales-recepcion">
+        <label htmlFor="observaciones-generales-inspeccion">Observaciones generales (opcional)</label>
+        <textarea id="observaciones-generales-inspeccion" ref={observacionGeneralRef} name="estado" rows={4} maxLength={2000} value={observacionGeneral} readOnly={dictandoObservacionGeneral} onChange={(evento) => setObservacionGeneral(evento.target.value)} placeholder="Describe el estado interior, accesorios o cualquier detalle adicional..." />
+        <div className="controles-dictado">
+          <button type="button" className={dictandoObservacionGeneral ? "boton-dictado activo" : "boton-dictado"} disabled={guardando || dictandoRevision || dictadoGeneralCompatible === false} aria-pressed={dictandoObservacionGeneral} aria-describedby="estado-dictado-observaciones-generales" onClick={alternarDictadoGeneral}>
+            <Mic size={17} />{dictandoObservacionGeneral ? "Detener dictado" : "Dictar observaciones"}
+          </button>
+          <span id="estado-dictado-observaciones-generales" className={dictandoObservacionGeneral ? "estado-dictado escuchando" : "estado-dictado"} role="status" aria-live="polite">{mensajeDictadoGeneral || "Puedes dictar o escribir y luego corregir el texto."}</span>
+        </div>
+      </div>
       <div className="bloque-carga-fotos">
       <label className="zona-fotos">
         <input
@@ -4282,9 +4315,10 @@ function FormularioRecepcion({
         resultadosIniciales={inspeccionInicial?.revisionOperativa ?? []}
         observacionInicial={inspeccionInicial?.observacionRevisionOperativa ?? ""}
         deshabilitado={guardando}
+        dictadoDeshabilitado={dictandoObservacionGeneral}
         alCambiarDictado={setDictandoRevision}
       />
-      <button className="boton-primario boton-ancho" type="submit" disabled={guardando || dictandoRevision}>
+      <button className="boton-primario boton-ancho" type="submit" disabled={guardando || dictandoRevision || dictandoObservacionGeneral}>
         <Sparkles size={20} />
         {inspeccionInicial
           ? "Guardar cambios de inspección"

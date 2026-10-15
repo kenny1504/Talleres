@@ -2139,7 +2139,7 @@ button.negocio-fila:hover { background: var(--superficie); }
   box-shadow: var(--sombra);
 }
 .formulario-recepcion-pagina > input[type="hidden"] { display: none; }
-.formulario-recepcion-pagina > label:not(.zona-fotos) { grid-area: observaciones; }
+.formulario-recepcion-pagina > .observaciones-generales-recepcion { grid-area: observaciones; display: grid; gap: 10px; min-width: 0; }
 .formulario-recepcion-pagina > .bloque-carga-fotos { grid-area: fotos; }
 .formulario-recepcion-pagina > .elementos-recepcion { grid-area: lista; }
 .formulario-recepcion-pagina > .boton-primario {
@@ -2177,6 +2177,7 @@ button.negocio-fila:hover { background: var(--superficie); }
 .paso-formulario small { margin-top: 3px; color: var(--tinta-suave); font-size: 11px; }
 
 .formulario > label,
+.observaciones-generales-recepcion > label,
 .fila-formulario label {
   display: grid;
   gap: 7px;

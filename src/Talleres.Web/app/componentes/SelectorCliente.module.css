@@ -1,0 +1,13 @@
+.campo { position: relative; display: grid; gap: 7px; min-width: 0; }
+.campo > label { color: #4e5b55; font-size: 11px; font-weight: 750; }
+.control { position: relative; min-width: 0; }
+.control > svg { position: absolute; top: 50%; left: 13px; transform: translateY(-50%); color: var(--tinta-suave); pointer-events: none; }
+.control > input[role="combobox"] { padding-left: 40px; }
+.desplegable { position: absolute; top: calc(100% + 5px); left: 0; right: 0; z-index: 10; overflow: hidden; border: 1px solid var(--borde); border-radius: 13px; background: white; box-shadow: var(--sombra); }
+.opciones { max-height: 264px; max-height: min(264px, 35dvh); overflow-y: auto; overscroll-behavior: contain; margin: 0; padding: 4px; list-style: none; }
+.opciones button { display: grid; gap: 3px; width: 100%; min-height: 50px; padding: 10px; border-radius: 8px; background: transparent; color: var(--tinta); text-align: left; overflow-wrap: anywhere; }
+.opciones button > span { font-size: 14px; font-weight: 600; }
+.opciones button > small { color: var(--tinta-suave); font-size: 12px; }
+.opciones button:hover, .opciones button.opcionActiva, .opciones button[aria-selected="true"] { background: var(--verde-claro); }
+.opciones button:focus-visible { outline: 2px solid var(--verde); outline-offset: -2px; }
+.mensaje { margin: 0; padding: 12px; color: var(--tinta-suave); font-size: 12px; line-height: 1.5; }

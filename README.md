@@ -19,6 +19,7 @@ El frontal vive en `src/Talleres.Web` y está diseñado primero para tablet hori
 - Estado de cuenta por cliente con cargos de todas sus órdenes no canceladas, placa, marca, modelo y año del vehículo atendido en cada orden, abonos globales y saldo pendiente o a favor.
 - Inspección visual táctil por zonas, tipo y severidad del daño, con fotografías públicas en Amazon S3 que pueden consultarse desde el detalle de la orden.
 - Descripción editable para cada daño y observaciones generales opcionales de la recepción, con confirmación al guardar sin ellas.
+- Dictado por voz en las observaciones generales de la inspección y en la revisión operativa, con edición manual y límite de 2000 caracteres. El guardado se habilita al finalizar el dictado.
 - Consulta y edición posterior de los hallazgos visuales dentro del detalle de la orden.
 - Órdenes, recepción e inspección en páginas de trabajo completas; no utilizan paneles laterales ni modales estrechos.
 - Distribución de dos columnas en tablet horizontal y computador, y flujo secuencial en tablet vertical.
