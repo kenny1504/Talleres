@@ -22,7 +22,10 @@ public interface IDiagnosticoOrdenServicioServicio
     /// <summary>Crea la dirección de lectura de una evidencia después de validar la orden y empresa.</summary>
     Task<Uri> CrearDireccionEvidenciaAsync(long ordenServicioId, long evidenciaId, CancellationToken cancellationToken = default);
 
-    /// <summary>Obtiene la vista pública limitada de una orden mediante su token.</summary>
+    /// <summary>Obtiene la vista pública de una orden, incluida su revisión operativa y observación persistidas.</summary>
+    /// <param name="token">Token no predecible que limita la consulta a una única orden y su empresa.</param>
+    /// <param name="cancellationToken">Permite cancelar la consulta.</param>
+    /// <returns>Información pública de la orden; la revisión está vacía cuando no se ha registrado.</returns>
     Task<OrdenServicioPublicaDto> ObtenerPublicaAsync(string token, CancellationToken cancellationToken = default);
 
     /// <summary>Registra de forma idempotente la autorización del cliente mediante el token público.</summary>

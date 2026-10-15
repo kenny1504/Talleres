@@ -1,11 +1,12 @@
 "use client";
 
 import { use, useEffect, useState } from "react";
-import { Building2, CalendarDays, Camera, CarFront, Check, CircleCheck, ClipboardList, FileText, Fuel, KeyRound, MapPin, Phone, Wrench, ZoomIn } from "lucide-react";
+import { Building2, CalendarDays, Camera, CarFront, Check, CircleCheck, ClipboardCheck, ClipboardList, FileText, Fuel, KeyRound, MapPin, Minus, Phone, Wrench, X, ZoomIn } from "lucide-react";
 import { useCargadorPantalla } from "../../componentes/ProveedorCargadorPantalla";
 import { VisorFotografias, type EstadoVisor, type ImagenVisor } from "../../componentes/VisorFotografias";
 import { formatearFechaHoraOrden } from "../../fechaHoraOrden";
 import { elementosRecepcion, type ElementosRecepcion } from "../../elementosRecepcion";
+import { actividadesRevisionOperativa, type ResultadoRevisionOperativa } from "../../revisionOperativa";
 
 interface EvidenciaPublica { id: number; nombreArchivo: string; }
 interface DanioInspeccionPublico { id: number; zona: string; tipo: string; severidad: string; observacion: string | null; }
@@ -17,6 +18,7 @@ interface OrdenPublica extends ElementosRecepcion {
   marca: string; modelo: string; anio: number; color: string | null; numeroVin: string | null;
   motivoIngreso: string | null; diagnostico: string; fechaAutorizacionClienteUtc: string | null;
   kilometraje: number | null; porcentajeCombustible: number | null; descripcionEstado: string | null;
+  revisionOperativa: ResultadoRevisionOperativa[]; observacionRevisionOperativa: string | null;
   daniosInspeccion: DanioInspeccionPublico[];
   evidenciasInspeccion: EvidenciaPublica[]; evidenciasDiagnostico: EvidenciaPublica[];
   detalles: DetallePublico[]; total: number;
@@ -58,6 +60,8 @@ export default function OrdenPublicaPagina({ params }: { params: Promise<{ token
   const evidenciasInspeccion = orden.evidenciasInspeccion ?? [];
   const elementosEntregados = elementosRecepcion.filter(({ campo }) => orden[campo]);
   const otrosElementos = orden.otrosElementos?.trim();
+  const revisionOperativa = orden.revisionOperativa ?? [];
+  const observacionRevisionOperativa = orden.observacionRevisionOperativa?.trim();
   const taller = orden.taller ?? { nombre: "Taller", direccion: null, telefono: null, logo: null };
   const imagenesInspeccion = evidenciasInspeccion
     .map((evidencia, indice) => ({ direccion: direccionEvidenciaInspeccion(token, evidencia.id), descripcion: `Fotografía ${indice + 1} de la inspección` }))
@@ -107,6 +111,22 @@ export default function OrdenPublicaPagina({ params }: { params: Promise<{ token
             )}
             {otrosElementos && <div className="otros-elementos-publicos"><small>Otros elementos</small><p>{otrosElementos}</p></div>}
             {elementosEntregados.length === 0 && !otrosElementos && <p className="elementos-publicos-vacios">Ninguno registrado</p>}
+          </article>
+          <article className="revision-operativa-publica" aria-labelledby="titulo-revision-operativa">
+            <div className="cabecera-elementos-publicos"><ClipboardCheck size={18} aria-hidden="true" /><h3 id="titulo-revision-operativa">Revisión operativa</h3></div>
+            <ul className="lista-elementos-publicos">
+              {actividadesRevisionOperativa.map(({ actividad, etiqueta }) => {
+                const resultado = revisionOperativa.find((item) => item.actividad === actividad);
+                const estado = resultado ? (resultado.correcto ? "Correcto" : "Con problema") : "Sin revisar";
+                return (
+                  <li key={actividad} className={resultado ? (resultado.correcto ? "revision-correcta" : "revision-con-problema") : "revision-sin-revisar"}>
+                    {resultado ? (resultado.correcto ? <Check size={16} aria-hidden="true" /> : <X size={16} aria-hidden="true" />) : <Minus size={16} aria-hidden="true" />}
+                    <span>{etiqueta}: {estado}</span>
+                  </li>
+                );
+              })}
+            </ul>
+            <div className="otros-elementos-publicos"><small>Observación de la revisión operativa</small><p>{observacionRevisionOperativa || "Sin observaciones de la revisión operativa."}</p></div>
           </article>
         </div>
         {orden.descripcionEstado && <div className="observacion-publica"><FileText size={20} /><span><small>Observaciones generales</small><p>{orden.descripcionEstado}</p></span></div>}

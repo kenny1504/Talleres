@@ -178,6 +178,18 @@ public sealed class DiagnosticoOrdenServicioServicio(
                 Kilometraje = orden.Recepcion == null ? (int?)null : orden.Recepcion.Kilometraje,
                 Combustible = orden.Recepcion == null ? (byte?)null : orden.Recepcion.PorcentajeCombustible,
                 DescripcionEstado = orden.Recepcion == null ? null : orden.Recepcion.DescripcionEstado,
+                RevisionOperativa = orden.Recepcion == null || orden.Recepcion.EmpresaId != orden.EmpresaId
+                    ? Array.Empty<ResultadoRevisionOperativaDto>()
+                    : orden.Recepcion.RevisionOperativa
+                        .Where(resultado => resultado.EmpresaId == orden.EmpresaId)
+                        .OrderBy(resultado => resultado.Actividad)
+                        .Select(resultado => new ResultadoRevisionOperativaDto
+                        {
+                            Actividad = resultado.Actividad,
+                            Correcto = resultado.Correcto
+                        }).ToArray(),
+                ObservacionRevisionOperativa = orden.Recepcion == null || orden.Recepcion.EmpresaId != orden.EmpresaId
+                    ? null : orden.Recepcion.ObservacionRevisionOperativa,
                 DejaLlaves = orden.Recepcion != null && orden.Recepcion.DejaLlaves,
                 DejaDocumentos = orden.Recepcion != null && orden.Recepcion.DejaDocumentos,
                 DejaLlantaRepuesto = orden.Recepcion != null && orden.Recepcion.DejaLlantaRepuesto,
@@ -211,6 +223,8 @@ public sealed class DiagnosticoOrdenServicioServicio(
             tallerNova.Logo);
         return new OrdenServicioPublicaDto(taller, datos.Numero, datos.Estado, datos.FechaIngreso, datos.Nombre, datos.Placa, datos.Marca, datos.Modelo, datos.Anio, datos.Color, datos.NumeroVin, datos.MotivoIngreso, datos.Diagnostico!, datos.FechaAutorizacionClienteUtc, datos.Kilometraje, datos.Combustible, datos.DescripcionEstado, datos.DejaLlaves, datos.DejaDocumentos, datos.DaniosInspeccion, datos.EvidenciasInspeccion, datos.Evidencias, datos.Detalles, datos.Detalles.Sum(item => item.Subtotal))
         {
+            RevisionOperativa = datos.RevisionOperativa,
+            ObservacionRevisionOperativa = datos.ObservacionRevisionOperativa,
             DejaLlantaRepuesto = datos.DejaLlantaRepuesto,
             DejaTrianguloSeguridad = datos.DejaTrianguloSeguridad,
             DejaGata = datos.DejaGata,

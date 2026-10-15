@@ -5,10 +5,7 @@ public sealed record PagoNegocioDto(
     long ClienteId,
     string NombreCliente,
     decimal Monto,
-    DateTime FechaRegistroUtc,
-    string? FormaPago,
-    string? Referencia,
-    DateTime? FechaAnulacionUtc);
+    DateTime FechaRegistroUtc);
 
 public sealed record PagosNegocioDto(
     IReadOnlyList<PagoNegocioDto> Pagos,

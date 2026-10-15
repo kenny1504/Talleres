@@ -2,6 +2,14 @@
 @UsuarioNova = usuario@example.com
 @ContrasenaNova = cambie-esta-clave
 @OrdenServicioId = 1
+@TokenPublicoOrden = sustituya-por-el-token-de-48-caracteres-del-diagnostico
+
+### Consulta pública sin sesión, usando el token del diagnóstico guardado.
+# Incluye revisionOperativa [{ actividad, correcto }] y observacionRevisionOperativa.
+# Solo incluye puntos revisados: true = Correcto, false = Con problema; los ausentes se muestran Sin revisar.
+# Sin revisión registrada devuelve revisionOperativa: [] y observacionRevisionOperativa: null.
+GET {{Talleres_Api_HostAddress}}/api/publico/ordenes-servicio/{{TokenPublicoOrden}}
+Accept: application/json
 
 ### Iniciar reparación desde el taller (requiere sesión y diagnóstico guardado).
 # Admite Diagnostico, Cotizacion, PendienteAprobacion y PreparacionReparacion.
@@ -20,11 +28,11 @@ Content-Type: application/json
 # agrupacion admite Dia, Semana o Mes. La cartera siempre muestra el saldo actual completo.
 GET {{Talleres_Api_HostAddress}}/api/estado-negocio?desde=2026-10-01&hasta=2026-10-14&desfaseHorarioMinutos=360&agrupacion=Dia
 
-### Todos los pagos del taller (requiere sesión). Situación: Todos, Vigentes o Anulados.
-GET {{Talleres_Api_HostAddress}}/api/estado-negocio/pagos?situacion=Todos&pagina=1&tamanoPagina=6
+### Pagos vigentes del taller (requiere sesión). Excluye anulados antes de paginar.
+GET {{Talleres_Api_HostAddress}}/api/estado-negocio/pagos?pagina=1&tamanoPagina=10
 
-### Pagos vigentes del período, buscando por cliente, forma de pago o referencia.
-GET {{Talleres_Api_HostAddress}}/api/estado-negocio/pagos?desde=2026-10-01&hasta=2026-10-14&desfaseHorarioMinutos=360&situacion=Vigentes&busqueda=transferencia&pagina=1&tamanoPagina=6
+### Pagos vigentes del período, buscando por nombre de cliente.
+GET {{Talleres_Api_HostAddress}}/api/estado-negocio/pagos?desde=2026-10-01&hasta=2026-10-14&desfaseHorarioMinutos=360&busqueda=cliente&pagina=1&tamanoPagina=10
 
 ###
 

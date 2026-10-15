@@ -62,6 +62,8 @@ public sealed record OrdenServicioPublicaDto(
     IReadOnlyCollection<DetalleOrdenServicioDto> Detalles,
     decimal Total)
 {
+    public IReadOnlyCollection<ResultadoRevisionOperativaDto> RevisionOperativa { get; init; } = [];
+    public string? ObservacionRevisionOperativa { get; init; }
     public bool DejaLlantaRepuesto { get; init; }
     public bool DejaTrianguloSeguridad { get; init; }
     public bool DejaGata { get; init; }

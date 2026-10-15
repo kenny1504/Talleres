@@ -1656,31 +1656,25 @@ button.negocio-fila:hover { background: var(--superficie); }
 .negocio-paginacion { display: flex; justify-content: space-between; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 0; color: var(--tinta-suave); font-size: 12px; }
 .negocio-paginacion > div { display: flex; gap: 8px; }
 .negocio-paginacion button { min-width: 44px; min-height: 44px; padding: 8px; }
-.negocio-pagos-encabezado { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px; }
+.negocio-pagos-encabezado { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 10px; }
 .negocio-pagos-encabezado > button { min-height: 44px; }
-.negocio-filtros-pagos { align-items: end; }
-.negocio-filtros-pagos label { flex: 1 1 160px; }
-.negocio-filtros-pagos label:last-of-type { flex: 2 1 240px; }
+.negocio-filtros-pagos { display: grid; grid-template-columns: 160px minmax(0, 1fr) auto; align-items: end; gap: 10px; }
 .negocio-filtros-pagos > button { min-height: 44px; }
-.negocio-tabla-pagos { width: 100%; margin-top: 12px; border-collapse: collapse; table-layout: fixed; color: var(--tinta); font-size: 12px; }
-.negocio-tabla-pagos th, .negocio-tabla-pagos td { padding: 10px 8px; text-align: left; border-bottom: 1px solid var(--borde); overflow-wrap: anywhere; vertical-align: middle; }
-.negocio-tabla-pagos thead th { color: var(--tinta-suave); font-weight: 650; }
-.negocio-tabla-pagos th:nth-child(2) { width: 22%; }
-.negocio-tabla-pagos td small { display: block; margin-top: 5px; color: var(--tinta-suave); font-size: 11px; line-height: 1.4; }
-.negocio-tabla-pagos .negocio-pago-monto { font-weight: 650; font-variant-numeric: tabular-nums; }
-.negocio-pago-cliente { min-height: 44px; padding: 5px 0; background: transparent; color: var(--tinta); text-align: left; text-decoration: underline; text-underline-offset: 3px; font-weight: 650; }
-.negocio-pago-estado { display: inline-block; padding: 4px 8px; border: 1px solid var(--borde); border-radius: 7px; background: var(--superficie); color: var(--tinta); }
-@media (max-width: 900px) {
-  .negocio-tabla-pagos thead { display: none; }
-  .negocio-tabla-pagos, .negocio-tabla-pagos tbody { display: block; }
-  .negocio-tabla-pagos tr { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 12px 0; border-bottom: 1px solid var(--borde); gap: 10px 18px; }
-  .negocio-tabla-pagos td { display: grid; min-width: 0; align-content: start; gap: 5px; padding: 0; border: 0; }
-  .negocio-tabla-pagos td::before { content: attr(data-etiqueta); color: var(--tinta-suave); font-size: 11px; font-weight: 500; }
-  .negocio-tabla-pagos .negocio-pago-cliente { min-height: 44px; padding: 0; }
-  .negocio-tabla-pagos td:nth-child(2) { grid-column: 1; grid-row: 1; }
-  .negocio-tabla-pagos td:nth-child(3) { grid-column: 2; grid-row: 1; }
-  .negocio-tabla-pagos td:nth-child(1) { grid-column: 1; grid-row: 2; }
-  .negocio-tabla-pagos td:nth-child(6) { grid-column: 2; grid-row: 2; }
+.negocio-pagos-lista { max-height: 340px; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
+.negocio-tabla-pagos { width: 100%; border-collapse: collapse; table-layout: fixed; color: var(--tinta); font-size: 12px; }
+.negocio-tabla-pagos th, .negocio-tabla-pagos td { padding: 4px 8px; text-align: left; border-bottom: 1px solid var(--borde); overflow-wrap: anywhere; vertical-align: middle; }
+.negocio-tabla-pagos thead th { position: sticky; top: 0; z-index: 1; padding-block: 8px; background: var(--panel); color: var(--tinta-suave); font-size: 11px; font-weight: 650; }
+.negocio-tabla-pagos th:last-child { width: 140px; }
+.negocio-tabla-pagos th:last-child, .negocio-tabla-pagos td:last-child { text-align: right; }
+.negocio-tabla-pagos .negocio-pago-monto { white-space: nowrap; font-size: 13px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.negocio-pago-cliente { width: 100%; min-height: 44px; display: grid; align-content: center; gap: 3px; padding: 0; background: transparent; color: var(--tinta); text-align: left; font-weight: 650; }
+.negocio-pago-cliente > span { overflow-wrap: anywhere; }
+.negocio-pago-cliente time { color: var(--tinta-suave); font-size: 11px; font-weight: 400; }
+.negocio-pagos .negocio-paginacion { padding: 8px 0 0; }
+@media (max-width: 620px) {
+  .negocio-filtros-pagos { grid-template-columns: minmax(0, 1fr) auto; }
+  .negocio-filtros-pagos > label:first-child { grid-column: 1 / -1; }
+  .negocio-tabla-pagos th:last-child { width: 110px; }
 }
 .estado-negocio button:disabled { cursor: not-allowed; opacity: .5; }
 .negocio-grafico { margin: 0; }
@@ -3817,12 +3811,14 @@ button.negocio-fila:hover { background: var(--superficie); }
 .datos-inspeccion-publica article { min-height: 76px; padding: 14px; display: flex; align-items: center; gap: 11px; border: 1px solid var(--borde); border-radius: 13px; background: var(--superficie); color: var(--verde); }
 .datos-inspeccion-publica span, .observacion-publica span { display: grid; gap: 3px; color: var(--tinta); }
 .datos-inspeccion-publica small, .observacion-publica small { color: var(--tinta-suave); }
-.datos-inspeccion-publica .elementos-entregados-publicos { grid-column: 1 / -1; min-width: 0; min-height: 0; display: grid; align-items: start; gap: 10px; }
+.datos-inspeccion-publica .elementos-entregados-publicos, .datos-inspeccion-publica .revision-operativa-publica { grid-column: 1 / -1; min-width: 0; min-height: 0; display: grid; align-items: start; gap: 10px; }
 .cabecera-elementos-publicos { display: flex; align-items: center; gap: 8px; }
 .cabecera-elementos-publicos h3 { margin: 0; color: var(--tinta); font-size: 14px; font-weight: 600; }
 .lista-elementos-publicos { margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 7px; list-style: none; }
 .lista-elementos-publicos li { max-width: 100%; min-width: 0; padding: 7px 10px; display: flex; align-items: center; gap: 7px; border: 1px solid var(--borde); border-radius: 8px; background: var(--panel); color: var(--tinta); font-size: 13px; line-height: 1.4; overflow-wrap: anywhere; }
 .lista-elementos-publicos svg, .cabecera-elementos-publicos svg { flex-shrink: 0; color: var(--verde); }
+.lista-elementos-publicos .revision-con-problema svg { color: var(--rojo); }
+.lista-elementos-publicos .revision-sin-revisar svg { color: var(--tinta-suave); }
 .otros-elementos-publicos { min-width: 0; padding-top: 9px; border-top: 1px solid var(--borde); }
 .otros-elementos-publicos p { margin: 3px 0 0; color: var(--tinta); font-size: 14px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
 .elementos-publicos-vacios { margin: 0; color: var(--tinta-suave); font-size: 14px; }
