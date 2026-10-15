@@ -3,6 +3,7 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { ArrowRight, ChevronLeft, ChevronRight, RefreshCw, TriangleAlert } from "lucide-react";
 import { useCargadorPantalla } from "./ProveedorCargadorPantalla";
+import { PagosClientesNegocio } from "./PagosClientesNegocio";
 
 type AgrupacionCobros = "Dia" | "Semana" | "Mes";
 type SituacionCuenta = "Pendiente" | "Liquidada" | "SaldoAFavor";
@@ -206,6 +207,8 @@ export function EstadoNegocio({ direccionApi, filtro, alConsultar, alVerCuenta, 
             </li>)}</ol>}
         </PanelNegocio>
       </div>
+
+      <PagosClientesNegocio direccionApi={direccionApi} desde={datos.desde} hasta={datos.hasta} alVerCuenta={alVerCuenta} />
 
       <PanelNegocio titulo="Cuentas de clientes" detalle="Saldo actual de todo el historial registrado, independiente del período seleccionado.">
         <div className="negocio-cartera-resumen">

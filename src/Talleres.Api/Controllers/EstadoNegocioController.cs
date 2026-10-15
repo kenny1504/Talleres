@@ -18,4 +18,15 @@ public sealed class EstadoNegocioController(IEstadoNegocioServicio estadoNegocio
     {
         return Ok(await estadoNegocioServicio.ObtenerAsync(solicitud, cancellationToken));
     }
+
+    [HttpGet("pagos")]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    [ProducesResponseType<PagosNegocioDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<PagosNegocioDto>> ListarPagos(
+        [FromQuery] ConsultarPagosNegocioSolicitud solicitud,
+        CancellationToken cancellationToken)
+    {
+        return Ok(await estadoNegocioServicio.ListarPagosAsync(solicitud, cancellationToken));
+    }
 }

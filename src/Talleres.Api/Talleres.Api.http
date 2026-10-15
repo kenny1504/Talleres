@@ -20,6 +20,12 @@ Content-Type: application/json
 # agrupacion admite Dia, Semana o Mes. La cartera siempre muestra el saldo actual completo.
 GET {{Talleres_Api_HostAddress}}/api/estado-negocio?desde=2026-10-01&hasta=2026-10-14&desfaseHorarioMinutos=360&agrupacion=Dia
 
+### Todos los pagos del taller (requiere sesión). Situación: Todos, Vigentes o Anulados.
+GET {{Talleres_Api_HostAddress}}/api/estado-negocio/pagos?situacion=Todos&pagina=1&tamanoPagina=6
+
+### Pagos vigentes del período, buscando por cliente, forma de pago o referencia.
+GET {{Talleres_Api_HostAddress}}/api/estado-negocio/pagos?desde=2026-10-01&hasta=2026-10-14&desfaseHorarioMinutos=360&situacion=Vigentes&busqueda=transferencia&pagina=1&tamanoPagina=6
+
 ###
 
 GET {{Talleres_Api_HostAddress}}/salud

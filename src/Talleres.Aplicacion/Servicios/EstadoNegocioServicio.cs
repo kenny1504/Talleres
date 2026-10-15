@@ -82,6 +82,60 @@ public sealed class EstadoNegocioServicio(
                 .ThenBy(modelo => modelo.Modelo).Take(5).ToArray());
     }
 
+    public async Task<PagosNegocioDto> ListarPagosAsync(
+        ConsultarPagosNegocioSolicitud solicitud,
+        CancellationToken cancellationToken = default)
+    {
+        var empresaId = contextoEmpresa.ObtenerEmpresaIdRequerido();
+        if (solicitud.Pagina < 1 || solicitud.TamanoPagina is < 1 or > 50 ||
+            solicitud.DesfaseHorarioMinutos is < -840 or > 840 || !Enum.IsDefined(solicitud.Situacion) ||
+            solicitud.Busqueda?.Length > 120)
+            throw new ReglaNegocioException("Los filtros o la paginación de pagos no son válidos.");
+
+        var consulta = dbContext.PagosClientes.AsNoTracking()
+            .Where(pago => pago.EmpresaId == empresaId && pago.Cliente.EmpresaId == empresaId);
+        if (solicitud.Desde.HasValue || solicitud.Hasta.HasValue)
+        {
+            ValidarPeriodo(new ConsultarEstadoNegocioSolicitud
+            {
+                Desde = solicitud.Desde, Hasta = solicitud.Hasta,
+                DesfaseHorarioMinutos = solicitud.DesfaseHorarioMinutos
+            });
+            var inicioUtc = DateTime.SpecifyKind(solicitud.Desde!.Value.ToDateTime(TimeOnly.MinValue)
+                .AddMinutes(solicitud.DesfaseHorarioMinutos), DateTimeKind.Utc);
+            var finUtc = DateTime.SpecifyKind(solicitud.Hasta!.Value.AddDays(1).ToDateTime(TimeOnly.MinValue)
+                .AddMinutes(solicitud.DesfaseHorarioMinutos), DateTimeKind.Utc);
+            consulta = consulta.Where(pago => pago.FechaRegistroUtc >= inicioUtc && pago.FechaRegistroUtc < finUtc);
+        }
+
+        if (solicitud.Situacion == SituacionPagoNegocio.Vigentes)
+            consulta = consulta.Where(pago => pago.FechaAnulacionUtc == null);
+        else if (solicitud.Situacion == SituacionPagoNegocio.Anulados)
+            consulta = consulta.Where(pago => pago.FechaAnulacionUtc != null);
+
+        var termino = solicitud.Busqueda?.Trim();
+        if (!string.IsNullOrEmpty(termino))
+            consulta = consulta.Where(pago => pago.Cliente.Nombre.Contains(termino) ||
+                (pago.FormaPago != null && pago.FormaPago.Contains(termino)) ||
+                (pago.Referencia != null && pago.Referencia.Contains(termino)));
+
+        var totalRegistros = await consulta.CountAsync(cancellationToken);
+        var totalPaginas = Math.Max(1, (int)Math.Ceiling(totalRegistros / (decimal)solicitud.TamanoPagina));
+        var pagina = Math.Min(solicitud.Pagina, totalPaginas);
+        var pagos = await consulta.OrderByDescending(pago => pago.FechaRegistroUtc).ThenByDescending(pago => pago.Id)
+            .Skip((pagina - 1) * solicitud.TamanoPagina).Take(solicitud.TamanoPagina)
+            .Select(pago => new PagoNegocioDto(pago.Id, pago.ClienteId, pago.Cliente.Nombre,
+                pago.Monto, pago.FechaRegistroUtc, pago.FormaPago, pago.Referencia, pago.FechaAnulacionUtc))
+            .ToArrayAsync(cancellationToken);
+
+        // SQL Server no conserva DateTime.Kind; el navegador debe recibir explícitamente UTC.
+        return new PagosNegocioDto(pagos.Select(pago => pago with
+        {
+            FechaRegistroUtc = DateTime.SpecifyKind(pago.FechaRegistroUtc, DateTimeKind.Utc),
+            FechaAnulacionUtc = pago.FechaAnulacionUtc is { } fecha ? DateTime.SpecifyKind(fecha, DateTimeKind.Utc) : null
+        }).ToArray(), totalRegistros, pagina, solicitud.TamanoPagina, totalPaginas);
+    }
+
     private async Task<CuentaNegocioDto[]> ObtenerCuentasAsync(long empresaId, CancellationToken cancellationToken)
     {
         // Los cargos son positivos. Floor evita diferencias entre el redondeo de SQL Server

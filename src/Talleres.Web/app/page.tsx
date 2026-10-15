@@ -420,6 +420,10 @@ export default function PaginaPrincipal() {
   const [mostrarRecepcion, setMostrarRecepcion] = useState(false);
   const [aviso, setAviso] = useState("");
   const [inspecciones, setInspecciones] = useState<Record<number, InspeccionVisual>>({});
+  const [falloInspeccion, setFalloInspeccion] = useState<{ ordenId: number; mensaje: string } | null>(null);
+  const [consultaInspeccion, setConsultaInspeccion] = useState(0);
+  const ordenInspeccionId = ordenDetalle?.id;
+  const estadoOrdenInspeccion = ordenDetalle?.estado;
   const vehiculoDetalle = vehiculos.find((vehiculo) => vehiculo.id === ordenDetalle?.vehiculoId);
   const ordenDetalleVisible = ordenDetalle && vehiculoDetalle
     ? {
@@ -478,21 +482,27 @@ export default function PaginaPrincipal() {
   }, [finalizarCargaPantalla, iniciarCargaPantalla, sesion]);
 
   useEffect(() => {
-    if (!ordenDetalle || ordenDetalle.estado === "Recepción") return;
+    if (!ordenInspeccionId || estadoOrdenInspeccion === "Recepción") return;
     const controlador = new AbortController();
     const cargaId = iniciarCargaPantalla("Consultando la inspección de la orden…");
-    cargarInspeccionApi(ordenDetalle.id, controlador.signal)
+    cargarInspeccionApi(ordenInspeccionId, controlador.signal)
       .then((inspeccion) => {
+        if (controlador.signal.aborted) return;
         if (inspeccion) {
-          setInspecciones((actuales) => ({ ...actuales, [ordenDetalle.id]: inspeccion }));
+          setInspecciones((actuales) => ({ ...actuales, [ordenInspeccionId]: inspeccion }));
         }
+        setFalloInspeccion(null);
       })
-      .catch(() => {
-        mostrarAviso("No fue posible consultar la inspección en la API");
+      .catch((error: unknown) => {
+        if (controlador.signal.aborted) return;
+        setFalloInspeccion({
+          ordenId: ordenInspeccionId,
+          mensaje: error instanceof Error ? error.message : "No fue posible consultar la inspección y sus fotografías.",
+        });
       })
       .finally(() => finalizarCargaPantalla(cargaId));
     return () => controlador.abort();
-  }, [finalizarCargaPantalla, iniciarCargaPantalla, ordenDetalle]);
+  }, [finalizarCargaPantalla, iniciarCargaPantalla, ordenInspeccionId, estadoOrdenInspeccion, consultaInspeccion]);
 
   useEffect(() => {
     if (procesoActivo) window.scrollTo({ top: 0, behavior: "smooth" });
@@ -1276,6 +1286,11 @@ export default function PaginaPrincipal() {
                   tecnicosTaller={tecnicosTaller}
                   cliente={clientes.find((cliente) => cliente.id === ordenDetalleVisible.clienteId)}
                   inspeccion={inspecciones[ordenDetalleVisible.id]}
+                  errorInspeccion={falloInspeccion?.ordenId === ordenDetalleVisible.id ? falloInspeccion.mensaje : undefined}
+                  alReintentarInspeccion={() => {
+                    setFalloInspeccion(null);
+                    setConsultaInspeccion((actual) => actual + 1);
+                  }}
                   alRecibir={() => setMostrarRecepcion(true)}
                   alActualizarOrden={actualizarOrdenEnPantalla}
                   alMostrarAviso={mostrarAviso}
@@ -2897,6 +2912,8 @@ function DetalleOrden({
   tecnicosTaller,
   cliente,
   inspeccion,
+  errorInspeccion,
+  alReintentarInspeccion,
   alRecibir,
   alActualizarOrden,
   alMostrarAviso,
@@ -2905,6 +2922,8 @@ function DetalleOrden({
   tecnicosTaller: TecnicoTallerApi[];
   cliente?: ClienteTaller;
   inspeccion?: InspeccionVisual;
+  errorInspeccion?: string;
+  alReintentarInspeccion: () => void;
   alRecibir: () => void;
   alActualizarOrden: (orden: OrdenTaller) => void;
   alMostrarAviso: (mensaje: string) => void;
@@ -3238,11 +3257,23 @@ function DetalleOrden({
       <div className="columna-inspeccion-orden flujo-orden">
         {orden.estado !== "Recepción" ? (
           <>
-            <ResumenInspeccion
-              ordenServicioId={orden.id}
-              inspeccion={inspeccion}
-              alEditar={alRecibir}
-            />
+            {errorInspeccion ? (
+              <div className="bloque-detalle">
+                <div className="estado-datos estado-datos-error" role="alert">
+                  <TriangleAlert size={20} aria-hidden="true" />
+                  <span>{errorInspeccion}</span>
+                </div>
+                <button type="button" className="boton-secundario" onClick={alReintentarInspeccion}>
+                  Reintentar inspección y fotografías
+                </button>
+              </div>
+            ) : inspeccion && (
+              <ResumenInspeccion
+                ordenServicioId={orden.id}
+                inspeccion={inspeccion}
+                alEditar={alRecibir}
+              />
+            )}
             {errorProceso && <div className="estado-datos estado-datos-error" role="alert">{errorProceso}</div>}
             {orden.estado === "Lista para entregar" && (
               <section className="paso-orden orden-lista">
@@ -5175,7 +5206,7 @@ async function cargarInspeccionApi(
       signal: senal,
     },
   );
-  if (!respuesta.ok) throw new Error("No fue posible consultar la inspección.");
+  if (!respuesta.ok) throw new Error(await obtenerMensajeErrorApi(respuesta, "No fue posible consultar la inspección y sus fotografías."));
 
   const recepcion = (await respuesta.json()) as RecepcionVehiculoApi;
   return convertirRecepcionApi(recepcion, ordenServicioId);

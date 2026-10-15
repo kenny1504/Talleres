@@ -81,8 +81,8 @@ public sealed class OrdenServicioServicio(
         CancellationToken cancellationToken = default)
     {
         contextoEmpresa.ObtenerEmpresaIdRequerido();
-        return await ProyectarDto(ConsultarOrdenes())
-                   .SingleOrDefaultAsync(orden => orden.Id == ordenServicioId, cancellationToken)
+        return await ProyectarDto(ConsultarOrdenes().Where(orden => orden.Id == ordenServicioId))
+                   .SingleOrDefaultAsync(cancellationToken)
                ?? throw new RecursoNoEncontradoException(
                    "La orden de servicio solicitada no existe.");
     }
