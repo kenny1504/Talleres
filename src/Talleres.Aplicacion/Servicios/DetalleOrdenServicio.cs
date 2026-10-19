@@ -228,10 +228,15 @@ public sealed class DetalleOrdenServicio(
 
     private static void ValidarDetallesEditables(OrdenServicio orden)
     {
-        if (orden.Estado is not EstadoOrdenServicio.Reparacion and not EstadoOrdenServicio.ListaParaEntrega)
+        if (orden.Estado is not EstadoOrdenServicio.Diagnostico
+            and not EstadoOrdenServicio.Cotizacion
+            and not EstadoOrdenServicio.PendienteAprobacion
+            and not EstadoOrdenServicio.PreparacionReparacion
+            and not EstadoOrdenServicio.Reparacion
+            and not EstadoOrdenServicio.ListaParaEntrega)
         {
             throw new ReglaNegocioException(
-                "Los productos y cargos solo pueden modificarse durante la reparación o mientras la orden está lista para entregar.");
+                "Los productos y cargos solo pueden modificarse desde el diagnóstico, durante la cotización, aprobación, preparación o reparación, y mientras la orden está lista para entregar.");
         }
     }
 

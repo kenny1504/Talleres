@@ -13,12 +13,18 @@ namespace Talleres.Pruebas.Servicios;
 
 public sealed class DetalleOrdenServicioPruebas
 {
-    [Fact]
-    public async Task AgregarInventarioAsync_ConExistencia_DescuentaYCalculaTotal()
+    [Theory]
+    [InlineData(EstadoOrdenServicio.Diagnostico)]
+    [InlineData(EstadoOrdenServicio.Cotizacion)]
+    [InlineData(EstadoOrdenServicio.PendienteAprobacion)]
+    [InlineData(EstadoOrdenServicio.PreparacionReparacion)]
+    [InlineData(EstadoOrdenServicio.Reparacion)]
+    [InlineData(EstadoOrdenServicio.ListaParaEntrega)]
+    public async Task AgregarInventarioAsync_ConExistencia_DescuentaYCalculaTotal(EstadoOrdenServicio estado)
     {
         var empresa = new ContextoEmpresaPrueba(1);
         await using var dbContext = CrearDbContext(empresa);
-        var orden = await CrearOrdenAsync(dbContext, empresa.EmpresaId, EstadoOrdenServicio.Reparacion);
+        var orden = await CrearOrdenAsync(dbContext, empresa.EmpresaId, estado);
         var inventario = new InventarioPrueba(new ArticuloInventarioDto(
             20, "REP-20", "Pastillas de freno", "unidad", 4, 125.50m));
         var servicio = new Talleres.Aplicacion.Servicios.DetalleOrdenServicio(
@@ -72,12 +78,17 @@ public sealed class DetalleOrdenServicioPruebas
         Assert.Equal(0, inventario.SalidasRegistradas);
     }
 
-    [Fact]
-    public async Task AgregarManualAsync_FueraDeReparacion_LanzaReglaNegocio()
+    [Theory]
+    [InlineData(EstadoOrdenServicio.Recepcion)]
+    [InlineData(EstadoOrdenServicio.ControlCalidad)]
+    [InlineData(EstadoOrdenServicio.Entregada)]
+    [InlineData(EstadoOrdenServicio.Cerrada)]
+    [InlineData(EstadoOrdenServicio.Cancelada)]
+    public async Task AgregarManualAsync_EstadoNoEditable_LanzaReglaNegocio(EstadoOrdenServicio estado)
     {
         var empresa = new ContextoEmpresaPrueba(1);
         await using var dbContext = CrearDbContext(empresa);
-        var orden = await CrearOrdenAsync(dbContext, empresa.EmpresaId, EstadoOrdenServicio.Diagnostico);
+        var orden = await CrearOrdenAsync(dbContext, empresa.EmpresaId, estado);
         var inventario = new InventarioPrueba(null);
         var servicio = new Talleres.Aplicacion.Servicios.DetalleOrdenServicio(
             dbContext, empresa, inventario);
@@ -93,12 +104,18 @@ public sealed class DetalleOrdenServicioPruebas
             CancellationToken.None));
     }
 
-    [Fact]
-    public async Task AgregarManualAsync_ListaParaEntrega_PermiteCorregirCargos()
+    [Theory]
+    [InlineData(EstadoOrdenServicio.Diagnostico)]
+    [InlineData(EstadoOrdenServicio.Cotizacion)]
+    [InlineData(EstadoOrdenServicio.PendienteAprobacion)]
+    [InlineData(EstadoOrdenServicio.PreparacionReparacion)]
+    [InlineData(EstadoOrdenServicio.Reparacion)]
+    [InlineData(EstadoOrdenServicio.ListaParaEntrega)]
+    public async Task AgregarManualAsync_EstadoEditable_PermiteCargosYLosConservaAlIniciarReparacion(EstadoOrdenServicio estado)
     {
         var empresa = new ContextoEmpresaPrueba(1);
         await using var dbContext = CrearDbContext(empresa);
-        var orden = await CrearOrdenAsync(dbContext, empresa.EmpresaId, EstadoOrdenServicio.ListaParaEntrega);
+        var orden = await CrearOrdenAsync(dbContext, empresa.EmpresaId, estado);
         var servicio = new Talleres.Aplicacion.Servicios.DetalleOrdenServicio(
             dbContext, empresa, new InventarioPrueba(null));
 
@@ -114,14 +131,39 @@ public sealed class DetalleOrdenServicioPruebas
 
         Assert.Equal(75m, resumen.Total);
         Assert.Equal("Ajuste final de mano de obra", Assert.Single(resumen.Detalles).Descripcion);
+
+        if (estado is EstadoOrdenServicio.Diagnostico or EstadoOrdenServicio.Cotizacion
+            or EstadoOrdenServicio.PendienteAprobacion or EstadoOrdenServicio.PreparacionReparacion)
+        {
+            orden.Diagnostico = "Se requiere ajustar el sistema de frenos.";
+            await dbContext.SaveChangesAsync();
+            var ordenes = new OrdenServicioServicio(dbContext, empresa);
+            await ordenes.CambiarEstadoAsync(orden.Id, new CambiarEstadoOrdenServicioSolicitud
+            {
+                Estado = EstadoOrdenServicio.Reparacion,
+                Descripcion = "Reparación iniciada desde el taller."
+            });
+
+            dbContext.ChangeTracker.Clear();
+            var despuesDeIniciar = await servicio.ObtenerAsync(orden.Id);
+            Assert.Equal(EstadoOrdenServicio.Reparacion, (await dbContext.OrdenesServicio.SingleAsync()).Estado);
+            Assert.Equal(75m, despuesDeIniciar.Total);
+            Assert.Equal(Assert.Single(resumen.Detalles).Id, Assert.Single(despuesDeIniciar.Detalles).Id);
+        }
     }
 
-    [Fact]
-    public async Task EliminarAsync_ProductoConSalida_DevuelveExistenciaYEliminaDetalle()
+    [Theory]
+    [InlineData(EstadoOrdenServicio.Diagnostico)]
+    [InlineData(EstadoOrdenServicio.Cotizacion)]
+    [InlineData(EstadoOrdenServicio.PendienteAprobacion)]
+    [InlineData(EstadoOrdenServicio.PreparacionReparacion)]
+    [InlineData(EstadoOrdenServicio.Reparacion)]
+    [InlineData(EstadoOrdenServicio.ListaParaEntrega)]
+    public async Task EliminarAsync_ProductoConSalida_DevuelveExistenciaYEliminaDetalle(EstadoOrdenServicio estado)
     {
         var empresa = new ContextoEmpresaPrueba(1);
         await using var dbContext = CrearDbContext(empresa);
-        var orden = await CrearOrdenAsync(dbContext, empresa.EmpresaId, EstadoOrdenServicio.ListaParaEntrega);
+        var orden = await CrearOrdenAsync(dbContext, empresa.EmpresaId, estado);
         var detalle = new Talleres.Dominio.Entidades.DetalleOrdenServicio
         {
             EmpresaId = empresa.EmpresaId,

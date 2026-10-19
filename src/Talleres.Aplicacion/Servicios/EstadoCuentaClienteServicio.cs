@@ -36,6 +36,7 @@ public sealed class EstadoCuentaClienteServicio(
                 orden.Id,
                 orden.Numero,
                 orden.Estado,
+                orden.FechaAutorizacionClienteUtc,
                 orden.FechaIngreso,
                 PlacaVehiculo = orden.Vehiculo.Placa,
                 MarcaVehiculo = orden.Vehiculo.Modelo.Marca.Nombre,
@@ -54,7 +55,8 @@ public sealed class EstadoCuentaClienteServicio(
             orden.PlacaVehiculo,
             orden.MarcaVehiculo,
             orden.ModeloVehiculo,
-            orden.AnioVehiculo)).ToArray();
+            orden.AnioVehiculo,
+            orden.FechaAutorizacionClienteUtc)).ToArray();
 
         var pagos = await dbContext.PagosClientes.AsNoTracking()
             .Where(pago => pago.EmpresaId == empresaId && pago.ClienteId == clienteId)

@@ -12,6 +12,7 @@ import { ModalCatalogoVehiculo } from "./componentes/ModalCatalogoVehiculo";
 import { SelectorCliente } from "./componentes/SelectorCliente";
 import { VisorFotografias, type EstadoVisor } from "./componentes/VisorFotografias";
 import { formatearFechaHoraOrden } from "./fechaHoraOrden";
+import { estaAprobadaPorCliente } from "./estadoOrden";
 import { describirElementosEntregados, elementosRecepcion, type ElementosRecepcion } from "./elementosRecepcion";
 import { actividadesRevisionOperativa, type ActividadRevisionOperativa, type ResultadoRevisionOperativa } from "./revisionOperativa";
 import {
@@ -62,6 +63,7 @@ type EstadoOrden =
   | "Diagnóstico"
   | "Cotización"
   | "Por aprobar"
+  | "Aprobada"
   | "Reparación"
   | "Control de calidad"
   | "Lista para entregar";
@@ -74,6 +76,7 @@ interface OrdenTaller {
   cliente: string;
   vehiculo: string;
   placa: string;
+  kilometraje: number | null;
   estado: EstadoOrden;
   motivo: string;
   tecnico: string;
@@ -181,9 +184,11 @@ interface OrdenServicioApi {
   nombreCliente: string;
   vehiculoId: number;
   placaVehiculo: string;
+  kilometraje: number | null;
   estado: string;
   fechaIngreso: string;
   fechaUltimoCambioEstado: string;
+  fechaAutorizacionClienteUtc: string | null;
   observaciones: string | null;
   visibleEnInicio: boolean;
   tecnicoTallerId: number | null;
@@ -291,6 +296,11 @@ interface FiltroHistorialOrdenes {
   id: number;
   nombre: string;
 }
+
+type RegistroPorEliminar =
+  | { tipo: "cliente"; registro: ClienteTaller }
+  | { tipo: "vehiculo"; registro: VehiculoTaller }
+  | { tipo: "orden"; registro: OrdenTaller };
 
 interface MarcaVehiculoApi {
   id: number;
@@ -402,6 +412,7 @@ export default function PaginaPrincipal() {
   const [tecnicosTaller, setTecnicosTaller] = useState<TecnicoTallerApi[]>([]);
   const [cargandoDatos, setCargandoDatos] = useState(true);
   const [errorDatos, setErrorDatos] = useState("");
+  const [errorActualizacionOrdenes, setErrorActualizacionOrdenes] = useState("");
   const [guardandoOrden, setGuardandoOrden] = useState(false);
   const [guardandoCliente, setGuardandoCliente] = useState(false);
   const [guardandoVehiculo, setGuardandoVehiculo] = useState(false);
@@ -422,8 +433,13 @@ export default function PaginaPrincipal() {
   const [inspecciones, setInspecciones] = useState<Record<number, InspeccionVisual>>({});
   const [falloInspeccion, setFalloInspeccion] = useState<{ ordenId: number; mensaje: string } | null>(null);
   const [consultaInspeccion, setConsultaInspeccion] = useState(0);
+  const [registroPorEliminar, setRegistroPorEliminar] = useState<RegistroPorEliminar | null>(null);
+  const [eliminandoRegistro, setEliminandoRegistro] = useState(false);
+  const [errorEliminacion, setErrorEliminacion] = useState("");
+  const eliminacionEnCurso = useRef(false);
   const ordenInspeccionId = ordenDetalle?.id;
   const estadoOrdenInspeccion = ordenDetalle?.estado;
+  const hayOrdenesPorAprobar = ordenes.some((orden) => orden.estado === "Por aprobar");
   const vehiculoDetalle = vehiculos.find((vehiculo) => vehiculo.id === ordenDetalle?.vehiculoId);
   const ordenDetalleVisible = ordenDetalle && vehiculoDetalle
     ? {
@@ -463,6 +479,7 @@ export default function PaginaPrincipal() {
         setModelosVehiculo(datos.modelosVehiculo);
         setTecnicosTaller(datos.tecnicosTaller);
         setErrorDatos("");
+        setErrorActualizacionOrdenes("");
       })
       .catch(() => {
         if (controlador.signal.aborted) return;
@@ -480,6 +497,47 @@ export default function PaginaPrincipal() {
       });
     return () => controlador.abort();
   }, [finalizarCargaPantalla, iniciarCargaPantalla, sesion]);
+
+  useEffect(() => {
+    if (!sesion || cargandoDatos || !hayOrdenesPorAprobar) return;
+    const controlador = new AbortController();
+    let consultando = false;
+
+    async function consultarAprobaciones() {
+      if (document.visibilityState !== "visible" || consultando) return;
+      consultando = true;
+      try {
+        const actualizadas = await cargarOrdenesApi(controlador.signal);
+        if (controlador.signal.aborted) return;
+        const aprobadas = new Map(actualizadas.filter((orden) => orden.estado === "Aprobada").map((orden) => [orden.id, orden]));
+        setErrorActualizacionOrdenes("");
+        if (aprobadas.size === 0) return;
+        // Solo actualizamos aprobaciones pendientes para no reemplazar avances hechos en esta pantalla.
+        const actualizarAprobacion = (orden: OrdenTaller): OrdenTaller => {
+          const aprobada = aprobadas.get(orden.id);
+          return orden.estado === "Por aprobar" && aprobada
+            ? { ...orden, estado: aprobada.estado, progreso: aprobada.progreso, color: aprobada.color }
+            : orden;
+        };
+        setOrdenes((actuales) => actuales.map(actualizarAprobacion));
+        setOrdenDetalle((actual) => actual ? actualizarAprobacion(actual) : actual);
+      } catch (error) {
+        if (!controlador.signal.aborted) setErrorActualizacionOrdenes(error instanceof Error ? error.message : "No fue posible actualizar las autorizaciones.");
+      } finally {
+        consultando = false;
+      }
+    }
+
+    const intervalo = window.setInterval(consultarAprobaciones, 30_000);
+    window.addEventListener("focus", consultarAprobaciones);
+    document.addEventListener("visibilitychange", consultarAprobaciones);
+    return () => {
+      controlador.abort();
+      window.clearInterval(intervalo);
+      window.removeEventListener("focus", consultarAprobaciones);
+      document.removeEventListener("visibilitychange", consultarAprobaciones);
+    };
+  }, [sesion, cargandoDatos, hayOrdenesPorAprobar]);
 
   useEffect(() => {
     if (!ordenInspeccionId || estadoOrdenInspeccion === "Recepción") return;
@@ -969,6 +1027,9 @@ export default function PaginaPrincipal() {
       dejaExtintor: datos.has("dejaExtintor"),
       dejaBotiquin: datos.has("dejaBotiquin"),
       dejaChalecoReflectante: datos.has("dejaChalecoReflectante"),
+      dejaPasacorrientes: datos.has("dejaPasacorrientes"),
+      dejaCopaRueda: datos.has("dejaCopaRueda"),
+      dejaAlfombras: datos.has("dejaAlfombras"),
       otrosElementos: String(datos.get("otrosElementos") || "").trim() || null,
       aceptaPruebaRuta: datos.has("aceptaPruebaRuta"),
       danios,
@@ -998,8 +1059,8 @@ export default function PaginaPrincipal() {
       actuales.map((orden) =>
         orden.id === ordenDetalle.id
           ? esActualizacion
-            ? orden
-            : { ...orden, estado: "Diagnóstico", progreso: 28 }
+            ? { ...orden, kilometraje: resultadoGuardado.inspeccion.kilometraje }
+            : { ...orden, kilometraje: resultadoGuardado.inspeccion.kilometraje, estado: "Diagnóstico", progreso: 28 }
           : orden,
       ),
     );
@@ -1039,16 +1100,71 @@ export default function PaginaPrincipal() {
     mostrarAviso("Fotografía eliminada de la inspección");
   }
 
-  function actualizarOrdenEnPantalla(ordenActualizada: OrdenTaller) {
+  const actualizarOrdenEnPantalla = useCallback((ordenActualizada: OrdenTaller) => {
     setOrdenDetalle(ordenActualizada);
     setOrdenes((actuales) => actuales.map((orden) =>
       orden.id === ordenActualizada.id ? ordenActualizada : orden,
     ));
-  }
+  }, []);
 
   function mostrarAviso(mensaje: string) {
     setAviso(mensaje);
     window.setTimeout(() => setAviso(""), 3600);
+  }
+
+  function confirmarEliminacion(registro: RegistroPorEliminar) {
+    setErrorEliminacion("");
+    setRegistroPorEliminar(registro);
+  }
+
+  async function eliminarRegistroConfirmado() {
+    if (!registroPorEliminar || eliminacionEnCurso.current) return;
+    eliminacionEnCurso.current = true;
+    setEliminandoRegistro(true);
+    setErrorEliminacion("");
+    const { tipo, registro } = registroPorEliminar;
+    try {
+      await ejecutarConCargadorPantalla(
+        tipo === "orden" ? "Eliminando la orden y devolviendo sus consumos…"
+          : tipo === "cliente" ? "Eliminando el cliente…" : "Eliminando el vehículo…",
+        () => eliminarRegistroApi(tipo, registro.id),
+      );
+      if (tipo === "orden") {
+        const restantes = ordenes.filter((orden) => orden.id !== registro.id);
+        setOrdenes(restantes);
+        setClientes((actuales) => actuales.map((cliente) => ({
+          ...cliente,
+          ordenActiva: restantes.find((orden) => orden.clienteId === cliente.id &&
+            orden.estado !== "Lista para entregar")?.numero ?? null,
+        })));
+        setInspecciones((actuales) => {
+          const siguientes = { ...actuales };
+          delete siguientes[registro.id];
+          return siguientes;
+        });
+        if (ordenDetalle?.id === registro.id) {
+          setOrdenDetalle(null);
+          setMostrarRecepcion(false);
+        }
+      } else if (tipo === "vehiculo") {
+        const restantes = vehiculos.filter((vehiculo) => vehiculo.id !== registro.id);
+        setVehiculos(restantes);
+        setClientes((actuales) => actuales.map((cliente) => ({
+          ...cliente,
+          cantidadVehiculos: restantes.filter((vehiculo) => vehiculo.clienteId === cliente.id).length,
+        })));
+      } else {
+        setClientes((actuales) => actuales.filter((cliente) => cliente.id !== registro.id));
+      }
+      setRegistroPorEliminar(null);
+      mostrarAviso(tipo === "orden" ? "Orden eliminada correctamente"
+        : tipo === "cliente" ? "Cliente eliminado correctamente" : "Vehículo eliminado correctamente");
+    } catch (error) {
+      setErrorEliminacion(error instanceof Error ? error.message : "No fue posible eliminar el registro.");
+    } finally {
+      eliminacionEnCurso.current = false;
+      setEliminandoRegistro(false);
+    }
   }
 
   async function cambiarTaller(empresaNovaId: number) {
@@ -1176,6 +1292,12 @@ export default function PaginaPrincipal() {
               <span><strong>Datos no disponibles.</strong> {errorDatos}</span>
             </div>
           )}
+          {hayOrdenesPorAprobar && errorActualizacionOrdenes && (
+            <div className="estado-datos estado-datos-error" role="alert">
+              <TriangleAlert size={20} />
+              <span>No fue posible actualizar las confirmaciones del cliente. {errorActualizacionOrdenes}</span>
+            </div>
+          )}
           {mostrarAdministracion ? (
             <VistaAdministracion
               sesion={sesion}
@@ -1294,6 +1416,7 @@ export default function PaginaPrincipal() {
                   alRecibir={() => setMostrarRecepcion(true)}
                   alActualizarOrden={actualizarOrdenEnPantalla}
                   alMostrarAviso={mostrarAviso}
+                  alEliminar={() => confirmarEliminacion({ tipo: "orden", registro: ordenDetalleVisible })}
                 />
               )}
             </PaginaProceso>
@@ -1331,6 +1454,7 @@ export default function PaginaPrincipal() {
               alCrearOrden={iniciarNuevaOrden}
               alVerHistorial={abrirHistorialCliente}
               alVerEstadoCuenta={abrirEstadoCuentaCliente}
+              alEliminar={(registro) => confirmarEliminacion({ tipo: "cliente", registro })}
             />
           ) : vista === "vehiculos" ? (
             <VistaVehiculos
@@ -1339,6 +1463,7 @@ export default function PaginaPrincipal() {
               datosDisponibles={!errorDatos}
               alCrear={() => abrirFormularioVehiculo()}
               alEditar={abrirFormularioVehiculo}
+              alEliminar={(registro) => confirmarEliminacion({ tipo: "vehiculo", registro })}
               alVerHistorial={abrirHistorialVehiculo}
             />
           ) : vista === "negocio" ? (
@@ -1363,6 +1488,27 @@ export default function PaginaPrincipal() {
         <NavegacionInferior vista={vista} alNavegar={navegar} />
       </div>
 
+      {registroPorEliminar && (
+        <ModalConfirmacion
+          titulo={registroPorEliminar.tipo === "orden" ? "Eliminar orden"
+            : registroPorEliminar.tipo === "cliente" ? "Eliminar cliente" : "Eliminar vehículo"}
+          descripcion={registroPorEliminar.tipo === "orden"
+            ? `¿Deseas eliminar la orden ${registroPorEliminar.registro.numero} de ${registroPorEliminar.registro.cliente}?`
+            : registroPorEliminar.tipo === "cliente"
+              ? `¿Deseas eliminar al cliente ${registroPorEliminar.registro.nombre}?`
+              : `¿Deseas eliminar el vehículo ${registroPorEliminar.registro.nombre}, placa ${registroPorEliminar.registro.placa}?`}
+          detalle={registroPorEliminar.tipo === "orden"
+            ? "Se eliminarán la orden, sus cargos, recepción y fotografías. Los consumos descontados se devolverán al inventario. Solo se permite si nunca llegó a lista para entregar. Esta acción es permanente."
+            : registroPorEliminar.tipo === "cliente"
+              ? "Solo se permite si no tiene vehículos, órdenes ni historial de pagos. Esta acción es permanente."
+              : "Solo se permite si no tiene ninguna orden asociada. Esta acción es permanente."}
+          etiquetaConfirmar="Eliminar"
+          procesando={eliminandoRegistro}
+          mensajeError={errorEliminacion}
+          alCancelar={() => { if (!eliminacionEnCurso.current) setRegistroPorEliminar(null); }}
+          alConfirmar={eliminarRegistroConfirmado}
+        />
+      )}
       {aviso && (
         <div className="aviso" role="status">
           <CircleCheck size={21} />
@@ -2095,7 +2241,7 @@ function VistaOrdenes({
   filtroHistorial: FiltroHistorialOrdenes | null;
   alLimpiarHistorial: () => void;
 }) {
-  const filtros = ["Todas", "Recepción", "Diagnóstico", "Por aprobar", "Reparación", "Lista para entregar"];
+  const filtros = ["Todas", "Recepción", "Diagnóstico", "Por aprobar", "Aprobada", "Reparación", "Lista para entregar"];
   const [busquedaOrdenes, setBusquedaOrdenes] = useState("");
   const ordenesVisibles = useMemo(() => {
     const termino = busquedaOrdenes.trim().toLocaleLowerCase("es");
@@ -2133,7 +2279,15 @@ function VistaOrdenes({
         <div className="cabecera-tabla"><span>Orden y vehículo</span><span>Cliente</span><span>Estado</span><span>Responsable</span><span /></div>
         {ordenesVisibles.map((orden) => (
           <button className="fila-tabla" key={orden.id} onClick={() => alAbrirOrden(orden)}>
-            <span className="celda-vehiculo"><span className="mini-auto"><CarFront size={21} /></span><span><strong>{orden.vehiculo}</strong><small>Placa: {orden.placa} · {orden.numero}</small><small>Ingreso: {orden.fechaHoraIngreso}</small></span></span>
+            <span className="celda-vehiculo">
+              <span className="mini-auto"><CarFront size={21} /></span>
+              <span>
+                <strong>{orden.vehiculo}</strong>
+                <small>Placa: {orden.placa} · {orden.numero}</small>
+                <small>Ingreso: {orden.fechaHoraIngreso}</small>
+                <small>Kilometraje: {orden.kilometraje !== null ? `${orden.kilometraje.toLocaleString("es-NI")} km` : "Sin registrar"}</small>
+              </span>
+            </span>
             <span className="cliente-tabla"><strong>{orden.cliente}</strong><small>{orden.motivo}</small></span>
             <span className="estado-tabla"><span className={`etiqueta-estado estado-${normalizarClase(orden.estado)}`}>{orden.estado}</span></span>
             <span className="responsable-tabla"><strong>{orden.tecnico}</strong></span>
@@ -2168,6 +2322,7 @@ function VistaClientes({
   alCrearOrden,
   alVerHistorial,
   alVerEstadoCuenta,
+  alEliminar,
 }: {
   clientes: ClienteTaller[];
   cargando: boolean;
@@ -2177,6 +2332,7 @@ function VistaClientes({
   alCrearOrden: (clienteId: number) => void;
   alVerHistorial: (cliente: ClienteTaller) => void;
   alVerEstadoCuenta: (cliente: ClienteTaller) => void;
+  alEliminar: (cliente: ClienteTaller) => void;
 }) {
   const [busquedaClientes, setBusquedaClientes] = useState("");
   const clientesVisibles = useMemo(() => {
@@ -2214,6 +2370,7 @@ function VistaClientes({
               <button className="boton-secundario boton-estado-cuenta" type="button" onClick={() => alVerEstadoCuenta(cliente)}>Estado de cuenta</button>
               <button className="boton-primario" type="button" disabled={!cliente.activo} onClick={() => alCrearOrden(cliente.id)}>Crear orden</button>
               <button className="boton-icono" type="button" onClick={() => alEditarCliente(cliente)} aria-label={`Editar cliente ${cliente.nombre}`}><Pencil size={18} /></button>
+              <button className="boton-icono" type="button" onClick={() => alEliminar(cliente)} aria-label={`Eliminar cliente ${cliente.nombre}`} title="Eliminar cliente"><Trash2 size={18} /></button>
             </span>
           </article>
         ))}
@@ -2240,6 +2397,7 @@ function VistaVehiculos({
   datosDisponibles,
   alCrear,
   alEditar,
+  alEliminar,
   alVerHistorial,
 }: {
   vehiculos: VehiculoTaller[];
@@ -2247,6 +2405,7 @@ function VistaVehiculos({
   datosDisponibles: boolean;
   alCrear: () => void;
   alEditar: (vehiculo: VehiculoTaller) => void;
+  alEliminar: (vehiculo: VehiculoTaller) => void;
   alVerHistorial: (vehiculo: VehiculoTaller) => void;
 }) {
   const [busquedaVehiculos, setBusquedaVehiculos] = useState("");
@@ -2277,6 +2436,7 @@ function VistaVehiculos({
             <span className="acciones-vehiculo">
               <button className="boton-secundario boton-historial" type="button" onClick={() => alVerHistorial(vehiculo)}><History size={18} />Historial</button>
               <button className="boton-icono" type="button" onClick={() => alEditar(vehiculo)} aria-label={`Editar vehículo ${vehiculo.placa}`}><Pencil size={18} /></button>
+              <button className="boton-icono" type="button" onClick={() => alEliminar(vehiculo)} aria-label={`Eliminar vehículo ${vehiculo.placa}`} title="Eliminar vehículo"><Trash2 size={18} /></button>
             </span>
           </article>
         ))}
@@ -2917,6 +3077,7 @@ function DetalleOrden({
   alRecibir,
   alActualizarOrden,
   alMostrarAviso,
+  alEliminar,
 }: {
   orden: OrdenTaller;
   tecnicosTaller: TecnicoTallerApi[];
@@ -2927,6 +3088,7 @@ function DetalleOrden({
   alRecibir: () => void;
   alActualizarOrden: (orden: OrdenTaller) => void;
   alMostrarAviso: (mensaje: string) => void;
+  alEliminar: () => void;
 }) {
   const { ejecutarConCargadorPantalla } = useCargadorPantalla();
   const [resumen, setResumen] = useState<ResumenDetallesOrdenServicioApi>({ detalles: [], total: 0 });
@@ -2948,12 +3110,12 @@ function DetalleOrden({
   const etapas: EstadoOrden[] = [
     "Recepción",
     "Diagnóstico",
-    "Por aprobar",
+    orden.estado === "Aprobada" ? "Aprobada" : "Por aprobar",
     "Reparación",
     "Lista para entregar",
   ];
   const indiceActual = Math.max(0, etapas.indexOf(orden.estado));
-  const detallesEditables = orden.estado === "Reparación" || orden.estado === "Lista para entregar";
+  const detallesEditables = orden.estado === "Diagnóstico" || orden.estado === "Por aprobar" || orden.estado === "Aprobada" || orden.estado === "Reparación" || orden.estado === "Lista para entregar";
   const articuloSeleccionado = articulos.find((articulo) => articulo.productoId === productoId);
   const terminoBusquedaProducto = busquedaProducto.trim();
   const productosCoincidentes = articulos.slice(0, 6);
@@ -2989,15 +3151,18 @@ function DetalleOrden({
   useEffect(() => {
     const controlador = new AbortController();
     ejecutarConCargadorPantalla("Consultando la información de la orden…", async () => {
-      const [cargos, diagnosticoActual] = await Promise.all([
+      const [cargos, diagnosticoActual, ordenActual] = await Promise.all([
         obtenerDetallesOrdenApi(orden.id, controlador.signal),
         obtenerDiagnosticoOrdenApi(orden.id, controlador.signal),
+        obtenerOrdenApi(orden.id, controlador.signal),
       ]);
-      return { cargos, diagnosticoActual };
+      return { cargos, diagnosticoActual, ordenActual };
     })
       .then((resultado) => {
+        if (controlador.signal.aborted) return;
         setResumen(resultado.cargos);
         setDiagnostico(resultado.diagnosticoActual);
+        alActualizarOrden(resultado.ordenActual);
         setErrorProceso("");
       })
       .catch((error) => {
@@ -3009,7 +3174,7 @@ function DetalleOrden({
         if (!controlador.signal.aborted) setCargandoProceso(false);
       });
     return () => controlador.abort();
-  }, [ejecutarConCargadorPantalla, orden.id]);
+  }, [ejecutarConCargadorPantalla, orden.id, alActualizarOrden]);
 
   useEffect(() => {
     if (!detallesEditables) return;
@@ -3183,10 +3348,21 @@ function DetalleOrden({
   }
 
   async function actualizarAutorizacion() {
-    setDiagnostico(await ejecutarConCargadorPantalla(
-      "Verificando la autorización del cliente…",
-      () => obtenerDiagnosticoOrdenApi(orden.id),
-    ));
+    if (guardandoProceso) return;
+    setGuardandoProceso(true);
+    setErrorProceso("");
+    try {
+      const [diagnosticoActual, ordenActual] = await ejecutarConCargadorPantalla(
+        "Verificando la autorización del cliente…",
+        () => Promise.all([obtenerDiagnosticoOrdenApi(orden.id), obtenerOrdenApi(orden.id)]),
+      );
+      setDiagnostico(diagnosticoActual);
+      alActualizarOrden(ordenActual);
+    } catch (error) {
+      setErrorProceso(error instanceof Error ? error.message : "No fue posible verificar la autorización.");
+    } finally {
+      setGuardandoProceso(false);
+    }
   }
 
   async function solicitarAprobacion() {
@@ -3244,11 +3420,16 @@ function DetalleOrden({
           {errorProceso && <small role="alert">{errorProceso}</small>}
         </div>
         <div className="bloque-detalle"><span className="sobrelinea">Avance de la orden</span><div className="barra-avance"><span style={{ width: `${orden.progreso}%` }} /></div><strong>{orden.progreso}% completado</strong></div>
+        <div className="bloque-detalle">
+          <button className="boton-secundario" type="button" disabled={guardandoProceso || cargandoProceso} onClick={alEliminar}>
+            <Trash2 size={18} />Eliminar orden
+          </button>
+        </div>
         <div className="linea-tiempo linea-tiempo-orden">
           {etapas.map((etapa, indice) => (
             <div key={etapa} className={indice < indiceActual ? "completo" : indice === indiceActual ? "actual" : ""}>
               <span>{indice < indiceActual ? <Check size={14} /> : ""}</span>
-              <div><strong>{etapa === "Por aprobar" ? "Aprobación (opcional)" : etapa}</strong><small>{etapa === "Por aprobar" && indice < indiceActual && !diagnostico?.fechaAutorizacionClienteUtc ? "Continuó desde el taller" : indice < indiceActual ? "Completado" : indice === indiceActual ? "Etapa actual" : "Pendiente"}</small></div>
+              <div><strong>{etapa === "Por aprobar" ? "Aprobación (opcional)" : etapa}</strong><small>{etapa === "Aprobada" ? "Confirmada por el cliente" : etapa === "Por aprobar" && indice < indiceActual && !diagnostico?.fechaAutorizacionClienteUtc ? "Continuó desde el taller" : indice < indiceActual ? "Completado" : indice === indiceActual ? "Etapa actual" : "Pendiente"}</small></div>
             </div>
           ))}
         </div>
@@ -3298,7 +3479,7 @@ function DetalleOrden({
                 alIniciarReparacion={orden.estado === "Diagnóstico" ? iniciarReparacion : undefined}
               />
             )}
-            {orden.estado === "Por aprobar" && !diagnostico?.diagnostico && (
+            {(orden.estado === "Por aprobar" || orden.estado === "Aprobada") && !diagnostico?.diagnostico && (
               <FormularioDiagnostico
                 key="diagnostico-pendiente-legacy"
                 ordenServicioId={orden.id}
@@ -3310,13 +3491,13 @@ function DetalleOrden({
                 alEliminarEvidencia={eliminarEvidenciaDiagnostico}
               />
             )}
-            {orden.estado === "Por aprobar" && (
+            {(orden.estado === "Por aprobar" || orden.estado === "Aprobada") && (
               <section className="paso-orden">
                 <span className="icono-llamada"><CircleCheck size={28} /></span>
                 <span className="sobrelinea">Continuar desde el taller</span>
                 <h2>Iniciar reparación</h2>
-                <p>{diagnostico?.fechaAutorizacionClienteUtc
-                  ? "El cliente autorizó continuar. Ya puedes iniciar la reparación y registrar sus cargos."
+                <p>{orden.estado === "Aprobada" || diagnostico?.fechaAutorizacionClienteUtc
+                  ? "El cliente autorizó continuar. Puedes revisar los cargos e iniciar la reparación."
                   : "Puedes iniciar la reparación desde el taller. La aprobación digital es opcional; el cliente no necesita usar el teléfono ni el sistema."}</p>
                 {diagnostico?.tokenPublico && (
                   <AccionesEnlacePublico
@@ -3327,14 +3508,14 @@ function DetalleOrden({
                     alMostrarAviso={alMostrarAviso}
                   />
                 )}
-                {!diagnostico?.fechaAutorizacionClienteUtc && <button className="boton-secundario boton-ancho" type="button" disabled={guardandoProceso} onClick={actualizarAutorizacion}><RotateCcw size={18} />Verificar autorización</button>}
+                {orden.estado !== "Aprobada" && !diagnostico?.fechaAutorizacionClienteUtc && <button className="boton-secundario boton-ancho" type="button" disabled={guardandoProceso} onClick={actualizarAutorizacion}><RotateCcw size={18} />Verificar autorización</button>}
                 <button type="button" className="boton-primario boton-ancho" disabled={cargandoProceso || guardandoProceso || !diagnostico?.diagnostico?.trim()} onClick={iniciarReparacion}><Wrench size={20} />Iniciar reparación</button>
                 {!diagnostico?.diagnostico?.trim() && <small className="ayuda-envio-diagnostico">Guarda el diagnóstico antes de iniciar la reparación.</small>}
               </section>
             )}
             {detallesEditables && (
               <section className="trabajo-reparacion">
-                <div className="cabecera-trabajo-reparacion"><div><span className="sobrelinea">Reparación</span><h2>Productos y cargos</h2></div><strong>{formatearMoneda(resumen.total)}</strong></div>
+                <div className="cabecera-trabajo-reparacion"><div><span className="sobrelinea">{orden.estado}</span><h2>Productos y cargos</h2></div><strong>{formatearMoneda(resumen.total)}</strong></div>
                 <div className="formularios-cargos">
                   <form className="formulario-cargo" onSubmit={agregarProducto}>
                     <div><Boxes size={21} /><span><strong>Agregar desde inventario</strong><small>Busca el producto y luego indica la cantidad</small></span></div>
@@ -3448,14 +3629,41 @@ function ModalConfirmacion({
   alConfirmar: () => Promise<void>;
 }) {
   const botonCancelarRef = useRef<HTMLButtonElement | null>(null);
+  const modalRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
+    if (!procesando && mensajeError) botonCancelarRef.current?.focus();
+  }, [mensajeError, procesando]);
+
+  useEffect(() => {
+    const controlAnterior = document.activeElement;
+    const desbordamientoAnterior = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
     botonCancelarRef.current?.focus();
+    return () => {
+      document.body.style.overflow = desbordamientoAnterior;
+      if (controlAnterior instanceof HTMLElement && controlAnterior.isConnected) controlAnterior.focus();
+    };
   }, []);
 
   useEffect(() => {
     function cerrarConEscape(evento: KeyboardEvent) {
       if (evento.key === "Escape" && !procesando) alCancelar();
+      if (evento.key !== "Tab") return;
+      const controles = modalRef.current?.querySelectorAll<HTMLButtonElement>("button:not([disabled])");
+      if (!controles?.length) { evento.preventDefault(); return; }
+      const primero = controles[0];
+      const ultimo = controles[controles.length - 1];
+      if (!modalRef.current?.contains(document.activeElement)) {
+        evento.preventDefault();
+        primero.focus();
+      } else if (evento.shiftKey && document.activeElement === primero) {
+        evento.preventDefault();
+        ultimo.focus();
+      } else if (!evento.shiftKey && document.activeElement === ultimo) {
+        evento.preventDefault();
+        primero.focus();
+      }
     }
 
     document.addEventListener("keydown", cerrarConEscape);
@@ -3465,7 +3673,7 @@ function ModalConfirmacion({
   return (
     <div className="fondo-modal-alta">
       <button className="cerrador-modal-fondo" type="button" disabled={procesando} aria-label="Cancelar confirmación" onClick={alCancelar} />
-      <section className="modal-alta modal-confirmacion" role="alertdialog" aria-modal="true" aria-labelledby="titulo-modal-confirmacion" aria-describedby="detalle-modal-confirmacion">
+      <section ref={modalRef} className="modal-alta modal-confirmacion" role="alertdialog" aria-modal="true" aria-labelledby="titulo-modal-confirmacion" aria-describedby="detalle-modal-confirmacion">
         <div className="cabecera-modal-alta">
           <div><span className="sobrelinea">Confirmación</span><h2 id="titulo-modal-confirmacion">{titulo}</h2></div>
           <button className="boton-icono" type="button" disabled={procesando} onClick={alCancelar} aria-label="Cancelar"><X size={20} /></button>
@@ -3588,7 +3796,7 @@ function FormularioDiagnostico({
     <section className="formulario-diagnostico">
       <div className="cabecera-diagnostico">
         <span className="icono-llamada"><ClipboardList size={28} /></span>
-        <div><span className="sobrelinea">Diagnóstico</span><h2>¿Qué tiene el vehículo?</h2><p>Explica los hallazgos y qué se recomienda hacer. No necesitas agregar todavía productos ni precios.</p></div>
+        <div><span className="sobrelinea">Diagnóstico</span><h2>¿Qué tiene el vehículo?</h2><p>Explica los hallazgos y qué se recomienda hacer. Puedes preparar el costo en Productos y cargos.</p></div>
       </div>
       <label className="campo-diagnostico">
         Diagnóstico del mecánico
@@ -4873,9 +5081,11 @@ async function cargarDatosApi(senal: AbortSignal): Promise<{
   return { ordenes, clientes, vehiculos, marcasVehiculo, modelosVehiculo, tecnicosTaller };
 }
 
-async function obtenerOrdenApi(ordenId: number): Promise<OrdenTaller> {
+async function obtenerOrdenApi(ordenId: number, senal?: AbortSignal): Promise<OrdenTaller> {
   const respuesta = await fetch(`${obtenerDireccionApi()}/api/ordenes-servicio/${ordenId}`, {
     credentials: "include",
+    cache: "no-store",
+    signal: senal,
   });
   if (!respuesta.ok) throw new Error(await obtenerMensajeErrorApi(respuesta, "No fue posible consultar la orden."));
   return convertirOrdenApi(await respuesta.json() as OrdenServicioApi);
@@ -4886,6 +5096,7 @@ async function cargarOrdenesApi(senal: AbortSignal): Promise<OrdenTaller[]> {
 
   const respuesta = await fetch(`${direccionApi}/api/ordenes-servicio`, {
     credentials: "include",
+    cache: "no-store",
     signal: senal,
   });
   if (!respuesta.ok) throw new Error("No fue posible consultar las órdenes.");
@@ -4901,6 +5112,17 @@ async function cargarClientesApi(senal: AbortSignal): Promise<ClienteApi[]> {
   });
   if (!respuesta.ok) throw new Error("No fue posible consultar los clientes.");
   return (await respuesta.json()) as ClienteApi[];
+}
+
+async function eliminarRegistroApi(tipo: RegistroPorEliminar["tipo"], id: number) {
+  const recursos = { orden: "ordenes-servicio", cliente: "clientes", vehiculo: "vehiculos" } as const;
+  const respuesta = await fetch(`${obtenerDireccionApi()}/api/${recursos[tipo]}/${id}`, {
+    method: "DELETE",
+    credentials: "include",
+  });
+  if (!respuesta.ok) {
+    throw new Error(await obtenerMensajeErrorApi(respuesta, "No fue posible eliminar el registro."));
+  }
 }
 
 async function guardarClienteApi(solicitud: {
@@ -5027,7 +5249,7 @@ async function crearOrdenApi(solicitud: {
 }
 
 function convertirOrdenApi(orden: OrdenServicioApi): OrdenTaller {
-  const estado = convertirEstadoApi(orden.estado);
+  const estado = convertirEstadoApi(orden.estado, orden.fechaAutorizacionClienteUtc);
   return {
     id: orden.id,
     clienteId: orden.clienteId,
@@ -5036,6 +5258,7 @@ function convertirOrdenApi(orden: OrdenServicioApi): OrdenTaller {
     cliente: orden.nombreCliente,
     vehiculo: `Vehículo · ${orden.placaVehiculo}`,
     placa: orden.placaVehiculo,
+    kilometraje: orden.kilometraje ?? null,
     estado,
     motivo: orden.observaciones || "Sin observaciones registradas",
     tecnico: orden.nombreTecnico ?? "Por asignar",
@@ -5143,6 +5366,9 @@ async function guardarRecepcionApi(
         dejaExtintor: inspeccion.dejaExtintor,
         dejaBotiquin: inspeccion.dejaBotiquin,
         dejaChalecoReflectante: inspeccion.dejaChalecoReflectante,
+        dejaPasacorrientes: inspeccion.dejaPasacorrientes,
+        dejaCopaRueda: inspeccion.dejaCopaRueda,
+        dejaAlfombras: inspeccion.dejaAlfombras,
         otrosElementos: inspeccion.otrosElementos,
         aceptaPruebaRuta: inspeccion.aceptaPruebaRuta,
         danios: inspeccion.danios.map((danio) => ({
@@ -5232,6 +5458,9 @@ function convertirRecepcionApi(
     dejaExtintor: recepcion.dejaExtintor,
     dejaBotiquin: recepcion.dejaBotiquin,
     dejaChalecoReflectante: recepcion.dejaChalecoReflectante,
+    dejaPasacorrientes: recepcion.dejaPasacorrientes,
+    dejaCopaRueda: recepcion.dejaCopaRueda,
+    dejaAlfombras: recepcion.dejaAlfombras,
     otrosElementos: recepcion.otrosElementos,
     aceptaPruebaRuta: recepcion.aceptaPruebaRuta,
     danios: recepcion.danios.map((danio, indice) => ({
@@ -5326,7 +5555,8 @@ function zonaDesdeApi(zona: string): ZonaVehiculo {
   return zonas[zona] || "frente";
 }
 
-function convertirEstadoApi(estado: string): EstadoOrden {
+function convertirEstadoApi(estado: string, fechaAutorizacionClienteUtc: string | null): EstadoOrden {
+  if (estaAprobadaPorCliente(estado, fechaAutorizacionClienteUtc)) return "Aprobada";
   const equivalencias: Record<string, EstadoOrden> = {
     Recepcion: "Recepción",
     Diagnostico: "Diagnóstico",
@@ -5356,6 +5586,7 @@ function progresoPorEstado(estado: EstadoOrden) {
     "Diagnóstico": 28,
     "Cotización": 42,
     "Por aprobar": 48,
+    "Aprobada": 56,
     "Reparación": 68,
     "Control de calidad": 88,
     "Lista para entregar": 100,
@@ -5369,6 +5600,7 @@ function colorPorEstado(estado: EstadoOrden) {
     "Diagnóstico": "#1f7a5b",
     "Cotización": "#d78b31",
     "Por aprobar": "#d78b31",
+    "Aprobada": "#1f7a5b",
     "Reparación": "#315e9d",
     "Control de calidad": "#7b5aa6",
     "Lista para entregar": "#238a70",

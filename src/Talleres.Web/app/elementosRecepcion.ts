@@ -9,6 +9,9 @@ export interface ElementosRecepcion {
   dejaExtintor: boolean;
   dejaBotiquin: boolean;
   dejaChalecoReflectante: boolean;
+  dejaPasacorrientes: boolean;
+  dejaCopaRueda: boolean;
+  dejaAlfombras: boolean;
   otrosElementos: string | null;
   aceptaPruebaRuta: boolean;
 }
@@ -27,6 +30,9 @@ export const elementosRecepcion: ReadonlyArray<{
   { campo: "dejaExtintor", etiqueta: "Extintor" },
   { campo: "dejaBotiquin", etiqueta: "Botiquín" },
   { campo: "dejaChalecoReflectante", etiqueta: "Chaleco reflectante" },
+  { campo: "dejaPasacorrientes", etiqueta: "Pasacorrientes" },
+  { campo: "dejaCopaRueda", etiqueta: "Copa de rueda" },
+  { campo: "dejaAlfombras", etiqueta: "Alfombras" },
 ];
 
 export function describirElementosEntregados(recepcion: ElementosRecepcion): string {

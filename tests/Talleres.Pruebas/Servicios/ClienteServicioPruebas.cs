@@ -29,6 +29,92 @@ public sealed class ClienteServicioPruebas
         Assert.Equal("8888-0000", cliente.Telefono);
     }
 
+    [Theory]
+    [InlineData("8888-0000", true)]
+    [InlineData("88880000", true)]
+    [InlineData("(8888) 0000", true)]
+    [InlineData("+8888.0000", true)]
+    [InlineData("8888\u00a00000", true)]
+    [InlineData("8888 0000", false)]
+    public async Task CrearAsync_TelefonoRegistrado_RechazaDuplicadoAunqueCambieElFormato(
+        string telefono,
+        bool activo)
+    {
+        var empresa = new ContextoEmpresaPrueba(1);
+        await using var contexto = CrearDbContext(empresa);
+        var servicio = new ClienteServicio(contexto, empresa);
+        var original = await servicio.CrearAsync(CrearSolicitudCliente());
+        if (!activo)
+        {
+            await servicio.ActualizarAsync(original.Id, new ActualizarClienteSolicitud
+            {
+                Nombre = original.Nombre,
+                Telefono = original.Telefono,
+                Activo = false
+            });
+        }
+
+        var excepcion = await Assert.ThrowsAsync<ReglaNegocioException>(() =>
+            servicio.CrearAsync(new CrearClienteSolicitud
+            {
+                Nombre = "Otro nombre",
+                Telefono = telefono
+            }));
+
+        Assert.Equal("El cliente ya está registrado con este número telefónico.", excepcion.Message);
+        Assert.Equal(original.Id, Assert.Single(await servicio.ListarAsync()).Id);
+    }
+
+    [Fact]
+    public async Task ActualizarAsync_TelefonoPropio_PermiteCambiarElFormato()
+    {
+        var empresa = new ContextoEmpresaPrueba(1);
+        await using var contexto = CrearDbContext(empresa);
+        var servicio = new ClienteServicio(contexto, empresa);
+        var original = await servicio.CrearAsync(CrearSolicitudCliente());
+
+        var actualizado = await servicio.ActualizarAsync(original.Id, new ActualizarClienteSolicitud
+        {
+            Nombre = "Nombre corregido",
+            Telefono = "8888 0000"
+        });
+
+        contexto.ChangeTracker.Clear();
+        var guardado = await servicio.ObtenerPorIdAsync(original.Id);
+        Assert.Equal(actualizado, guardado);
+        Assert.Equal("Nombre corregido", guardado.Nombre);
+        Assert.Equal("8888 0000", guardado.Telefono);
+    }
+
+    [Fact]
+    public async Task ActualizarAsync_TelefonoDeOtroCliente_RechazaSinModificarLosDatos()
+    {
+        var empresa = new ContextoEmpresaPrueba(1);
+        await using var contexto = CrearDbContext(empresa);
+        var servicio = new ClienteServicio(contexto, empresa);
+        await servicio.CrearAsync(CrearSolicitudCliente());
+        var otro = await servicio.CrearAsync(new CrearClienteSolicitud
+        {
+            Nombre = "Segundo cliente",
+            Telefono = "7777-0000"
+        });
+
+        var excepcion = await Assert.ThrowsAsync<ReglaNegocioException>(() =>
+            servicio.ActualizarAsync(otro.Id, new ActualizarClienteSolicitud
+            {
+                Nombre = "No debe guardarse",
+                Telefono = "8888 0000"
+            }));
+
+        Assert.Equal("El cliente ya está registrado con este número telefónico.", excepcion.Message);
+        // Un guardado posterior tampoco debe persistir cambios del intento rechazado.
+        await contexto.SaveChangesAsync();
+        contexto.ChangeTracker.Clear();
+        var guardado = await servicio.ObtenerPorIdAsync(otro.Id);
+        Assert.Equal("Segundo cliente", guardado.Nombre);
+        Assert.Equal("7777-0000", guardado.Telefono);
+    }
+
     [Fact]
     public async Task ListarAsync_EmpresasDistintas_AislaLosClientes()
     {

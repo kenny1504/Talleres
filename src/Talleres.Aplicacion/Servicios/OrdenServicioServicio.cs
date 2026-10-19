@@ -223,7 +223,9 @@ public sealed class OrdenServicioServicio(
                 .Select(historial => (DateTime?)historial.Fecha)
                 .FirstOrDefault() ?? orden.FechaIngreso) > limiteListaParaEntrega,
             orden.TecnicoTallerId,
-            orden.TecnicoTaller == null ? null : orden.TecnicoTaller.Nombre));
+            orden.TecnicoTaller == null ? null : orden.TecnicoTaller.Nombre,
+            orden.Recepcion == null ? (int?)null : orden.Recepcion.Kilometraje,
+            orden.FechaAutorizacionClienteUtc));
     }
 
     private static OrdenServicioDto ConvertirDto(
@@ -247,7 +249,9 @@ public sealed class OrdenServicioServicio(
             orden.Estado != EstadoOrdenServicio.ListaParaEntrega ||
             fechaUltimoCambioEstado > DateTime.UtcNow.Subtract(PermanenciaListaParaEntregaEnInicio),
             orden.TecnicoTallerId,
-            nombreTecnico ?? orden.TecnicoTaller?.Nombre);
+            nombreTecnico ?? orden.TecnicoTaller?.Nombre,
+            orden.Recepcion?.Kilometraje,
+            orden.FechaAutorizacionClienteUtc);
 
     private static string GenerarNumero(DateTime fecha) =>
         $"OS-{fecha:yyyyMMddHHmmss}-{Guid.NewGuid():N}"[..25].ToUpperInvariant();

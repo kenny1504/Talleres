@@ -10,6 +10,16 @@ public sealed class ClientesController(
     IClienteServicio clienteServicio,
     IEstadoCuentaClienteServicio estadoCuentaClienteServicio) : ControllerBase
 {
+    [HttpDelete("{clienteId:long}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status422UnprocessableEntity)]
+    public async Task<IActionResult> Eliminar(long clienteId, CancellationToken cancellationToken)
+    {
+        await clienteServicio.EliminarAsync(clienteId, cancellationToken);
+        return NoContent();
+    }
+
     [HttpGet]
     [ProducesResponseType<IReadOnlyCollection<ClienteDto>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<IReadOnlyCollection<ClienteDto>>> Listar(
@@ -33,6 +43,7 @@ public sealed class ClientesController(
     [HttpPost]
     [ProducesResponseType<ClienteDto>(StatusCodes.Status201Created)]
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status422UnprocessableEntity)]
     public async Task<ActionResult<ClienteDto>> Crear(
         CrearClienteSolicitud solicitud,
         CancellationToken cancellationToken)
@@ -43,6 +54,7 @@ public sealed class ClientesController(
 
     [HttpPut("{clienteId:long}")]
     [ProducesResponseType<ClienteDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status422UnprocessableEntity)]
     public async Task<ActionResult<ClienteDto>> Actualizar(
         long clienteId,
         ActualizarClienteSolicitud solicitud,

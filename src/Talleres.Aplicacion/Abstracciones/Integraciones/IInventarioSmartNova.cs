@@ -38,7 +38,7 @@ public interface IInventarioSmartNova
         RegistrarSalidaInventarioSolicitud solicitud,
         CancellationToken cancellationToken);
 
-    /// <summary>Anula una salida y restituye sus existencias cuando una operación local no puede completarse.</summary>
+    /// <summary>Anula una salida y restituye sus existencias. Una salida ya anulada de la misma empresa se considera devuelta, sin duplicar existencias.</summary>
     /// <param name="empresaNovaId">Empresa propietaria de la salida.</param>
     /// <param name="salidaId">Salida que debe compensarse.</param>
     /// <param name="usuarioId">Usuario responsable de la operación original.</param>

@@ -7,6 +7,13 @@ namespace Talleres.Aplicacion.Servicios.Contratos;
 /// </summary>
 public interface IVehiculoServicio
 {
+    /// <summary>Elimina un vehículo de la empresa activa únicamente cuando no tiene ninguna orden asociada.</summary>
+    /// <param name="vehiculoId">Identificador del vehículo que se eliminará.</param>
+    /// <param name="cancellationToken">Token para cancelar la operación.</param>
+    /// <returns>Una tarea que finaliza después de eliminar el vehículo.</returns>
+    /// <exception cref="Talleres.Dominio.Excepciones.ReglaNegocioException">El vehículo conserva órdenes, incluidas las canceladas.</exception>
+    Task EliminarAsync(long vehiculoId, CancellationToken cancellationToken = default);
+
     /// <summary>
     /// Registra un vehículo para un cliente existente y valida la unicidad de la placa.
     /// </summary>

@@ -41,6 +41,12 @@ public sealed class RecepcionVehiculo : IEntidadEmpresa
 
     public bool DejaChalecoReflectante { get; set; }
 
+    public bool DejaPasacorrientes { get; set; }
+
+    public bool DejaCopaRueda { get; set; }
+
+    public bool DejaAlfombras { get; set; }
+
     public string? OtrosElementos { get; set; }
 
     public bool AceptaPruebaRuta { get; set; }

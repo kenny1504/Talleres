@@ -13,6 +13,9 @@ export const actividadesRevisionOperativa = [
   { actividad: "Refrigerante", etiqueta: "Refrigerante" },
   { actividad: "RecordatorioAceite", etiqueta: "Recordatorio de aceite" },
   { actividad: "Bocina", etiqueta: "Bocina" },
+  { actividad: "AireAcondicionado", etiqueta: "Aire acondicionado" },
+  { actividad: "Radio", etiqueta: "Radio" },
+  { actividad: "Retrovisores", etiqueta: "Retrovisores" },
 ] as const;
 
 export type ActividadRevisionOperativa = typeof actividadesRevisionOperativa[number]["actividad"];

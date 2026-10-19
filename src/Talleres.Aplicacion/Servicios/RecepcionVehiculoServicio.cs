@@ -64,6 +64,9 @@ public sealed class RecepcionVehiculoServicio(
             DejaExtintor = solicitud.DejaExtintor,
             DejaBotiquin = solicitud.DejaBotiquin,
             DejaChalecoReflectante = solicitud.DejaChalecoReflectante,
+            DejaPasacorrientes = solicitud.DejaPasacorrientes,
+            DejaCopaRueda = solicitud.DejaCopaRueda,
+            DejaAlfombras = solicitud.DejaAlfombras,
             OtrosElementos = LimpiarOpcional(solicitud.OtrosElementos),
             AceptaPruebaRuta = solicitud.AceptaPruebaRuta,
             FechaRecepcion = fechaActual
@@ -145,6 +148,9 @@ public sealed class RecepcionVehiculoServicio(
         recepcion.DejaExtintor = solicitud.DejaExtintor;
         recepcion.DejaBotiquin = solicitud.DejaBotiquin;
         recepcion.DejaChalecoReflectante = solicitud.DejaChalecoReflectante;
+        recepcion.DejaPasacorrientes = solicitud.DejaPasacorrientes;
+        recepcion.DejaCopaRueda = solicitud.DejaCopaRueda;
+        recepcion.DejaAlfombras = solicitud.DejaAlfombras;
         recepcion.OtrosElementos = LimpiarOpcional(solicitud.OtrosElementos);
         recepcion.AceptaPruebaRuta = solicitud.AceptaPruebaRuta;
         ActualizarRevisionOperativa(
@@ -221,6 +227,9 @@ public sealed class RecepcionVehiculoServicio(
                        DejaExtintor = recepcion.DejaExtintor,
                        DejaBotiquin = recepcion.DejaBotiquin,
                        DejaChalecoReflectante = recepcion.DejaChalecoReflectante,
+                       DejaPasacorrientes = recepcion.DejaPasacorrientes,
+                       DejaCopaRueda = recepcion.DejaCopaRueda,
+                       DejaAlfombras = recepcion.DejaAlfombras,
                        OtrosElementos = recepcion.OtrosElementos,
                        AceptaPruebaRuta = recepcion.AceptaPruebaRuta
                    })
@@ -272,6 +281,9 @@ public sealed class RecepcionVehiculoServicio(
         DejaExtintor = recepcion.DejaExtintor,
         DejaBotiquin = recepcion.DejaBotiquin,
         DejaChalecoReflectante = recepcion.DejaChalecoReflectante,
+        DejaPasacorrientes = recepcion.DejaPasacorrientes,
+        DejaCopaRueda = recepcion.DejaCopaRueda,
+        DejaAlfombras = recepcion.DejaAlfombras,
         OtrosElementos = recepcion.OtrosElementos,
         AceptaPruebaRuta = recepcion.AceptaPruebaRuta
     };
@@ -285,7 +297,7 @@ public sealed class RecepcionVehiculoServicio(
         // Los clientes anteriores que omiten la revisión conservan los resultados ya registrados.
         if (resultados is null) return;
 
-        if (resultados.Count > 14
+        if (resultados.Count > 17
             || resultados.Any(resultado => resultado is null || !Enum.IsDefined(resultado.Actividad))
             || resultados.Select(resultado => resultado.Actividad).Distinct().Count() != resultados.Count)
         {

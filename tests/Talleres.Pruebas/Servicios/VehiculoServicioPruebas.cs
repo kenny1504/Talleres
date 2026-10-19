@@ -52,7 +52,7 @@ public sealed class VehiculoServicioPruebas
             CrearCliente("PROPIETARIO-ORIGINAL"),
             CancellationToken.None);
         var nuevoPropietario = await clienteServicio.CrearAsync(
-            CrearCliente("NUEVO-PROPIETARIO"),
+            CrearCliente("NUEVO-PROPIETARIO", "7777-0000"),
             CancellationToken.None);
         var vehiculo = await vehiculoServicio.CrearAsync(
             CrearVehiculo(propietarioOriginal.Id, modeloToyotaId, "M 100-001"),
@@ -129,10 +129,10 @@ public sealed class VehiculoServicioPruebas
                 CancellationToken.None));
     }
 
-    private static CrearClienteSolicitud CrearCliente(string _) => new()
+    private static CrearClienteSolicitud CrearCliente(string _, string telefono = "8888-0000") => new()
     {
         Nombre = "Cliente de prueba",
-        Telefono = "8888-0000"
+        Telefono = telefono
     };
 
     private static CrearVehiculoSolicitud CrearVehiculo(

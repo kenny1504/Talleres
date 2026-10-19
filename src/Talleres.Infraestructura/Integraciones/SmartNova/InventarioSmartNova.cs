@@ -157,6 +157,18 @@ public sealed class InventarioSmartNova(SmartNovaDbContext contexto) : IInventar
             await comando.ExecuteNonQueryAsync(cancellationToken);
             if (!Convert.ToBoolean(indicador.Value))
             {
+                // Permite reintentar si NOVA confirmó la devolución pero falló el guardado local.
+                var yaAnulada = await contexto.Database.SqlQuery<int>($"""
+                    SELECT CONVERT(int, COUNT(*)) AS [Value]
+                    FROM Inventario.Salida
+                    WHERE Id = {salidaId} AND EmpresaId = {empresaNovaId}
+                      AND (EstadoId = 2 OR FechaAnulacion IS NOT NULL)
+                    """).SingleAsync(cancellationToken);
+                if (yaAnulada > 0)
+                {
+                    return;
+                }
+
                 throw new IntegracionNoDisponibleException(
                     Convert.ToString(mensaje.Value) ?? "No fue posible anular la salida de inventario.");
             }

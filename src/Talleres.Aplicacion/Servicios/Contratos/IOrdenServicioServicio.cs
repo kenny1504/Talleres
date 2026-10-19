@@ -22,7 +22,7 @@ public interface IOrdenServicioServicio
     /// </summary>
     /// <param name="ordenServicioId">Identificador interno de la orden.</param>
     /// <param name="cancellationToken">Token para cancelar la consulta.</param>
-    /// <returns>La orden encontrada con sus datos principales.</returns>
+    /// <returns>La orden con sus datos principales y el kilometraje de su recepción, o null si aún no se ha registrado.</returns>
     Task<OrdenServicioDto> ObtenerPorIdAsync(
         long ordenServicioId,
         CancellationToken cancellationToken = default);
@@ -31,7 +31,7 @@ public interface IOrdenServicioServicio
     /// Lista las órdenes visibles para la empresa actual, de la más reciente a la más antigua.
     /// </summary>
     /// <param name="cancellationToken">Token para cancelar la consulta.</param>
-    /// <returns>Colección de órdenes de servicio.</returns>
+    /// <returns>Órdenes con el kilometraje registrado en la recepción de cada una, o null si aún no tienen recepción.</returns>
     Task<IReadOnlyCollection<OrdenServicioDto>> ListarAsync(
         CancellationToken cancellationToken = default);
 

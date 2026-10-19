@@ -15,5 +15,8 @@ public enum ActividadRevisionOperativa
     AceiteDireccion = 11,
     Refrigerante = 12,
     RecordatorioAceite = 13,
-    Bocina = 14
+    Bocina = 14,
+    AireAcondicionado = 15,
+    Radio = 16,
+    Retrovisores = 17
 }

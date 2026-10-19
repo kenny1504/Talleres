@@ -3,11 +3,13 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { ChevronRight, CircleCheck, CreditCard, ReceiptText, TriangleAlert } from "lucide-react";
 import { useCargadorPantalla } from "./ProveedorCargadorPantalla";
+import { estaAprobadaPorCliente } from "../estadoOrden";
 
 interface OrdenEstadoCuenta {
   id: number;
   numero: string;
   estado: string;
+  fechaAutorizacionClienteUtc: string | null;
   fechaIngreso: string;
   total: number;
   placaVehiculo: string;
@@ -167,7 +169,7 @@ export function EstadoCuentaCliente({
                   <span>
                     <strong>{orden.numero}</strong>
                     <span className="estado-cuenta-vehiculo">{orden.placaVehiculo} · {orden.marcaVehiculo} {orden.modeloVehiculo} {orden.anioVehiculo}</span>
-                    <small>{fecha(orden.fechaIngreso)} · {etiquetaEstado(orden.estado)}</small>
+                    <small>{fecha(orden.fechaIngreso)} · {estaAprobadaPorCliente(orden.estado, orden.fechaAutorizacionClienteUtc) ? "Aprobada" : etiquetaEstado(orden.estado)}</small>
                   </span>
                   <strong>{moneda(orden.total)}</strong>
                   <ChevronRight size={18} aria-hidden="true" />

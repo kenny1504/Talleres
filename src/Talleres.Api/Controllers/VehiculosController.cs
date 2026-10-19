@@ -8,6 +8,16 @@ namespace Talleres.Api.Controllers;
 [Route("api/vehiculos")]
 public sealed class VehiculosController(IVehiculoServicio vehiculoServicio) : ControllerBase
 {
+    [HttpDelete("{vehiculoId:long}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status422UnprocessableEntity)]
+    public async Task<IActionResult> Eliminar(long vehiculoId, CancellationToken cancellationToken)
+    {
+        await vehiculoServicio.EliminarAsync(vehiculoId, cancellationToken);
+        return NoContent();
+    }
+
     [HttpGet]
     [ProducesResponseType<IReadOnlyCollection<VehiculoDto>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<IReadOnlyCollection<VehiculoDto>>> Listar(

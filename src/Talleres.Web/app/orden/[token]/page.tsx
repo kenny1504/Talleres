@@ -5,6 +5,7 @@ import { Building2, CalendarDays, Camera, CarFront, Check, CircleCheck, Clipboar
 import { useCargadorPantalla } from "../../componentes/ProveedorCargadorPantalla";
 import { VisorFotografias, type EstadoVisor, type ImagenVisor } from "../../componentes/VisorFotografias";
 import { formatearFechaHoraOrden } from "../../fechaHoraOrden";
+import { estaAprobadaPorCliente } from "../../estadoOrden";
 import { elementosRecepcion, type ElementosRecepcion } from "../../elementosRecepcion";
 import { actividadesRevisionOperativa, type ResultadoRevisionOperativa } from "../../revisionOperativa";
 
@@ -88,7 +89,7 @@ export default function OrdenPublicaPagina({ params }: { params: Promise<{ token
       </section>
       <header className="cabecera-publica">
         <div><span className="sobrelinea">Orden de servicio</span><h1>{orden.numero}</h1><p>Información compartida por tu taller</p></div>
-        <span className="estado-publico">{etiquetaEstado(orden.estado)}</span>
+        <span className="estado-publico">{estaAprobadaPorCliente(orden.estado, orden.fechaAutorizacionClienteUtc) ? "Aprobada" : etiquetaEstado(orden.estado)}</span>
       </header>
       <section className="vehiculo-publico">
         <span><CarFront size={30} /></span>
@@ -175,7 +176,7 @@ export default function OrdenPublicaPagina({ params }: { params: Promise<{ token
       {orden.detalles.length > 0 && <section className="tarjeta-publica cargos-publicos"><span className="sobrelinea">Productos y servicios registrados</span><h2>Detalle de la orden</h2>{orden.detalles.map((detalle) => <article key={detalle.id}><span><strong>{detalle.descripcion}</strong><small>{detalle.cantidad} {detalle.unidadMedida || "unidad"} × {moneda(detalle.precioUnitario)}</small></span><strong>{moneda(detalle.subtotal)}</strong></article>)}<div><span>Total</span><strong>{moneda(orden.total)}</strong></div></section>}
       <section className={`autorizacion-publica ${autorizada ? "autorizada" : ""}`}>
         <span>{autorizada ? <CircleCheck size={30} /> : <Wrench size={30} />}</span>
-        <div><span className="sobrelinea">Autorización</span><h2>{autorizada ? "Autorización registrada" : "¿Autorizas continuar?"}</h2><p>{autorizada ? "El taller ya puede continuar con la reparación." : "Esta autorización permite al taller continuar. Los productos, servicios y el total pueden agregarse después durante la reparación."}</p>{autorizada && <p className="estado-autorizacion-publica">Estado actual: <strong>{etiquetaEstado(orden.estado)}</strong></p>}</div>
+        <div><span className="sobrelinea">Autorización</span><h2>{autorizada ? "Autorización registrada" : "¿Autorizas continuar?"}</h2><p>{autorizada ? "El taller ya puede continuar con la reparación." : "Esta autorización permite al taller continuar. Los productos, servicios y el total pueden agregarse después durante la reparación."}</p>{autorizada && <p className="estado-autorizacion-publica">Estado actual: <strong>{estaAprobadaPorCliente(orden.estado, orden.fechaAutorizacionClienteUtc) ? "Aprobada" : etiquetaEstado(orden.estado)}</strong></p>}</div>
         {!autorizada && orden.estado === "PendienteAprobacion" && <button type="button" className="boton-primario" onClick={autorizar}><Check size={20} />Autorizar continuar</button>}
       </section>
       <footer className="pie-publico">

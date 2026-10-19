@@ -16,4 +16,6 @@ public sealed record OrdenServicioDto(
     bool TieneRecepcion,
     bool VisibleEnInicio,
     long? TecnicoTallerId,
-    string? NombreTecnico);
+    string? NombreTecnico,
+    int? Kilometraje,
+    DateTime? FechaAutorizacionClienteUtc = null);

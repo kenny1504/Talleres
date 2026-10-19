@@ -13,6 +13,23 @@ public sealed class VehiculoServicio(
     ITallerDbContext dbContext,
     IContextoEmpresa contextoEmpresa) : IVehiculoServicio
 {
+    public async Task EliminarAsync(long vehiculoId, CancellationToken cancellationToken = default)
+    {
+        var empresaId = contextoEmpresa.ObtenerEmpresaIdRequerido();
+        var vehiculo = await dbContext.Vehiculos.SingleOrDefaultAsync(
+            item => item.Id == vehiculoId && item.EmpresaId == empresaId, cancellationToken)
+            ?? throw new RecursoNoEncontradoException("El vehículo solicitado no existe.");
+
+        if (await dbContext.OrdenesServicio.AsNoTracking().AnyAsync(
+                item => item.VehiculoId == vehiculoId && item.EmpresaId == empresaId, cancellationToken))
+        {
+            throw new ReglaNegocioException("No se puede eliminar el vehículo porque tiene órdenes asociadas.");
+        }
+
+        dbContext.Vehiculos.Remove(vehiculo);
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
     public async Task<VehiculoDto> CrearAsync(
         CrearVehiculoSolicitud solicitud,
         CancellationToken cancellationToken = default)

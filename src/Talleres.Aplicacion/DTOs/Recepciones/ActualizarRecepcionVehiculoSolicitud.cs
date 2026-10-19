@@ -13,7 +13,7 @@ public sealed class ActualizarRecepcionVehiculoSolicitud
     [StringLength(2000)]
     public string? DescripcionEstado { get; init; }
 
-    [MaxLength(14)]
+    [MaxLength(17)]
     public IReadOnlyCollection<ResultadoRevisionOperativaDto>? RevisionOperativa { get; init; }
 
     [StringLength(2000)]
@@ -38,6 +38,12 @@ public sealed class ActualizarRecepcionVehiculoSolicitud
     public bool DejaBotiquin { get; init; }
 
     public bool DejaChalecoReflectante { get; init; }
+
+    public bool DejaPasacorrientes { get; init; }
+
+    public bool DejaCopaRueda { get; init; }
+
+    public bool DejaAlfombras { get; init; }
 
     [StringLength(500)]
     public string? OtrosElementos { get; init; }

@@ -72,6 +72,9 @@ public sealed record OrdenServicioPublicaDto(
     public bool DejaExtintor { get; init; }
     public bool DejaBotiquin { get; init; }
     public bool DejaChalecoReflectante { get; init; }
+    public bool DejaPasacorrientes { get; init; }
+    public bool DejaCopaRueda { get; init; }
+    public bool DejaAlfombras { get; init; }
     public string? OtrosElementos { get; init; }
     public bool AceptaPruebaRuta { get; init; }
 }

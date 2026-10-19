@@ -118,6 +118,9 @@ public sealed class DiagnosticoOrdenServicioPruebas
             DejaExtintor = true,
             DejaBotiquin = true,
             DejaChalecoReflectante = true,
+            DejaPasacorrientes = true,
+            DejaCopaRueda = true,
+            DejaAlfombras = true,
             OtrosElementos = "Cables de arranque",
             AceptaPruebaRuta = true,
             ObservacionRevisionOperativa = "La bocina no funciona.\nLuces delanteras verificadas."
@@ -142,6 +145,20 @@ public sealed class DiagnosticoOrdenServicioPruebas
             Severidad = SeveridadDanioVehiculo.Moderado,
             Observacion = "Golpe en defensa"
         });
+        foreach (var actividad in new[]
+        {
+            ActividadRevisionOperativa.AireAcondicionado,
+            ActividadRevisionOperativa.Radio,
+            ActividadRevisionOperativa.Retrovisores
+        })
+        {
+            recepcion.RevisionOperativa.Add(new ResultadoRevisionOperativa
+            {
+                EmpresaId = 7,
+                Actividad = actividad,
+                Correcto = actividad != ActividadRevisionOperativa.Radio
+            });
+        }
         recepcion.Evidencias.Add(new EvidenciaInspeccion
         {
             EmpresaId = 7,
@@ -170,6 +187,9 @@ public sealed class DiagnosticoOrdenServicioPruebas
         Assert.True(resultado.DejaExtintor);
         Assert.True(resultado.DejaBotiquin);
         Assert.True(resultado.DejaChalecoReflectante);
+        Assert.True(resultado.DejaPasacorrientes);
+        Assert.True(resultado.DejaCopaRueda);
+        Assert.True(resultado.DejaAlfombras);
         Assert.True(resultado.AceptaPruebaRuta);
         Assert.Equal("Cables de arranque", resultado.OtrosElementos);
         Assert.Equal("La bocina no funciona.\nLuces delanteras verificadas.", resultado.ObservacionRevisionOperativa);
@@ -183,6 +203,21 @@ public sealed class DiagnosticoOrdenServicioPruebas
             {
                 Assert.Equal(ActividadRevisionOperativa.Bocina, revision.Actividad);
                 Assert.False(revision.Correcto);
+            },
+            revision =>
+            {
+                Assert.Equal(ActividadRevisionOperativa.AireAcondicionado, revision.Actividad);
+                Assert.True(revision.Correcto);
+            },
+            revision =>
+            {
+                Assert.Equal(ActividadRevisionOperativa.Radio, revision.Actividad);
+                Assert.False(revision.Correcto);
+            },
+            revision =>
+            {
+                Assert.Equal(ActividadRevisionOperativa.Retrovisores, revision.Actividad);
+                Assert.True(revision.Correcto);
             });
         Assert.Single(resultado.DaniosInspeccion);
         Assert.Equal("Golpe en defensa", resultado.DaniosInspeccion.Single().Observacion);

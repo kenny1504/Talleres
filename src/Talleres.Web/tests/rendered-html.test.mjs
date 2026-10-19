@@ -2,7 +2,21 @@ import assert from "node:assert/strict";
 import { access, readFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { once } from "node:events";
+import { stripTypeScriptTypes } from "node:module";
 import test from "node:test";
+
+test("reconoce la confirmación guardada sin adelantar las demás etapas de la orden", async () => {
+  const fuente = await readFile(new URL("../app/estadoOrden.ts", import.meta.url), "utf8");
+  const { estaAprobadaPorCliente } = await import(`data:text/javascript,${encodeURIComponent(stripTypeScriptTypes(fuente))}`);
+  const fecha = "2026-10-19T15:00:00Z";
+
+  assert.equal(estaAprobadaPorCliente("PendienteAprobacion", fecha), true);
+  assert.equal(estaAprobadaPorCliente("PendienteAprobacion", null), false);
+  assert.equal(estaAprobadaPorCliente("PendienteAprobacion", undefined), false);
+  for (const estado of ["Recepcion", "Diagnostico", "Cotizacion", "PreparacionReparacion", "Reparacion", "ControlCalidad", "ListaParaEntrega", "Entregada", "Cerrada", "Cancelada"]) {
+    assert.equal(estaAprobadaPorCliente(estado, fecha), false, estado);
+  }
+});
 
 async function renderizar() {
   const direccionWorker = new URL("../dist/server/index.js", import.meta.url);
@@ -350,7 +364,7 @@ test("permite eliminar productos descontados y comunica la devolución al invent
   assert.doesNotMatch(pagina, /window\.(?:alert|confirm)\s*\(/);
 });
 
-test("lleva la orden hasta entrega y registra productos y cargos durante reparación", async () => {
+test("lleva la orden hasta entrega y registra productos y cargos desde diagnóstico", async () => {
   const [pagina, estilos] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
@@ -378,7 +392,7 @@ test("lleva la orden hasta entrega y registra productos y cargos durante reparac
   assert.doesNotMatch(pagina, /name="unidadMedida"/);
   assert.match(pagina, /Total de la orden/);
   assert.match(pagina, /existencia insuficiente/);
-  assert.match(pagina, /const detallesEditables = orden\.estado === "Reparación" \|\| orden\.estado === "Lista para entregar"/);
+  assert.match(pagina, /const detallesEditables = orden\.estado === "Diagnóstico" \|\| orden\.estado === "Por aprobar" \|\| orden\.estado === "Aprobada" \|\| orden\.estado === "Reparación" \|\| orden\.estado === "Lista para entregar"/);
   assert.match(pagina, /Puedes corregir el diagnóstico, las evidencias, los productos y los cargos antes de entregarlo/);
   assert.match(pagina, /api\/ordenes-servicio\/\$\{ordenServicioId\}\/detalles\/inventario/);
   assert.match(estilos, /\.formularios-cargos\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1\.25fr\)/s);

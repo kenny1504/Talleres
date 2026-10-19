@@ -54,9 +54,19 @@ namespace Talleres.Infraestructura.Persistencia.Migraciones
                         .HasMaxLength(30)
                         .HasColumnType("nvarchar(30)");
 
+                    b.Property<string>("TelefonoNormalizado")
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)")
+                        .HasComputedColumnSql("REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE([Telefono], N' ', N''), N'-', N''), N'(', N''), N')', N''), N'+', N''), N'.', N''), NCHAR(9), N''), NCHAR(13), N''), NCHAR(10), N''), NCHAR(160), N'')", true);
+
                     b.HasKey("Id");
 
                     b.HasIndex("EmpresaId", "Nombre");
+
+                    b.HasIndex("EmpresaId", "TelefonoNormalizado")
+                        .IsUnique();
 
                     b.ToTable("Clientes", (string)null);
                 });
@@ -485,10 +495,16 @@ namespace Talleres.Infraestructura.Persistencia.Migraciones
                     b.Property<bool>("AceptaPruebaRuta")
                         .HasColumnType("bit");
 
+                    b.Property<bool>("DejaAlfombras")
+                        .HasColumnType("bit");
+
                     b.Property<bool>("DejaBotiquin")
                         .HasColumnType("bit");
 
                     b.Property<bool>("DejaChalecoReflectante")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("DejaCopaRueda")
                         .HasColumnType("bit");
 
                     b.Property<bool>("DejaDocumentos")
@@ -510,6 +526,9 @@ namespace Talleres.Infraestructura.Persistencia.Migraciones
                         .HasColumnType("bit");
 
                     b.Property<bool>("DejaLlaves")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("DejaPasacorrientes")
                         .HasColumnType("bit");
 
                     b.Property<bool>("DejaTrianguloSeguridad")

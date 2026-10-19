@@ -200,6 +200,9 @@ public sealed class DiagnosticoOrdenServicioServicio(
                 DejaExtintor = orden.Recepcion != null && orden.Recepcion.DejaExtintor,
                 DejaBotiquin = orden.Recepcion != null && orden.Recepcion.DejaBotiquin,
                 DejaChalecoReflectante = orden.Recepcion != null && orden.Recepcion.DejaChalecoReflectante,
+                DejaPasacorrientes = orden.Recepcion != null && orden.Recepcion.EmpresaId == orden.EmpresaId && orden.Recepcion.DejaPasacorrientes,
+                DejaCopaRueda = orden.Recepcion != null && orden.Recepcion.EmpresaId == orden.EmpresaId && orden.Recepcion.DejaCopaRueda,
+                DejaAlfombras = orden.Recepcion != null && orden.Recepcion.EmpresaId == orden.EmpresaId && orden.Recepcion.DejaAlfombras,
                 OtrosElementos = orden.Recepcion == null ? null : orden.Recepcion.OtrosElementos,
                 AceptaPruebaRuta = orden.Recepcion != null && orden.Recepcion.AceptaPruebaRuta,
                 DaniosInspeccion = orden.Recepcion == null
@@ -233,6 +236,9 @@ public sealed class DiagnosticoOrdenServicioServicio(
             DejaExtintor = datos.DejaExtintor,
             DejaBotiquin = datos.DejaBotiquin,
             DejaChalecoReflectante = datos.DejaChalecoReflectante,
+            DejaPasacorrientes = datos.DejaPasacorrientes,
+            DejaCopaRueda = datos.DejaCopaRueda,
+            DejaAlfombras = datos.DejaAlfombras,
             OtrosElementos = datos.OtrosElementos,
             AceptaPruebaRuta = datos.AceptaPruebaRuta
         };

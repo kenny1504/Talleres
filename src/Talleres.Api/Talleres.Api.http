@@ -2,13 +2,63 @@
 @UsuarioNova = usuario@example.com
 @ContrasenaNova = cambie-esta-clave
 @OrdenServicioId = 1
+@ClienteEliminarId = 1
+@VehiculoEliminarId = 1
 @TokenPublicoOrden = sustituya-por-el-token-de-48-caracteres-del-diagnostico
+
+### Eliminar una orden (permanente, requiere sesión del taller activo).
+# 204: eliminada con sus dependencias; devuelve consumos y conserva los pagos globales.
+# 422: alcanzó ListaParaEntrega, Entregada o Cerrada, incluso si después fue cancelada.
+# 503: no se completó la devolución del inventario; conserva la orden para reintentar.
+DELETE {{Talleres_Api_HostAddress}}/api/ordenes-servicio/{{OrdenServicioId}}
+
+### Eliminar un vehículo sin ninguna orden, incluidas las canceladas (requiere sesión).
+# 204: eliminado; 422: tiene órdenes; 404: no pertenece al taller activo.
+DELETE {{Talleres_Api_HostAddress}}/api/vehiculos/{{VehiculoEliminarId}}
+
+### Eliminar un cliente sin vehículos, órdenes ni pagos (requiere sesión).
+# Los pagos anulados también bloquean la eliminación para conservar el historial.
+# 204: eliminado; 422: tiene registros asociados; 404: no pertenece al taller activo.
+DELETE {{Talleres_Api_HostAddress}}/api/clientes/{{ClienteEliminarId}}
+
+### Listar órdenes del taller activo (requiere sesión).
+# Cada orden incluye kilometraje: entero registrado en su recepción, o null si no tiene recepción.
+GET {{Talleres_Api_HostAddress}}/api/ordenes-servicio
+Accept: application/json
+
+### Consultar una orden con el mismo kilometraje histórico que el listado (requiere sesión).
+# El listado, el detalle y las órdenes del estado de cuenta incluyen fechaAutorizacionClienteUtc.
+# Con estado PendienteAprobacion y fecha registrada, la web muestra Aprobada; la reparación la inicia el taller.
+GET {{Talleres_Api_HostAddress}}/api/ordenes-servicio/{{OrdenServicioId}}
+Accept: application/json
 
 ### Consulta pública sin sesión, usando el token del diagnóstico guardado.
 # Incluye revisionOperativa [{ actividad, correcto }] y observacionRevisionOperativa.
 # Solo incluye puntos revisados: true = Correcto, false = Con problema; los ausentes se muestran Sin revisar.
 # Sin revisión registrada devuelve revisionOperativa: [] y observacionRevisionOperativa: null.
 GET {{Talleres_Api_HostAddress}}/api/publico/ordenes-servicio/{{TokenPublicoOrden}}
+Accept: application/json
+
+### Confirmar la orden como cliente mediante el token público (sin sesión).
+# Registra fechaAutorizacionClienteUtc de forma idempotente y la web muestra Aprobada.
+# Conserva la etapa operativa hasta que el taller inicie la reparación.
+POST {{Talleres_Api_HostAddress}}/api/publico/ordenes-servicio/{{TokenPublicoOrden}}/autorizar
+Accept: application/json
+
+### Agregar un cargo desde diagnóstico, antes de iniciar reparación (requiere sesión).
+# También admite Cotizacion, PendienteAprobacion, PreparacionReparacion, Reparacion y ListaParaEntrega.
+# Los cargos se conservan al cambiar de estado y se incluyen en el total y el enlace público.
+POST {{Talleres_Api_HostAddress}}/api/ordenes-servicio/{{OrdenServicioId}}/detalles/manual
+Content-Type: application/json
+
+{
+  "descripcion": "Mano de obra de reparación",
+  "cantidad": 2,
+  "precioUnitario": 500.00
+}
+
+### Consultar los cargos y el total antes o después de iniciar reparación.
+GET {{Talleres_Api_HostAddress}}/api/ordenes-servicio/{{OrdenServicioId}}/detalles
 Accept: application/json
 
 ### Iniciar reparación desde el taller (requiere sesión y diagnóstico guardado).
@@ -64,6 +114,16 @@ Content-Type: application/json
   "nombre": "Ana López",
   "telefono": "8888-0000",
   "direccion": "Managua"
+}
+
+### Repetir el teléfono con otro formato devuelve 422 sin crear otro cliente.
+# Requiere haber registrado el cliente anterior en la misma empresa.
+POST {{Talleres_Api_HostAddress}}/api/clientes
+Content-Type: application/json
+
+{
+  "nombre": "Cliente repetido",
+  "telefono": "8888 0000"
 }
 
 ###
@@ -133,7 +193,10 @@ Content-Type: application/json
   "descripcionEstado": "Vehículo recibido para revisión general.",
   "revisionOperativa": [
     { "actividad": "LucesDelanteras", "correcto": true },
-    { "actividad": "Bocina", "correcto": false }
+    { "actividad": "Bocina", "correcto": false },
+    { "actividad": "AireAcondicionado", "correcto": true },
+    { "actividad": "Radio", "correcto": false },
+    { "actividad": "Retrovisores", "correcto": true }
   ],
   "observacionRevisionOperativa": "La bocina no funciona.",
   "dejaLlaves": true,
@@ -146,6 +209,9 @@ Content-Type: application/json
   "dejaExtintor": true,
   "dejaBotiquin": false,
   "dejaChalecoReflectante": false,
+  "dejaPasacorrientes": true,
+  "dejaCopaRueda": true,
+  "dejaAlfombras": true,
   "otrosElementos": "Llave de seguridad de ruedas",
   "aceptaPruebaRuta": true,
   "danios": []
@@ -170,7 +236,10 @@ Content-Type: application/json
   "descripcionEstado": "Vehículo recibido para revisión general.",
   "revisionOperativa": [
     { "actividad": "LucesDelanteras", "correcto": true },
-    { "actividad": "Bocina", "correcto": true }
+    { "actividad": "Bocina", "correcto": true },
+    { "actividad": "AireAcondicionado", "correcto": true },
+    { "actividad": "Radio", "correcto": true },
+    { "actividad": "Retrovisores", "correcto": false }
   ],
   "observacionRevisionOperativa": "Se verificó nuevamente la bocina y funciona correctamente.",
   "dejaLlaves": true,
@@ -183,7 +252,10 @@ Content-Type: application/json
   "dejaExtintor": true,
   "dejaBotiquin": true,
   "dejaChalecoReflectante": false,
-  "otrosElementos": "Llave de seguridad de ruedas y cables de arranque",
+  "dejaPasacorrientes": false,
+  "dejaCopaRueda": true,
+  "dejaAlfombras": true,
+  "otrosElementos": "Llave de seguridad de ruedas",
   "aceptaPruebaRuta": true,
   "danios": []
 }

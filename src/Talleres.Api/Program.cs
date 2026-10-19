@@ -160,6 +160,7 @@ builder.Services.AddScoped<IEstadoNegocioServicio, EstadoNegocioServicio>();
 builder.Services.AddScoped<IVehiculoServicio, VehiculoServicio>();
 builder.Services.AddScoped<ICatalogoVehiculoServicio, CatalogoVehiculoServicio>();
 builder.Services.AddScoped<IOrdenServicioServicio, OrdenServicioServicio>();
+builder.Services.AddScoped<IEliminacionOrdenServicio, EliminacionOrdenServicio>();
 builder.Services.AddScoped<ITecnicoTallerServicio, TecnicoTallerServicio>();
 builder.Services.AddScoped<IDetalleOrdenServicio, DetalleOrdenServicio>();
 builder.Services.AddScoped<IDiagnosticoOrdenServicioServicio, DiagnosticoOrdenServicioServicio>();

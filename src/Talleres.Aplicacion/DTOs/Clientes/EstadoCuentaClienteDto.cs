@@ -11,7 +11,8 @@ public sealed record OrdenEstadoCuentaClienteDto(
     string PlacaVehiculo,
     string MarcaVehiculo,
     string ModeloVehiculo,
-    int AnioVehiculo);
+    int AnioVehiculo,
+    DateTime? FechaAutorizacionClienteUtc = null);
 
 public sealed record PagoClienteDto(
     long Id,

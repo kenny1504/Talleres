@@ -1,3 +1,4 @@
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using Talleres.Aplicacion.Abstracciones.Multitenencia;
@@ -42,15 +43,45 @@ public sealed class TallerDbContext(
     public DbSet<TallerSincronizado> TalleresSincronizados =>
         Set<TallerSincronizado>();
 
-    public override Task<int> SaveChangesAsync(
+    public override async Task<int> SaveChangesAsync(
         CancellationToken cancellationToken = default)
     {
         ValidarAislamientoEmpresa();
-        return base.SaveChangesAsync(cancellationToken);
+        try
+        {
+            return await base.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException excepcion) when (
+            excepcion.InnerException is SqlException { Number: 2601 or 2627 } excepcionSql &&
+            excepcionSql.Message.Contains("IX_Clientes_EmpresaId_TelefonoNormalizado", StringComparison.Ordinal))
+        {
+            // El índice resuelve también dos altas simultáneas con el mismo teléfono.
+            throw new ReglaNegocioException("El cliente ya está registrado con este número telefónico.");
+        }
     }
 
-    public Task<IDbContextTransaction> IniciarTransaccionAsync(CancellationToken cancellationToken = default) =>
-        Database.BeginTransactionAsync(cancellationToken);
+    public Task<IDbContextTransaction> IniciarTransaccionAsync(
+        CancellationToken cancellationToken = default,
+        System.Data.IsolationLevel nivelAislamiento = System.Data.IsolationLevel.ReadCommitted) =>
+        Database.IsRelational()
+            ? Database.BeginTransactionAsync(nivelAislamiento, cancellationToken)
+            : Database.BeginTransactionAsync(cancellationToken);
+
+    public Task<TResultado> EjecutarConEstrategiaAsync<TResultado>(
+        Func<Task<TResultado>> operacion,
+        CancellationToken cancellationToken = default)
+    {
+        var intento = 0;
+        return Database.CreateExecutionStrategy().ExecuteAsync(async _ =>
+        {
+            if (intento++ > 0)
+            {
+                ChangeTracker.Clear();
+            }
+
+            return await operacion();
+        }, cancellationToken);
+    }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
