@@ -3590,6 +3590,7 @@ button.negocio-fila:hover { background: var(--superficie); }
 
 @media (max-width: 1180px) {
   .aplicacion { grid-template-columns: 96px minmax(0, 1fr); }
+  .acciones-eliminar-orden { display: flex; justify-content: center; }
   .barra-lateral { padding-inline: 13px; align-items: center; }
   .marca { padding: 0; }
   .marca-nombre,

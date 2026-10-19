@@ -3420,8 +3420,8 @@ function DetalleOrden({
           {errorProceso && <small role="alert">{errorProceso}</small>}
         </div>
         <div className="bloque-detalle"><span className="sobrelinea">Avance de la orden</span><div className="barra-avance"><span style={{ width: `${orden.progreso}%` }} /></div><strong>{orden.progreso}% completado</strong></div>
-        <div className="bloque-detalle">
-          <button className="boton-secundario" type="button" disabled={guardandoProceso || cargandoProceso} onClick={alEliminar}>
+        <div className="bloque-detalle acciones-eliminar-orden">
+          <button className="boton-eliminar-confirmacion" type="button" disabled={guardandoProceso || cargandoProceso} onClick={alEliminar}>
             <Trash2 size={18} />Eliminar orden
           </button>
         </div>
