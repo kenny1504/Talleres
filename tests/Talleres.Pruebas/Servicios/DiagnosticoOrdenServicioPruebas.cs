@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Talleres.Aplicacion.Abstracciones.Integraciones;
 using Talleres.Aplicacion.DTOs.Autenticacion;
+using Talleres.Aplicacion.DTOs.Configuracion;
 using Talleres.Aplicacion.DTOs.OrdenesServicio;
 using Talleres.Aplicacion.Servicios;
 using Talleres.Dominio.Entidades;
@@ -31,7 +32,7 @@ public sealed class DiagnosticoOrdenServicioPruebas
         };
         contexto.OrdenesServicio.Add(orden);
         await contexto.SaveChangesAsync();
-        var servicio = new DiagnosticoOrdenServicioServicio(contexto, empresa, new AlmacenamientoEvidenciasPrueba(), new IdentidadNovaPrueba());
+        var servicio = new DiagnosticoOrdenServicioServicio(contexto, empresa, new AlmacenamientoEvidenciasPrueba(), new IdentidadNovaPrueba(), new ConfiguracionMonetariaNovaPrueba());
 
         var resultado = await servicio.GuardarAsync(orden.Id, new GuardarDiagnosticoOrdenServicioSolicitud
         {
@@ -67,7 +68,7 @@ public sealed class DiagnosticoOrdenServicioPruebas
         contexto.OrdenesServicio.Add(orden);
         await contexto.SaveChangesAsync();
         var servicio = new DiagnosticoOrdenServicioServicio(
-            contexto, empresa, new AlmacenamientoEvidenciasPrueba(), new IdentidadNovaPrueba());
+            contexto, empresa, new AlmacenamientoEvidenciasPrueba(), new IdentidadNovaPrueba(), new ConfiguracionMonetariaNovaPrueba());
 
         var resultado = await servicio.GuardarAsync(orden.Id, new GuardarDiagnosticoOrdenServicioSolicitud
         {
@@ -78,8 +79,10 @@ public sealed class DiagnosticoOrdenServicioPruebas
         Assert.NotNull(resultado.FechaAutorizacionClienteUtc);
     }
 
-    [Fact]
-    public async Task ObtenerPublicaAsync_IncluyeLaInspeccionCompleta()
+    [Theory]
+    [InlineData("C$", 0, ",", ".")]
+    [InlineData("$", 3, ".", ",")]
+    public async Task ObtenerPublicaAsync_IncluyeLaInspeccionCompleta(string simbolo, int decimales, string separadorDecimal, string separadorMiles)
     {
         var empresa = new ContextoEmpresaPrueba(7);
         var opciones = new DbContextOptionsBuilder<TallerDbContext>()
@@ -169,13 +172,29 @@ public sealed class DiagnosticoOrdenServicioPruebas
             FechaCargaUtc = DateTime.UtcNow
         });
         contexto.RecepcionesVehiculo.Add(recepcion);
+        orden.Detalles.Add(new Talleres.Dominio.Entidades.DetalleOrdenServicio
+        {
+            EmpresaId = 7,
+            Tipo = TipoDetalleOrdenServicio.Inventario,
+            Descripcion = "Aceite de motor",
+            UnidadMedida = "1",
+            Cantidad = 2,
+            PrecioUnitario = 1200
+        });
         await contexto.SaveChangesAsync();
         var empresaPublica = new ContextoEmpresaPrueba(0);
         await using var contextoPublico = new TallerDbContext(opciones, empresaPublica);
-        var servicio = new DiagnosticoOrdenServicioServicio(contextoPublico, empresaPublica, new AlmacenamientoEvidenciasPrueba(), new IdentidadNovaPrueba());
+        var configuracion = new ConfiguracionMonetariaDto(simbolo, separadorDecimal, decimales, separadorMiles);
+        var servicio = new DiagnosticoOrdenServicioServicio(contextoPublico, empresaPublica, new AlmacenamientoEvidenciasPrueba(), new IdentidadNovaPrueba(), new ConfiguracionMonetariaNovaPrueba(configuracion));
 
         var resultado = await servicio.ObtenerPublicaAsync(orden.TokenPublico);
 
+        Assert.Equal(configuracion, resultado.ConfiguracionMonetaria);
+        Assert.Equal(2400m, resultado.Total);
+        var cargo = Assert.Single(resultado.Detalles);
+        Assert.Equal(2m, cargo.Cantidad);
+        Assert.Equal(1200m, cargo.PrecioUnitario);
+        Assert.Equal(2400m, cargo.Subtotal);
         Assert.Equal((byte)100, resultado.PorcentajeCombustible);
         Assert.True(resultado.DejaLlaves);
         Assert.True(resultado.DejaDocumentos);
@@ -227,6 +246,15 @@ public sealed class DiagnosticoOrdenServicioPruebas
         Assert.Equal("Carretera Norte, Managua", resultado.Taller.Direccion);
         Assert.Equal("+505 88887777", resultado.Taller.Telefono);
         Assert.Equal("https://example.test/logo.png", resultado.Taller.Logo);
+    }
+
+    private sealed class ConfiguracionMonetariaNovaPrueba(ConfiguracionMonetariaDto? configuracion = null) : IConfiguracionMonetariaSmartNova
+    {
+        public Task<ConfiguracionMonetariaDto> ObtenerAsync(int empresaNovaId, CancellationToken cancellationToken)
+        {
+            Assert.Equal(7, empresaNovaId);
+            return Task.FromResult(configuracion ?? new ConfiguracionMonetariaDto("C$", ".", 2, ","));
+        }
     }
 
     private sealed class IdentidadNovaPrueba : IIdentidadSmartNova

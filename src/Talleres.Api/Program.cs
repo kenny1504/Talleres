@@ -153,6 +153,7 @@ builder.Services.AddDbContext<SmartNovaDbContext>(opciones =>
 builder.Services.AddScoped<IPasswordHasher<UsuarioSmartNova>, PasswordHasher<UsuarioSmartNova>>();
 builder.Services.AddScoped<IIdentidadSmartNova, IdentidadSmartNova>();
 builder.Services.AddScoped<IInventarioSmartNova, InventarioSmartNova>();
+builder.Services.AddScoped<IConfiguracionMonetariaSmartNova, ConfiguracionMonetariaSmartNova>();
 
 builder.Services.AddScoped<IClienteServicio, ClienteServicio>();
 builder.Services.AddScoped<IEstadoCuentaClienteServicio, EstadoCuentaClienteServicio>();

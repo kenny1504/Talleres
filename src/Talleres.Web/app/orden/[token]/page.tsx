@@ -8,6 +8,7 @@ import { formatearFechaHoraOrden } from "../../fechaHoraOrden";
 import { estaAprobadaPorCliente } from "../../estadoOrden";
 import { elementosRecepcion, type ElementosRecepcion } from "../../elementosRecepcion";
 import { actividadesRevisionOperativa, type ResultadoRevisionOperativa } from "../../revisionOperativa";
+import { formatearCantidad, formatearImporte, type ConfiguracionMonetaria } from "../../formatoMonetario";
 
 interface EvidenciaPublica { id: number; nombreArchivo: string; }
 interface DanioInspeccionPublico { id: number; zona: string; tipo: string; severidad: string; observacion: string | null; }
@@ -23,6 +24,7 @@ interface OrdenPublica extends ElementosRecepcion {
   daniosInspeccion: DanioInspeccionPublico[];
   evidenciasInspeccion: EvidenciaPublica[]; evidenciasDiagnostico: EvidenciaPublica[];
   detalles: DetallePublico[]; total: number;
+  configuracionMonetaria: ConfiguracionMonetaria;
 }
 
 export default function OrdenPublicaPagina({ params }: { params: Promise<{ token: string }> }) {
@@ -64,6 +66,7 @@ export default function OrdenPublicaPagina({ params }: { params: Promise<{ token
   const revisionOperativa = orden.revisionOperativa ?? [];
   const observacionRevisionOperativa = orden.observacionRevisionOperativa?.trim();
   const taller = orden.taller ?? { nombre: "Taller", direccion: null, telefono: null, logo: null };
+  const formatoMonetario = orden.configuracionMonetaria;
   const imagenesInspeccion = evidenciasInspeccion
     .map((evidencia, indice) => ({ direccion: direccionEvidenciaInspeccion(token, evidencia.id), descripcion: `Fotografía ${indice + 1} de la inspección` }))
     .filter((imagen) => !imagenesInvalidas.has(imagen.direccion));
@@ -173,7 +176,22 @@ export default function OrdenPublicaPagina({ params }: { params: Promise<{ token
           {orden.motivoIngreso && <div className="dato-publico-ancho"><span><small>Motivo de ingreso</small><strong>{orden.motivoIngreso}</strong></span></div>}
         </aside>
       </div>
-      {orden.detalles.length > 0 && <section className="tarjeta-publica cargos-publicos"><span className="sobrelinea">Productos y servicios registrados</span><h2>Detalle de la orden</h2>{orden.detalles.map((detalle) => <article key={detalle.id}><span><strong>{detalle.descripcion}</strong><small>{detalle.cantidad} {detalle.unidadMedida || "unidad"} × {moneda(detalle.precioUnitario)}</small></span><strong>{moneda(detalle.subtotal)}</strong></article>)}<div><span>Total</span><strong>{moneda(orden.total)}</strong></div></section>}
+      {orden.detalles.length > 0 && (
+        <section className="tarjeta-publica cargos-publicos">
+          <span className="sobrelinea">Productos y servicios registrados</span>
+          <h2>Detalle de la orden</h2>
+          {orden.detalles.map((detalle) => (
+            <article key={detalle.id}>
+              <span>
+                <strong>{detalle.descripcion}</strong>
+                <small translate="no">{formatearCantidad(detalle.cantidad, formatoMonetario)} × {formatearImporte(detalle.precioUnitario, formatoMonetario)}</small>
+              </span>
+              <strong className="importe-cargo-publico" translate="no" aria-label={`Subtotal: ${formatearImporte(detalle.subtotal, formatoMonetario)}`}>{formatearImporte(detalle.subtotal, formatoMonetario)}</strong>
+            </article>
+          ))}
+          <div><span>Total</span><strong translate="no">{formatearImporte(orden.total, formatoMonetario)}</strong></div>
+        </section>
+      )}
       <section className={`autorizacion-publica ${autorizada ? "autorizada" : ""}`}>
         <span>{autorizada ? <CircleCheck size={30} /> : <Wrench size={30} />}</span>
         <div><span className="sobrelinea">Autorización</span><h2>{autorizada ? "Autorización registrada" : "¿Autorizas continuar?"}</h2><p>{autorizada ? "El taller ya puede continuar con la reparación." : "Esta autorización permite al taller continuar. Los productos, servicios y el total pueden agregarse después durante la reparación."}</p>{autorizada && <p className="estado-autorizacion-publica">Estado actual: <strong>{estaAprobadaPorCliente(orden.estado, orden.fechaAutorizacionClienteUtc) ? "Aprobada" : etiquetaEstado(orden.estado)}</strong></p>}</div>
@@ -200,14 +218,15 @@ function direccionEvidenciaInspeccion(token: string, evidenciaId: number) { retu
 async function obtenerOrden(token: string, signal?: AbortSignal): Promise<OrdenPublica> {
   const respuesta = await fetch(`${direccionApi()}/api/publico/ordenes-servicio/${token}`, { signal });
   if (!respuesta.ok) throw new Error(respuesta.status === 404 ? "El enlace no existe o dejó de estar disponible." : "No fue posible consultar la orden.");
-  return await respuesta.json() as OrdenPublica;
+  const datos = await respuesta.json() as OrdenPublica;
+  if (!datos.configuracionMonetaria) throw new Error("No fue posible obtener la configuración monetaria del taller.");
+  return datos;
 }
 async function autorizarOrden(token: string): Promise<OrdenPublica> {
   const respuesta = await fetch(`${direccionApi()}/api/publico/ordenes-servicio/${token}/autorizar`, { method: "POST" });
   if (!respuesta.ok) throw new Error("No fue posible registrar la autorización. Inténtalo nuevamente.");
   return await respuesta.json() as OrdenPublica;
 }
-function moneda(valor: number) { return new Intl.NumberFormat("es-NI", { style: "currency", currency: "NIO" }).format(valor); }
 function etiquetaEstado(estado: string) { return ({ Recepcion: "Recepción", Diagnostico: "Diagnóstico", Cotizacion: "Cotización", PendienteAprobacion: "Por autorizar", PreparacionReparacion: "Preparación de reparación", Reparacion: "En reparación", ControlCalidad: "Control de calidad", ListaParaEntrega: "Lista para entregar", Entregada: "Entregada", Cerrada: "Cerrada", Cancelada: "Cancelada" } as Record<string, string>)[estado] ?? estado; }
 function etiquetaCombustible(porcentaje: number) { return porcentaje >= 88 ? "Tanque lleno" : porcentaje >= 63 ? "3/4 de tanque" : porcentaje >= 38 ? "Medio tanque" : porcentaje >= 13 ? "1/4 de tanque" : "Reserva"; }
 function etiquetaTipoDanio(tipo: string) { return tipo === "Rayon" ? "Rayón" : tipo; }

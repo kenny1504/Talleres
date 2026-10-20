@@ -3842,10 +3842,14 @@ button.negocio-fila:hover { background: var(--superficie); }
 .datos-publicos span { display: grid; gap: 2px; }
 .datos-publicos small { color: var(--tinta-suave); }
 .dato-publico-ancho { padding-top: 14px; border-top: 1px solid var(--borde); }
-.cargos-publicos article { min-height: 58px; display: flex; justify-content: space-between; gap: 16px; align-items: center; border-top: 1px solid var(--borde); }
-.cargos-publicos article span { display: grid; gap: 3px; }
+.cargos-publicos article { min-height: 58px; padding-block: 9px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 16px; align-items: center; border-top: 1px solid var(--borde); }
+.cargos-publicos article span { min-width: 0; display: grid; gap: 3px; overflow-wrap: anywhere; }
 .cargos-publicos article small { color: var(--tinta-suave); }
-.cargos-publicos > div { padding-top: 16px; display: flex; justify-content: space-between; font-size: 20px; }
+.importe-cargo-publico { justify-self: end; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.cargos-publicos > div { padding-top: 16px; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 16px; font-size: 20px; font-variant-numeric: tabular-nums; }
+@media (max-width: 480px) {
+  .cargos-publicos article { grid-template-columns: minmax(0, 1fr); }
+}
 .autorizacion-publica { padding: 22px; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 16px; align-items: center; border: 1px solid #e6c37a; border-radius: 18px; background: #fff8e8; }
 .autorizacion-publica > span { width: 54px; height: 54px; display: grid; place-items: center; border-radius: 15px; background: white; color: #9b6a10; }
 .autorizacion-publica h2 { margin: 3px 0; }

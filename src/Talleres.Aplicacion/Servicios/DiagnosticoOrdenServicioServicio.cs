@@ -17,7 +17,8 @@ public sealed class DiagnosticoOrdenServicioServicio(
     ITallerDbContext dbContext,
     IContextoEmpresa contextoEmpresa,
     IAlmacenamientoEvidencias almacenamientoEvidencias,
-    IIdentidadSmartNova identidadSmartNova) : IDiagnosticoOrdenServicioServicio
+    IIdentidadSmartNova identidadSmartNova,
+    IConfiguracionMonetariaSmartNova configuracionMonetaria) : IDiagnosticoOrdenServicioServicio
 {
     private const int CantidadMaximaEvidencias = 8;
 
@@ -212,7 +213,7 @@ public sealed class DiagnosticoOrdenServicioServicio(
                     ? Array.Empty<EvidenciaInspeccionDto>()
                     : orden.Recepcion.Evidencias.Select(evidencia => new EvidenciaInspeccionDto(evidencia.Id, evidencia.NombreArchivo, evidencia.TipoContenido, evidencia.Longitud, evidencia.FechaCargaUtc)).ToArray(),
                 Evidencias = orden.EvidenciasDiagnostico.Select(e => new EvidenciaDiagnosticoDto(e.Id, e.NombreArchivo, e.TipoContenido, e.Longitud, e.FechaCargaUtc)).ToArray(),
-                Detalles = orden.Detalles.Select(d => new DetalleOrdenServicioDto(d.Id, d.Tipo, d.ProductoInventarioId, d.BodegaInventarioId, d.CodigoProducto, d.Descripcion, d.UnidadMedida, d.Cantidad, d.PrecioUnitario, d.Cantidad * d.PrecioUnitario, d.ExistenciaDescontada, d.FechaCreacion)).ToArray()
+                Detalles = orden.Detalles.Where(d => d.EmpresaId == orden.EmpresaId).Select(d => new DetalleOrdenServicioDto(d.Id, d.Tipo, d.ProductoInventarioId, d.BodegaInventarioId, d.CodigoProducto, d.Descripcion, d.UnidadMedida, d.Cantidad, d.PrecioUnitario, d.Cantidad * d.PrecioUnitario, d.ExistenciaDescontada, d.FechaCreacion)).ToArray()
             })
             .SingleOrDefaultAsync(cancellationToken)
             ?? throw new RecursoNoEncontradoException("El enlace público no existe o dejó de estar disponible.");
@@ -224,8 +225,10 @@ public sealed class DiagnosticoOrdenServicioServicio(
             FormatearDireccion(tallerNova.Direccion, tallerNova.Ciudad, tallerNova.Barrio, tallerNova.Calle),
             FormatearTelefono(tallerNova.PrefijoTelefono, tallerNova.Telefono),
             tallerNova.Logo);
+        var formatoMonetario = await configuracionMonetaria.ObtenerAsync(checked((int)datos.EmpresaId), cancellationToken);
         return new OrdenServicioPublicaDto(taller, datos.Numero, datos.Estado, datos.FechaIngreso, datos.Nombre, datos.Placa, datos.Marca, datos.Modelo, datos.Anio, datos.Color, datos.NumeroVin, datos.MotivoIngreso, datos.Diagnostico!, datos.FechaAutorizacionClienteUtc, datos.Kilometraje, datos.Combustible, datos.DescripcionEstado, datos.DejaLlaves, datos.DejaDocumentos, datos.DaniosInspeccion, datos.EvidenciasInspeccion, datos.Evidencias, datos.Detalles, datos.Detalles.Sum(item => item.Subtotal))
         {
+            ConfiguracionMonetaria = formatoMonetario,
             RevisionOperativa = datos.RevisionOperativa,
             ObservacionRevisionOperativa = datos.ObservacionRevisionOperativa,
             DejaLlantaRepuesto = datos.DejaLlantaRepuesto,

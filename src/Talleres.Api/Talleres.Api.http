@@ -36,12 +36,16 @@ Accept: application/json
 # Incluye revisionOperativa [{ actividad, correcto }] y observacionRevisionOperativa.
 # Solo incluye puntos revisados: true = Correcto, false = Con problema; los ausentes se muestran Sin revisar.
 # Sin revisión registrada devuelve revisionOperativa: [] y observacionRevisionOperativa: null.
+# Incluye configuracionMonetaria de la empresa de la orden, consultada en Galileo.
+# Ejemplo: { "simbolo": "C$", "separadorDecimal": ",", "cantidadDecimales": 0, "separadorMiles": "." }
+# detalles conserva cantidad, precioUnitario y subtotal numéricos; la web muestra 2 × C$ 1.200 y C$ 2.400.
 GET {{Talleres_Api_HostAddress}}/api/publico/ordenes-servicio/{{TokenPublicoOrden}}
 Accept: application/json
 
 ### Confirmar la orden como cliente mediante el token público (sin sesión).
 # Registra fechaAutorizacionClienteUtc de forma idempotente y la web muestra Aprobada.
 # Conserva la etapa operativa hasta que el taller inicie la reparación.
+# La respuesta también incluye configuracionMonetaria vigente, igual que la consulta pública.
 POST {{Talleres_Api_HostAddress}}/api/publico/ordenes-servicio/{{TokenPublicoOrden}}/autorizar
 Accept: application/json
 

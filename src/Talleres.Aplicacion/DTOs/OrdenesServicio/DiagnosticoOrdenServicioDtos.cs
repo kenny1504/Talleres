@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Talleres.Aplicacion.DTOs.Configuracion;
 using Talleres.Aplicacion.DTOs.Recepciones;
 using Talleres.Dominio.Enumeraciones;
 
@@ -62,6 +63,8 @@ public sealed record OrdenServicioPublicaDto(
     IReadOnlyCollection<DetalleOrdenServicioDto> Detalles,
     decimal Total)
 {
+    public required ConfiguracionMonetariaDto ConfiguracionMonetaria { get; init; }
+
     public IReadOnlyCollection<ResultadoRevisionOperativaDto> RevisionOperativa { get; init; } = [];
     public string? ObservacionRevisionOperativa { get; init; }
     public bool DejaLlantaRepuesto { get; init; }

@@ -5,6 +5,20 @@ import { once } from "node:events";
 import { stripTypeScriptTypes } from "node:module";
 import test from "node:test";
 
+test("formatea los cargos públicos con el símbolo, separadores y decimales de Galileo", async () => {
+  const fuente = await readFile(new URL("../app/formatoMonetario.ts", import.meta.url), "utf8");
+  const { formatearImporte, formatearCantidad } = await import(`data:text/javascript,${encodeURIComponent(stripTypeScriptTypes(fuente))}`);
+  const configuracion = { simbolo: "C$", separadorDecimal: ",", cantidadDecimales: 0, separadorMiles: "." };
+
+  assert.equal(formatearImporte(1200, configuracion), "C$ 1.200");
+  assert.equal(formatearImporte(2400, configuracion), "C$ 2.400");
+  assert.equal(formatearCantidad(2, configuracion), "2");
+  assert.equal(formatearCantidad(1.25, configuracion), "1,25");
+  assert.equal(formatearImporte(2400.5, { ...configuracion, cantidadDecimales: 2 }), "C$ 2.400,50");
+  assert.equal(formatearImporte(2400.5, { ...configuracion, simbolo: "$", separadorDecimal: ".", separadorMiles: ",", cantidadDecimales: 3 }), "$ 2,400.500");
+  assert.equal(formatearImporte(2400, { ...configuracion, separadorMiles: null }), "C$ 2400");
+});
+
 test("reconoce la confirmación guardada sin adelantar las demás etapas de la orden", async () => {
   const fuente = await readFile(new URL("../app/estadoOrden.ts", import.meta.url), "utf8");
   const { estaAprobadaPorCliente } = await import(`data:text/javascript,${encodeURIComponent(stripTypeScriptTypes(fuente))}`);
