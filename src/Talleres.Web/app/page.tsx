@@ -3592,7 +3592,7 @@ function DetalleOrden({
           titulo={detallePorEliminar.tipo === "Inventario" ? "Eliminar producto" : "Eliminar cargo"}
           descripcion={`¿Deseas eliminar ${detallePorEliminar.descripcion} de la orden?`}
           detalle={detallePorEliminar.existenciaDescontada
-            ? `Se devolverán ${detallePorEliminar.cantidad} ${detallePorEliminar.unidadMedida || "unidad(es)"} al inventario.`
+            ? `Cantidad que se devolverá al inventario: ${detallePorEliminar.cantidad}.`
             : "Este concepto se quitará del total de la orden."}
           etiquetaConfirmar={detallePorEliminar.existenciaDescontada ? "Eliminar y devolver" : "Eliminar cargo"}
           procesando={guardandoProceso}
@@ -3954,7 +3954,7 @@ function ResumenCargosOrden({
       {resumen.detalles.map((detalle) => (
         <article key={detalle.id}>
           <div><strong>{detalle.descripcion}</strong><small>{detalle.codigoProducto || "Detalle manual"}{detalle.existenciaDescontada ? " · Existencia descontada" : detalle.tipo === "Inventario" ? " · Sin descuento de existencia" : ""}</small></div>
-          <span>{detalle.cantidad} {detalle.unidadMedida || ""}</span>
+          <span>{detalle.cantidad}</span>
           <span>{formatearMoneda(detalle.precioUnitario)}</span>
           <strong>{formatearMoneda(detalle.subtotal)}</strong>
           {!soloLectura ? <button type="button" disabled={guardando} onClick={() => alEliminar(detalle)} aria-label={`Eliminar ${detalle.descripcion}`}><Trash2 size={17} /></button> : <span />}
