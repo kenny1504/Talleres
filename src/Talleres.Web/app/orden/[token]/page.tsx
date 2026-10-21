@@ -4,6 +4,8 @@ import { use, useEffect, useState } from "react";
 import { Building2, CalendarDays, Camera, CarFront, Check, CircleCheck, ClipboardCheck, ClipboardList, FileText, Fuel, KeyRound, MapPin, Minus, Phone, Wrench, X, ZoomIn } from "lucide-react";
 import { useCargadorPantalla } from "../../componentes/ProveedorCargadorPantalla";
 import { VisorFotografias, type EstadoVisor, type ImagenVisor } from "../../componentes/VisorFotografias";
+import { MapaInspeccion } from "../../componentes/MapaInspeccion";
+import { etiquetaZona, zonaDesdeApi, type SeveridadDanio } from "../../inspeccionVehiculo";
 import { formatearFechaHoraOrden } from "../../fechaHoraOrden";
 import { estaAprobadaPorCliente } from "../../estadoOrden";
 import { elementosRecepcion, type ElementosRecepcion } from "../../elementosRecepcion";
@@ -11,7 +13,7 @@ import { actividadesRevisionOperativa, type ResultadoRevisionOperativa } from ".
 import { formatearCantidad, formatearImporte, type ConfiguracionMonetaria } from "../../formatoMonetario";
 
 interface EvidenciaPublica { id: number; nombreArchivo: string; }
-interface DanioInspeccionPublico { id: number; zona: string; tipo: string; severidad: string; observacion: string | null; }
+interface DanioInspeccionPublico { id: number; zona: string; tipo: string; severidad: SeveridadDanio; observacion: string | null; }
 interface DetallePublico { id: number; descripcion: string; cantidad: number; unidadMedida: string | null; precioUnitario: number; subtotal: number; }
 interface TallerPublico { nombre: string; direccion: string | null; telefono: string | null; logo: string | null; }
 interface OrdenPublica extends ElementosRecepcion {
@@ -60,6 +62,10 @@ export default function OrdenPublicaPagina({ params }: { params: Promise<{ token
   if (!orden) return null;
   const autorizada = Boolean(orden.fechaAutorizacionClienteUtc);
   const daniosInspeccion = orden.daniosInspeccion ?? [];
+  const daniosMapa = daniosInspeccion.map((danio) => ({
+    zona: zonaDesdeApi(danio.zona),
+    severidad: danio.severidad,
+  }));
   const evidenciasInspeccion = orden.evidenciasInspeccion ?? [];
   const elementosEntregados = elementosRecepcion.filter(({ campo }) => orden[campo]);
   const otrosElementos = orden.otrosElementos?.trim();
@@ -134,17 +140,18 @@ export default function OrdenPublicaPagina({ params }: { params: Promise<{ token
           </article>
         </div>
         {orden.descripcionEstado && <div className="observacion-publica"><FileText size={20} /><span><small>Observaciones generales</small><p>{orden.descripcionEstado}</p></span></div>}
-        {daniosInspeccion.length > 0 && (
+        <div className="mapa-hallazgos-publicos">
+          <MapaInspeccion danios={daniosMapa} />
           <div className="hallazgos-publicos">
             <h3>Daños y hallazgos visuales</h3>
-            {daniosInspeccion.map((danio) => (
+            {daniosInspeccion.length > 0 ? daniosInspeccion.map((danio) => (
               <article key={danio.id}>
-                <span className={`severidad-publica severidad-${danio.severidad.toLocaleLowerCase("es")}`}>{danio.severidad}</span>
-                <div><strong>{etiquetaTipoDanio(danio.tipo)} · {etiquetaZona(danio.zona)}</strong><p>{danio.observacion || "Sin observación adicional."}</p></div>
+                <span className={"severidad-publica severidad-" + danio.severidad.toLocaleLowerCase("es")}>{danio.severidad}</span>
+                <div><strong>{etiquetaTipoDanio(danio.tipo)} · {etiquetaZona(zonaDesdeApi(danio.zona))}</strong><p>{danio.observacion || "Sin observación adicional."}</p></div>
               </article>
-            ))}
+            )) : <p>No se registraron daños visibles durante la inspección.</p>}
           </div>
-        )}
+        </div>
         {imagenesInspeccion.length > 0 && (
           <div className="evidencias-publicas">
             <h3><Camera size={20} /> Fotografías de la inspección</h3>
@@ -230,4 +237,3 @@ async function autorizarOrden(token: string): Promise<OrdenPublica> {
 function etiquetaEstado(estado: string) { return ({ Recepcion: "Recepción", Diagnostico: "Diagnóstico", Cotizacion: "Cotización", PendienteAprobacion: "Por autorizar", PreparacionReparacion: "Preparación de reparación", Reparacion: "En reparación", ControlCalidad: "Control de calidad", ListaParaEntrega: "Lista para entregar", Entregada: "Entregada", Cerrada: "Cerrada", Cancelada: "Cancelada" } as Record<string, string>)[estado] ?? estado; }
 function etiquetaCombustible(porcentaje: number) { return porcentaje >= 88 ? "Tanque lleno" : porcentaje >= 63 ? "3/4 de tanque" : porcentaje >= 38 ? "Medio tanque" : porcentaje >= 13 ? "1/4 de tanque" : "Reserva"; }
 function etiquetaTipoDanio(tipo: string) { return tipo === "Rayon" ? "Rayón" : tipo; }
-function etiquetaZona(zona: string) { return zona.replace(/([a-záéíóúñ])([A-ZÁÉÍÓÚÑ])/g, "$1 $2").toLocaleLowerCase("es").replace(/^./, (letra) => letra.toLocaleUpperCase("es")); }

@@ -18,7 +18,7 @@ El frontal vive en `src/Talleres.Web` y está diseñado primero para tablet hori
 - Registro táctil de productos de inventario, compras externas, mano de obra y otros cargos durante la reparación.
 - Total calculado y visible desde el detalle de la orden y la preparación de la entrega.
 - Estado de cuenta por cliente con cargos de todas sus órdenes no canceladas, placa, marca, modelo y año del vehículo atendido en cada orden, abonos globales y saldo pendiente o a favor.
-- Inspección visual táctil por zonas, tipo y severidad del daño, con fotografías públicas en Amazon S3 que pueden consultarse desde el detalle de la orden.
+- Inspección visual táctil con 27 zonas y vistas superior, frontal y trasera, tipo y severidad del daño, con fotografías públicas en Amazon S3 que pueden consultarse desde el detalle de la orden.
 - Descripción editable para cada daño y observaciones generales opcionales de la recepción, con confirmación al guardar sin ellas.
 - Dictado por voz en las observaciones generales de la inspección y en la revisión operativa, con edición manual y límite de 2000 caracteres. El guardado se habilita al finalizar el dictado.
 - Consulta y edición posterior de los hallazgos visuales dentro del detalle de la orden.
@@ -265,6 +265,8 @@ Si la API queda `unhealthy`, revise los logs del servicio `api`: `/salud` compru
 | `DELETE` | `/api/ordenes-servicio/{id}/recepcion/evidencias/{evidenciaId}` | Elimina la fotografía de S3 y de la inspección |
 
 ## Verificación
+
+El mapa de inspección permite alternar entre las siluetas superior (16 puntos), frontal (8) y trasera (7), tanto al registrar como al editar, consultar y abrir el enlace público del cliente. La vista pública muestra el mismo mapa en modo de consulta, junto con tipo, severidad y observación de cada hallazgo. Son 27 zonas distintas: algunas se comparten entre vistas y muestran los mismos hallazgos, sin duplicarlos. Los lados izquierdo y derecho siempre corresponden al vehículo; en la vista frontal aparecen invertidos respecto a quien mira. Las ocho zonas originales conservan sus valores (1–8); las nuevas zonas se agregan con valores 9–27 a `ZonaVehiculo`. La columna `DaniosVehiculo.Zona` ya es entera, sin restricciones por catálogo, por lo que esta ampliación no cambia el modelo relacional ni requiere migración SQL. Se deben publicar API y frontal juntos para que la API acepte las nuevas zonas. Cada hallazgo conserva zona, tipo, severidad y observación.
 
 La recepción incluye una **revisión operativa** independiente de los elementos entregados: luces delanteras, bajas, altas, direccionales y laterales, luz de freno, halógenos, aceite de motor, líquido de frenos, líquido de embrague (clutch), aceite de dirección, refrigerante, recordatorio de aceite y bocina. Cada punto admite ✓ Correcto o ✕ Con problema; sin selección significa sin revisar. Volver a tocar la opción seleccionada la deja sin revisar. La observación de esta revisión es opcional, admite hasta 2000 caracteres y permite dictado en español en navegadores compatibles con acceso al micrófono. El dictado añade texto al existente y permite corregirlo antes de guardar. Debe detenerse antes de enviar la inspección.
 

@@ -186,6 +186,8 @@ Content-Type: application/json
 
 ### Recepción: usar una orden nueva que aún esté en recepción.
 # descripcionEstado es opcional (máximo 2000 caracteres): se puede omitir, enviar null o "".
+# Zona admite las ocho zonas originales y las nuevas de puertas, guardafangos, retrovisores,
+# faros, vidrio trasero, luces traseras y extremos de parachoques (ver ZonaVehiculo).
 # revisionOperativa incluye solo actividades revisadas; correcto=true equivale a ✓ y false a ✕.
 
 POST {{Talleres_Api_HostAddress}}/api/ordenes-servicio/{{OrdenServicioId}}/recepcion
@@ -218,7 +220,26 @@ Content-Type: application/json
   "dejaAlfombras": true,
   "otrosElementos": "Llave de seguridad de ruedas",
   "aceptaPruebaRuta": true,
-  "danios": []
+  "danios": [
+    {
+      "zona": "PuertaDelanteraIzquierda",
+      "tipo": "Rayon",
+      "severidad": "Leve",
+      "observacion": "Rayón en la puerta delantera izquierda."
+    },
+    {
+      "zona": "FaroDerecho",
+      "tipo": "Luz",
+      "severidad": "Moderado",
+      "observacion": "Daño en el faro derecho, visible de frente."
+    },
+    {
+      "zona": "ParachoquesTraseroIzquierdo",
+      "tipo": "Golpe",
+      "severidad": "Moderado",
+      "observacion": "Golpe en el extremo izquierdo del parachoques trasero."
+    }
+  ]
 }
 
 ### Consultar todos los elementos y hallazgos persistidos.
@@ -261,7 +282,26 @@ Content-Type: application/json
   "dejaAlfombras": true,
   "otrosElementos": "Llave de seguridad de ruedas",
   "aceptaPruebaRuta": true,
-  "danios": []
+  "danios": [
+    {
+      "zona": "PuertaDelanteraIzquierda",
+      "tipo": "Rayon",
+      "severidad": "Leve",
+      "observacion": "Rayón en la puerta delantera izquierda."
+    },
+    {
+      "zona": "FaroDerecho",
+      "tipo": "Luz",
+      "severidad": "Moderado",
+      "observacion": "Daño en el faro derecho, visible de frente."
+    },
+    {
+      "zona": "ParachoquesTraseroIzquierdo",
+      "tipo": "Golpe",
+      "severidad": "Moderado",
+      "observacion": "Golpe en el extremo izquierdo del parachoques trasero."
+    }
+  ]
 }
 
 ###

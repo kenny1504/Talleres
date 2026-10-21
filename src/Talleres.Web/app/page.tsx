@@ -9,6 +9,8 @@ import {
 import { EstadoCuentaCliente } from "./componentes/EstadoCuentaCliente";
 import { EstadoNegocio, crearFiltroEstadoNegocio } from "./componentes/EstadoNegocio";
 import { ModalCatalogoVehiculo } from "./componentes/ModalCatalogoVehiculo";
+import { MapaInspeccion } from "./componentes/MapaInspeccion";
+import { etiquetaZona, zonaParaApi, zonaDesdeApi, type DanioVisual, type ZonaVehiculo, type TipoDanio, type SeveridadDanio } from "./inspeccionVehiculo";
 import { SelectorCliente } from "./componentes/SelectorCliente";
 import { VisorFotografias, type EstadoVisor } from "./componentes/VisorFotografias";
 import { formatearFechaHoraOrden } from "./fechaHoraOrden";
@@ -86,27 +88,6 @@ interface OrdenTaller {
   color: string;
   visibleEnInicio: boolean;
   prioridad?: boolean;
-}
-
-type ZonaVehiculo =
-  | "frente"
-  | "capo"
-  | "parabrisas"
-  | "techo"
-  | "lateral-izquierdo"
-  | "lateral-derecho"
-  | "maletero"
-  | "posterior";
-
-type TipoDanio = "Rayón" | "Abolladura" | "Golpe" | "Vidrio" | "Luz";
-type SeveridadDanio = "Leve" | "Moderado" | "Severo";
-
-interface DanioVisual {
-  id: string;
-  zona: ZonaVehiculo;
-  tipo: TipoDanio;
-  severidad: SeveridadDanio;
-  observacion: string;
 }
 
 interface InspeccionVisual extends ElementosRecepcion {
@@ -384,17 +365,6 @@ const navegacion: NavegacionItem[] = [
   { id: "tecnicos", etiqueta: "Técnicos", icono: Wrench },
   { id: "inventario", etiqueta: "Inventario", icono: Boxes },
   { id: "negocio", etiqueta: "Estado del negocio", icono: ChartNoAxesCombined },
-];
-
-const zonasVehiculo: Array<{ id: ZonaVehiculo; etiqueta: string }> = [
-  { id: "frente", etiqueta: "Frente" },
-  { id: "capo", etiqueta: "Capó" },
-  { id: "parabrisas", etiqueta: "Parabrisas" },
-  { id: "techo", etiqueta: "Techo" },
-  { id: "lateral-izquierdo", etiqueta: "Lateral izquierdo" },
-  { id: "lateral-derecho", etiqueta: "Lateral derecho" },
-  { id: "maletero", etiqueta: "Maletero" },
-  { id: "posterior", etiqueta: "Posterior" },
 ];
 
 export default function PaginaPrincipal() {
@@ -4600,51 +4570,6 @@ function FormularioRecepcion({
   );
 }
 
-function MapaInspeccion({
-  danios,
-  alMarcar,
-  compacto = false,
-}: {
-  danios: DanioVisual[];
-  alMarcar?: (zona: ZonaVehiculo) => void;
-  compacto?: boolean;
-}) {
-  return (
-    <div className={`mapa-inspeccion ${compacto ? "mapa-compacto" : ""}`}>
-      <div className="orientacion-vehiculo"><span />Frente del vehículo<span /></div>
-      <div className="silueta-vehiculo" aria-label="Esquema superior del vehículo">
-        <span className="rueda rueda-1" />
-        <span className="rueda rueda-2" />
-        <span className="rueda rueda-3" />
-        <span className="rueda rueda-4" />
-        <span className="carroceria">
-          <span className="parabrisas-esquema" />
-          <span className="techo-esquema" />
-          <span className="vidrio-trasero-esquema" />
-        </span>
-        {zonasVehiculo.map((zona) => {
-          const daniosZona = danios.filter((danio) => danio.zona === zona.id);
-          const severidadMayor = obtenerSeveridadMayor(daniosZona);
-          return (
-            <button
-              key={zona.id}
-              type="button"
-              disabled={!alMarcar}
-              className={`marca-zona zona-${zona.id} ${daniosZona.length ? "con-danio" : ""} ${severidadMayor ? `nivel-${normalizarClase(severidadMayor)}` : ""}`}
-              aria-label={`${zona.etiqueta}${daniosZona.length ? `, ${daniosZona.length} daños` : ""}`}
-              onClick={() => alMarcar?.(zona.id)}
-            >
-              {daniosZona.length > 0 ? daniosZona.length : <Plus size={14} />}
-              <span>{zona.etiqueta}</span>
-            </button>
-          );
-        })}
-      </div>
-      {!compacto && <p className="ayuda-mapa">Toca una zona para colocar un marcador</p>}
-    </div>
-  );
-}
-
 function ResumenInspeccion({
   ordenServicioId,
   inspeccion,
@@ -4756,17 +4681,6 @@ function ResumenInspeccion({
       {visor && <VisorFotografias seleccion={visor} alCerrar={() => setVisor(null)} />}
     </section>
   );
-}
-
-function etiquetaZona(zona: ZonaVehiculo) {
-  return zonasVehiculo.find((item) => item.id === zona)?.etiqueta || zona;
-}
-
-function obtenerSeveridadMayor(danios: DanioVisual[]): SeveridadDanio | null {
-  if (danios.some((danio) => danio.severidad === "Severo")) return "Severo";
-  if (danios.some((danio) => danio.severidad === "Moderado")) return "Moderado";
-  if (danios.some((danio) => danio.severidad === "Leve")) return "Leve";
-  return null;
 }
 
 function normalizarClase(valor: string) {
@@ -5525,34 +5439,6 @@ async function eliminarEvidenciaApi(
       "No fue posible eliminar la fotografía.",
     ));
   }
-}
-
-function zonaParaApi(zona: ZonaVehiculo) {
-  const zonas: Record<ZonaVehiculo, string> = {
-    frente: "Frente",
-    capo: "Capo",
-    parabrisas: "Parabrisas",
-    techo: "Techo",
-    "lateral-izquierdo": "LateralIzquierdo",
-    "lateral-derecho": "LateralDerecho",
-    maletero: "Maletero",
-    posterior: "Posterior",
-  };
-  return zonas[zona];
-}
-
-function zonaDesdeApi(zona: string): ZonaVehiculo {
-  const zonas: Record<string, ZonaVehiculo> = {
-    Frente: "frente",
-    Capo: "capo",
-    Parabrisas: "parabrisas",
-    Techo: "techo",
-    LateralIzquierdo: "lateral-izquierdo",
-    LateralDerecho: "lateral-derecho",
-    Maletero: "maletero",
-    Posterior: "posterior",
-  };
-  return zonas[zona] || "frente";
 }
 
 function convertirEstadoApi(estado: string, fechaAutorizacionClienteUtc: string | null): EstadoOrden {
