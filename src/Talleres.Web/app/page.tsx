@@ -3685,6 +3685,7 @@ function FormularioDiagnostico({
 }) {
   const [texto, setTexto] = useState(diagnostico?.diagnostico ?? "");
   const [fotografias, setFotografias] = useState<File[]>([]);
+  const [visor, setVisor] = useState<EstadoVisor | null>(null);
   const [errorFotos, setErrorFotos] = useState("");
   const [dictando, setDictando] = useState(false);
   const [mensajeDictado, setMensajeDictado] = useState("");
@@ -3706,6 +3707,14 @@ function FormularioDiagnostico({
     () => () => vistasPrevias.forEach((vista) => URL.revokeObjectURL(vista.direccion)),
     [vistasPrevias],
   );
+
+  const imagenesVisor = [
+    ...(diagnostico?.evidencias ?? []).map((evidencia) => ({
+      direccion: direccionEvidenciaDiagnostico(ordenServicioId, evidencia.id),
+      descripcion: "Fotografía del diagnóstico: " + evidencia.nombreArchivo,
+    })),
+    ...vistasPrevias.map((vista) => ({ direccion: vista.direccion, descripcion: "Vista previa: " + vista.nombre })),
+  ];
 
   function alternarDictado() {
     if (reconocimiento.current) {
@@ -3818,18 +3827,24 @@ function FormularioDiagnostico({
       </div>
       {((diagnostico?.evidencias.length ?? 0) > 0 || vistasPrevias.length > 0) && (
         <div className="galeria-evidencias galeria-edicion galeria-diagnostico">
-          {diagnostico?.evidencias.map((evidencia) => (
+          {diagnostico?.evidencias.map((evidencia, indice) => (
             <figure key={evidencia.id}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={direccionEvidenciaDiagnostico(ordenServicioId, evidencia.id)} alt={`Evidencia del diagnóstico ${evidencia.nombreArchivo}`} loading="lazy" />
+              <button className="miniatura-evidencia" type="button" aria-label={"Ampliar fotografía del diagnóstico " + evidencia.nombreArchivo} onClick={() => setVisor({ imagenes: imagenesVisor, indice })}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={direccionEvidenciaDiagnostico(ordenServicioId, evidencia.id)} alt={`Evidencia del diagnóstico ${evidencia.nombreArchivo}`} loading="lazy" />
+                <span className="indicador-ampliar-evidencia">Ver fotografía</span>
+              </button>
               <figcaption>Guardada</figcaption>
               <button className="boton-eliminar-evidencia" type="button" disabled={guardando} onClick={() => alEliminarEvidencia(evidencia.id)} aria-label={`Eliminar ${evidencia.nombreArchivo}`}><Trash2 size={18} /></button>
             </figure>
           ))}
           {vistasPrevias.map((vista, indice) => (
             <figure key={vista.direccion}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={vista.direccion} alt={`Vista previa ${vista.nombre}`} />
+              <button className="miniatura-evidencia" type="button" aria-label={"Ampliar vista previa " + vista.nombre} onClick={() => setVisor({ imagenes: imagenesVisor, indice: (diagnostico?.evidencias.length ?? 0) + indice })}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={vista.direccion} alt={`Vista previa ${vista.nombre}`} />
+                <span className="indicador-ampliar-evidencia">Ver fotografía</span>
+              </button>
               <figcaption>Por guardar</figcaption>
               <button
                 className="boton-eliminar-evidencia"
@@ -3862,6 +3877,7 @@ function FormularioDiagnostico({
       )}
       {alEnviarAprobacion && <button type="button" className="boton-secundario boton-ancho" disabled={guardando || !diagnosticoGuardado} onClick={alEnviarAprobacion}><MessageCircleMore size={20} />Solicitar aprobación por WhatsApp</button>}
       {alEnviarAprobacion && !diagnosticoGuardado && <small className="ayuda-envio-diagnostico">Guarda el diagnóstico antes de enviarlo al cliente.</small>}
+      {visor && <VisorFotografias seleccion={visor} alCerrar={() => setVisor(null)} />}
     </section>
   );
 }
@@ -4100,6 +4116,7 @@ function FormularioRecepcion({
   const detalleDanioRef = useRef<HTMLTextAreaElement | null>(null);
   const [cantidadFotos, setCantidadFotos] = useState(0);
   const [fotografias, setFotografias] = useState<File[]>([]);
+  const [visor, setVisor] = useState<EstadoVisor | null>(null);
   const entradaFotografias = useRef<HTMLInputElement | null>(null);
   const [errorFotos, setErrorFotos] = useState("");
   const [evidenciaPorEliminar, setEvidenciaPorEliminar] = useState<EvidenciaInspeccion | null>(null);
@@ -4129,6 +4146,13 @@ function FormularioRecepcion({
     () => () => vistasPrevias.forEach((vista) => URL.revokeObjectURL(vista.direccion)),
     [vistasPrevias],
   );
+  const imagenesVisor = [
+    ...(inspeccionInicial?.evidencias ?? []).map((evidencia) => ({
+      direccion: direccionEvidencia(orden.id, evidencia.id),
+      descripcion: "Fotografía de inspección: " + evidencia.nombreArchivo,
+    })),
+    ...vistasPrevias.map((vista) => ({ direccion: vista.direccion, descripcion: "Vista previa: " + vista.nombre })),
+  ];
   const danioEditandoId = danioEditando?.id;
   const esDanioExistente = danioEditando
     ? danios.some((danio) => danio.id === danioEditando.id)
@@ -4454,14 +4478,17 @@ function FormularioRecepcion({
       {errorFotos && <p className="error-fotografias" role="alert">{errorFotos}</p>}
       {(inspeccionInicial?.evidencias.length || vistasPrevias.length > 0) && (
         <div className="galeria-evidencias galeria-edicion">
-          {inspeccionInicial?.evidencias.map((evidencia) => (
+          {inspeccionInicial?.evidencias.map((evidencia, indice) => (
             <figure key={evidencia.id}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={direccionEvidencia(orden.id, evidencia.id)}
-                alt={`Evidencia ${evidencia.nombreArchivo}`}
-                loading="lazy"
-              />
+              <button className="miniatura-evidencia" type="button" aria-label={"Ampliar fotografía de inspección " + evidencia.nombreArchivo} onClick={() => setVisor({ imagenes: imagenesVisor, indice })}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={direccionEvidencia(orden.id, evidencia.id)}
+                  alt={`Evidencia ${evidencia.nombreArchivo}`}
+                  loading="lazy"
+                />
+                <span className="indicador-ampliar-evidencia">Ver fotografía</span>
+              </button>
               <figcaption>Guardada</figcaption>
               <button
                 className="boton-eliminar-evidencia"
@@ -4476,8 +4503,11 @@ function FormularioRecepcion({
           ))}
           {vistasPrevias.map((vista, indice) => (
             <figure key={vista.direccion}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={vista.direccion} alt={`Vista previa ${vista.nombre}`} />
+              <button className="miniatura-evidencia" type="button" aria-label={"Ampliar vista previa " + vista.nombre} onClick={() => setVisor({ imagenes: imagenesVisor, indice: (inspeccionInicial?.evidencias.length ?? 0) + indice })}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={vista.direccion} alt={`Vista previa ${vista.nombre}`} />
+                <span className="indicador-ampliar-evidencia">Ver fotografía</span>
+              </button>
               <figcaption>Por guardar</figcaption>
               <button
                 className="boton-eliminar-evidencia"
@@ -4566,6 +4596,7 @@ function FormularioRecepcion({
         alConfirmar={eliminarEvidenciaConfirmada}
       />
     )}
+    {visor && <VisorFotografias seleccion={visor} alCerrar={() => setVisor(null)} />}
     </>
   );
 }

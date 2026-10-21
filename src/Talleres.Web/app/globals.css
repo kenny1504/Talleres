@@ -3476,10 +3476,32 @@ button.negocio-fila:hover { background: var(--superficie); }
   cursor: zoom-in;
 }
 
-.galeria-edicion { margin-top: 0; }
+.galeria-evidencias.galeria-edicion {
+  margin-top: 0;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 120px), 1fr));
+}
+
+.galeria-edicion figure { display: grid; grid-template-columns: minmax(0, 1fr) 44px; align-items: center; }
+.galeria-edicion .miniatura-evidencia { grid-column: 1 / -1; width: 100%; border: 0; border-radius: 0; }
+.galeria-edicion .miniatura-evidencia:focus-visible { outline-offset: -3px; }
+.indicador-ampliar-evidencia {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  left: 6px;
+  padding: 4px 5px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.94);
+  color: var(--tinta);
+  font-size: 10px;
+  font-weight: 700;
+  text-align: center;
+  pointer-events: none;
+}
 
 .galeria-edicion figcaption {
-  padding: 6px 8px;
+  min-width: 0;
+  padding: 6px 4px;
   color: var(--tinta-suave);
   font-size: 9px;
   font-weight: 700;
@@ -3505,6 +3527,17 @@ button.negocio-fila:hover { background: var(--superficie); }
   box-shadow: 0 3px 10px rgba(41, 27, 24, 0.12);
 }
 
+.galeria-edicion .boton-eliminar-evidencia {
+  position: static;
+  width: 44px;
+  padding: 0;
+  align-self: stretch;
+  border: 0;
+  border-left: 1px solid var(--borde);
+  border-radius: 0;
+  background: white;
+  box-shadow: none;
+}
 .boton-eliminar-evidencia.confirmando {
   background: var(--rojo);
   color: white;
