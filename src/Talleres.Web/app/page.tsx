@@ -1896,6 +1896,12 @@ function NavegacionInferior({ vista, alNavegar }: { vista: Vista; alNavegar: (vi
   );
 }
 
+function obtenerSaludoInicio(hora: number): string {
+  if (hora < 6 || hora >= 18) return "Buenas noches";
+  if (hora < 12) return "Buenos días";
+  return "Buenas tardes";
+}
+
 function VistaInicio({
   ordenes,
   vehiculos,
@@ -1917,16 +1923,35 @@ function VistaInicio({
   alAbrirOrden: (orden: OrdenTaller) => void;
   alVerOrdenes: () => void;
 }) {
+  const [fechaCliente, setFechaCliente] = useState<Date | null>(null);
+
+  useEffect(() => {
+    const actualizarFechaCliente = () => setFechaCliente(new Date());
+    actualizarFechaCliente();
+    const intervalo = window.setInterval(actualizarFechaCliente, 60_000);
+    window.addEventListener("focus", actualizarFechaCliente);
+    document.addEventListener("visibilitychange", actualizarFechaCliente);
+
+    return () => {
+      window.clearInterval(intervalo);
+      window.removeEventListener("focus", actualizarFechaCliente);
+      document.removeEventListener("visibilitychange", actualizarFechaCliente);
+    };
+  }, []);
+
   const vehiculosPorId = new Map(vehiculos.map((vehiculo) => [vehiculo.id, vehiculo]));
   const ordenesEnTaller = ordenes.filter((orden) => orden.estado !== "Lista para entregar");
   const ordenesPorAprobar = ordenes.filter((orden) => orden.estado === "Por aprobar");
   const ordenesListas = ordenes.filter((orden) => orden.estado === "Lista para entregar");
   const ordenesEnRecepcion = ordenes.filter((orden) => orden.estado === "Recepción");
-  const fechaActual = new Intl.DateTimeFormat("es-NI", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-  }).format(new Date());
+  const fechaActual = fechaCliente
+    ? new Intl.DateTimeFormat("es-NI", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+    }).format(fechaCliente)
+    : "Tu taller";
+  const saludo = fechaCliente ? obtenerSaludoInicio(fechaCliente.getHours()) : "Hola";
   const valorMetrica = (cantidad: number) =>
     cargando ? "…" : datosDisponibles ? String(cantidad) : "—";
 
@@ -1935,7 +1960,7 @@ function VistaInicio({
       <section className="encabezado-pagina encabezado-inicio">
         <div>
           <span className="sobrelinea">{fechaActual}</span>
-          <h1>Buen día, {nombreUsuario.split(" ")[0]}</h1>
+          <h1>{saludo}, {nombreUsuario.split(" ")[0]}</h1>
           <p>
             {cargando
               ? "Consultando la operación actual del taller."
@@ -1965,7 +1990,7 @@ function VistaInicio({
           <span className="dato-taller-ruc"><strong>RUC</strong><em>{taller.ruc || "No registrado"}</em></span>
           <span className="dato-taller-telefono"><strong>Teléfono</strong><em>+{taller.prefijoTelefono} {taller.telefono}</em></span>
           <span className="dato-taller-contacto"><strong>Correo</strong><em>{taller.correo || "No registrado"}</em></span>
-          <span className="dato-taller-ancho"><strong>Dirección</strong><em>{[taller.direccion, taller.ciudad, taller.barrio, taller.calle].filter(Boolean).join(", ") || "No registrada"}</em></span>
+          <span className="dato-taller-direccion"><strong>Dirección</strong><em>{[taller.direccion, taller.ciudad, taller.barrio, taller.calle].filter(Boolean).join(", ") || "No registrada"}</em></span>
         </div>
       </section>
 
