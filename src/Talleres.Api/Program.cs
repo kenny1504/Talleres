@@ -165,6 +165,7 @@ builder.Services.AddScoped<IEliminacionOrdenServicio, EliminacionOrdenServicio>(
 builder.Services.AddScoped<ITecnicoTallerServicio, TecnicoTallerServicio>();
 builder.Services.AddScoped<IDetalleOrdenServicio, DetalleOrdenServicio>();
 builder.Services.AddScoped<IDiagnosticoOrdenServicioServicio, DiagnosticoOrdenServicioServicio>();
+builder.Services.AddScoped<IExpedienteVehiculoPublicoServicio, ExpedienteVehiculoPublicoServicio>();
 builder.Services.AddScoped<IRecepcionVehiculoServicio, RecepcionVehiculoServicio>();
 builder.Services.AddScoped<IEvidenciaInspeccionServicio, EvidenciaInspeccionServicio>();
 builder.Services.AddSingleton<IAlmacenamientoEvidencias>(_ =>

@@ -7,7 +7,7 @@ import { VisorFotografias, type EstadoVisor, type ImagenVisor } from "../../comp
 import { MapaInspeccion } from "../../componentes/MapaInspeccion";
 import { etiquetaZona, zonaDesdeApi, type SeveridadDanio } from "../../inspeccionVehiculo";
 import { formatearFechaHoraOrden } from "../../fechaHoraOrden";
-import { estaAprobadaPorCliente } from "../../estadoOrden";
+import { estaAprobadaPorCliente, etiquetaEstado } from "../../estadoOrden";
 import { elementosRecepcion, type ElementosRecepcion } from "../../elementosRecepcion";
 import { actividadesRevisionOperativa, type ResultadoRevisionOperativa } from "../../revisionOperativa";
 import { formatearCantidad, formatearImporte, type ConfiguracionMonetaria } from "../../formatoMonetario";
@@ -103,6 +103,10 @@ export default function OrdenPublicaPagina({ params }: { params: Promise<{ token
       <section className="vehiculo-publico">
         <span><CarFront size={30} /></span>
         <div><small>Vehículo de {orden.nombreCliente}</small><h2>{orden.marca} {orden.modelo}</h2><p>{orden.anio} · Placa {orden.placa}{orden.color ? ` · ${orden.color}` : ""}</p></div>
+      </section>
+      <section className="acceso-expediente-publico">
+        <div><strong>Expediente del vehículo</strong><p>Consulta todas las visitas de este vehículo al taller.</p></div>
+        <a className="boton-secundario" href={`/orden/${encodeURIComponent(token)}/expediente`}>Ver expediente</a>
       </section>
       <section className="tarjeta-publica inspeccion-publica">
         <div className="cabecera-seccion-publica">
@@ -234,6 +238,5 @@ async function autorizarOrden(token: string): Promise<OrdenPublica> {
   if (!respuesta.ok) throw new Error("No fue posible registrar la autorización. Inténtalo nuevamente.");
   return await respuesta.json() as OrdenPublica;
 }
-function etiquetaEstado(estado: string) { return ({ Recepcion: "Recepción", Diagnostico: "Diagnóstico", Cotizacion: "Cotización", PendienteAprobacion: "Por autorizar", PreparacionReparacion: "Preparación de reparación", Reparacion: "En reparación", ControlCalidad: "Control de calidad", ListaParaEntrega: "Lista para entregar", Entregada: "Entregada", Cerrada: "Cerrada", Cancelada: "Cancelada" } as Record<string, string>)[estado] ?? estado; }
 function etiquetaCombustible(porcentaje: number) { return porcentaje >= 88 ? "Tanque lleno" : porcentaje >= 63 ? "3/4 de tanque" : porcentaje >= 38 ? "Medio tanque" : porcentaje >= 13 ? "1/4 de tanque" : "Reserva"; }
 function etiquetaTipoDanio(tipo: string) { return tipo === "Rayon" ? "Rayón" : tipo; }

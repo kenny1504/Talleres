@@ -141,6 +141,8 @@ test("el proxy conserva por separado todas las cookies de autenticación", async
     assert.equal(solicitud.headers["x-forwarded-proto"], "https");
     respuesta.writeHead(302, {
       location: "https://talleres.example.com/",
+      "cache-control": "no-store, no-cache",
+      pragma: "no-cache",
       "set-cookie": cookies,
     });
     respuesta.end();
@@ -172,6 +174,8 @@ test("el proxy conserva por separado todas las cookies de autenticación", async
 
     assert.equal(respuesta.status, 302);
     assert.deepEqual(respuesta.headers.getSetCookie(), cookies);
+    assert.equal(respuesta.headers.get("cache-control"), "no-store, no-cache");
+    assert.equal(respuesta.headers.get("pragma"), "no-cache");
   } finally {
     delete process.env.TALLERES_API_INTERNA_URL;
     servidorApi.close();

@@ -6,6 +6,7 @@ using Talleres.Aplicacion.DTOs.OrdenesServicio;
 using Talleres.Aplicacion.Servicios;
 using Talleres.Dominio.Entidades;
 using Talleres.Dominio.Enumeraciones;
+using Talleres.Dominio.Excepciones;
 using Talleres.Infraestructura.Persistencia;
 using Talleres.Pruebas.Soporte;
 
@@ -248,6 +249,138 @@ public sealed class DiagnosticoOrdenServicioPruebas
         Assert.Equal("https://example.test/logo.png", resultado.Taller.Logo);
     }
 
+    [Fact]
+    public async Task ExpedientePublico_LimitaVehiculoEmpresaYRelacionadosSinSesion()
+    {
+        var opciones = new DbContextOptionsBuilder<TallerDbContext>().UseInMemoryDatabase(Guid.NewGuid().ToString()).Options;
+        var compartidaId = await PrepararExpedienteAsync(opciones);
+        await using var publico = new TallerDbContext(opciones, new ContextoEmpresaPrueba(0));
+        var servicio = new ExpedienteVehiculoPublicoServicio(publico, new IdentidadNovaPrueba(), new ConfiguracionMonetariaNovaPrueba());
+
+        var resultado = await servicio.ObtenerAsync("  " + new string('A', 48) + "  ", new());
+
+        Assert.Equal("M123456", resultado.Vehiculo.Placa);
+        Assert.Equal("Taller de Prueba", resultado.NombreTaller);
+        Assert.Equal(12, resultado.TotalOrdenes);
+        Assert.Equal(10, resultado.TamanoPagina);
+        Assert.Equal(1, resultado.Pagina);
+        Assert.Equal(10, resultado.Ordenes.Count);
+        var compartida = Assert.Single(resultado.Ordenes, orden => orden.EsOrdenCompartida);
+        Assert.Equal("OS-01", compartida.Numero);
+        Assert.Null(compartida.Kilometraje); // La recepción ajena insertada deliberadamente no se expone.
+        Assert.Equal(250m, compartida.Total);
+        Assert.Equal("Servicio propio", Assert.Single(compartida.Cargos).Descripcion);
+        Assert.Contains(resultado.Ordenes, orden => orden.Estado == EstadoOrdenServicio.Cancelada);
+        Assert.Contains(resultado.Ordenes, orden => orden.Estado == EstadoOrdenServicio.Cerrada);
+        Assert.Contains(resultado.Ordenes, orden => orden.Diagnostico == null);
+        Assert.DoesNotContain(resultado.Ordenes, orden => orden.Numero.Contains("AJENA") || orden.Numero.Contains("OTRO"));
+        Assert.Empty(publico.ChangeTracker.Entries());
+        var ordenPersistida = await publico.OrdenesServicio.IgnoreQueryFilters().AsNoTracking().SingleAsync(orden => orden.Id == compartidaId);
+        Assert.Null(ordenPersistida.FechaAutorizacionClienteUtc);
+        Assert.Equal(EstadoOrdenServicio.PendienteAprobacion, ordenPersistida.Estado);
+    }
+
+    [Fact]
+    public async Task ExpedientePublico_PaginaTodoElHistorialSinDuplicarOrdenes()
+    {
+        var opciones = new DbContextOptionsBuilder<TallerDbContext>().UseInMemoryDatabase(Guid.NewGuid().ToString()).Options;
+        await PrepararExpedienteAsync(opciones);
+        await using var publico = new TallerDbContext(opciones, new ContextoEmpresaPrueba(0));
+        var servicio = new ExpedienteVehiculoPublicoServicio(publico, new IdentidadNovaPrueba(), new ConfiguracionMonetariaNovaPrueba());
+        var token = new string('a', 48);
+
+        var primera = await servicio.ObtenerAsync(token, new());
+        var segunda = await servicio.ObtenerAsync(token, new() { Pagina = 2 });
+        var ultima = await servicio.ObtenerAsync(token, new() { Pagina = int.MaxValue });
+
+        Assert.Equal(2, segunda.Pagina);
+        Assert.Equal(2, segunda.Ordenes.Count);
+        Assert.Equal(12, primera.Ordenes.Concat(segunda.Ordenes).Select(orden => orden.Numero).Distinct().Count());
+        Assert.Equal(segunda.Ordenes.Select(orden => orden.Numero), ultima.Ordenes.Select(orden => orden.Numero));
+        Assert.Equal(primera.Ordenes.Select(orden => orden.Numero), (await servicio.ObtenerAsync(token, new())).Ordenes.Select(orden => orden.Numero));
+    }
+
+    [Fact]
+    public async Task ExpedientePublico_RechazaTokensInvalidosInexistentesYRelacionesDeOtraEmpresa()
+    {
+        var opciones = new DbContextOptionsBuilder<TallerDbContext>().UseInMemoryDatabase(Guid.NewGuid().ToString()).Options;
+        var compartidaId = await PrepararExpedienteAsync(opciones);
+        await using var publico = new TallerDbContext(opciones, new ContextoEmpresaPrueba(0));
+        var servicio = new ExpedienteVehiculoPublicoServicio(publico, new IdentidadNovaPrueba(), new ConfiguracionMonetariaNovaPrueba());
+        foreach (var token in new[] { "", "invalido", new string('z', 48), new string('b', 48), new string('c', 48) })
+            await Assert.ThrowsAsync<RecursoNoEncontradoException>(() => servicio.ObtenerAsync(token, new()));
+
+        await using var internoTaller = new TallerDbContext(opciones, new ContextoEmpresaPrueba(7));
+        var compartida = await internoTaller.OrdenesServicio.SingleAsync(orden => orden.Id == compartidaId);
+        compartida.Diagnostico = null;
+        await internoTaller.SaveChangesAsync();
+        await Assert.ThrowsAsync<RecursoNoEncontradoException>(() => servicio.ObtenerAsync(new string('a', 48), new()));
+    }
+
+    private static async Task<long> PrepararExpedienteAsync(DbContextOptions<TallerDbContext> opciones)
+    {
+        long compartidaId;
+        long vehiculoId;
+        await using (var contexto = new TallerDbContext(opciones, new ContextoEmpresaPrueba(7)))
+        {
+            var cliente = new Cliente { EmpresaId = 7, Nombre = "Cliente", Telefono = "88880000" };
+            var marca = new MarcaVehiculo { EmpresaId = 7, Nombre = "Toyota" };
+            var modelo = new ModeloVehiculo { EmpresaId = 7, Nombre = "Hilux", Marca = marca };
+            var vehiculo = new Vehiculo { EmpresaId = 7, Cliente = cliente, Modelo = modelo, Placa = "M123456", Anio = 2024 };
+            OrdenServicio? compartida = null;
+            for (var indice = 0; indice < 12; indice++)
+            {
+                var orden = new OrdenServicio
+                {
+                    EmpresaId = 7, Cliente = cliente, Vehiculo = vehiculo, Numero = $"OS-{indice + 1:00}",
+                    Estado = indice == 0 ? EstadoOrdenServicio.PendienteAprobacion : indice == 1 ? EstadoOrdenServicio.Cancelada : EstadoOrdenServicio.Cerrada,
+                    FechaIngreso = new DateTime(2026, 10, 21, 12, 0, 0, DateTimeKind.Utc).AddDays(-indice),
+                    Diagnostico = indice == 0 ? "Diagnóstico compartido" : null,
+                    TokenPublico = indice == 0 ? new string('a', 48) : null
+                };
+                contexto.OrdenesServicio.Add(orden);
+                if (indice == 0) compartida = orden;
+            }
+            compartida!.Detalles.Add(new Talleres.Dominio.Entidades.DetalleOrdenServicio
+            {
+                EmpresaId = 7, Descripcion = "Servicio propio", Cantidad = 2, PrecioUnitario = 125, Tipo = TipoDetalleOrdenServicio.Manual
+            });
+            var otroVehiculo = new Vehiculo { EmpresaId = 7, Cliente = cliente, Modelo = modelo, Placa = "OTRO-VEHICULO", Anio = 2024 };
+            contexto.OrdenesServicio.Add(new OrdenServicio
+            {
+                EmpresaId = 7, Cliente = cliente, Vehiculo = otroVehiculo, Numero = "OS-OTRO-VEHICULO", FechaIngreso = DateTime.UtcNow
+            });
+            await contexto.SaveChangesAsync();
+            compartidaId = compartida.Id;
+            vehiculoId = vehiculo.Id;
+        }
+        await using (var contextoAjeno = new TallerDbContext(opciones, new ContextoEmpresaPrueba(8)))
+        {
+            var cliente = new Cliente { EmpresaId = 8, Nombre = "Cliente ajeno", Telefono = "88889999" };
+            var marca = new MarcaVehiculo { EmpresaId = 8, Nombre = "Otra marca" };
+            var modelo = new ModeloVehiculo { EmpresaId = 8, Nombre = "Otro modelo", Marca = marca };
+            var vehiculo = new Vehiculo { EmpresaId = 8, Cliente = cliente, Modelo = modelo, Placa = "M123456", Anio = 2024 };
+            contextoAjeno.OrdenesServicio.Add(new OrdenServicio
+            {
+                EmpresaId = 8, Cliente = cliente, Vehiculo = vehiculo, Numero = "OS-AJENA-MISMA-PLACA", FechaIngreso = DateTime.UtcNow
+            });
+            contextoAjeno.OrdenesServicio.Add(new OrdenServicio
+            {
+                EmpresaId = 8, Cliente = cliente, VehiculoId = vehiculoId, Numero = "OS-AJENA-RELACION", FechaIngreso = DateTime.UtcNow,
+                Diagnostico = "Ajeno", TokenPublico = new string('c', 48)
+            });
+            contextoAjeno.DetallesOrdenesServicio.Add(new Talleres.Dominio.Entidades.DetalleOrdenServicio
+            {
+                EmpresaId = 8, OrdenServicioId = compartidaId, Descripcion = "Cargo ajeno", Cantidad = 1, PrecioUnitario = 999, Tipo = TipoDetalleOrdenServicio.Manual
+            });
+            contextoAjeno.RecepcionesVehiculo.Add(new RecepcionVehiculo
+            {
+                EmpresaId = 8, OrdenServicioId = compartidaId, Kilometraje = 999999, DescripcionEstado = "Recepción ajena"
+            });
+            await contextoAjeno.SaveChangesAsync();
+        }
+        return compartidaId;
+    }
     private sealed class ConfiguracionMonetariaNovaPrueba(ConfiguracionMonetariaDto? configuracion = null) : IConfiguracionMonetariaSmartNova
     {
         public Task<ConfiguracionMonetariaDto> ObtenerAsync(int empresaNovaId, CancellationToken cancellationToken)

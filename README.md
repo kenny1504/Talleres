@@ -296,3 +296,9 @@ Las reglas que deben respetar las ampliaciones futuras están consolidadas en [`
 - Se versionan el código fuente, migraciones, pruebas, documentación, archivos de proyecto, `package-lock.json` y `.env.example`.
 - Se excluyen dependencias instaladas, compilaciones, cachés, bases de datos locales, resultados de pruebas, logs, archivos del IDE y cualquier `.env` real.
 - Las cadenas de conexión y credenciales de cada entorno deben configurarse mediante variables de entorno o el almacén de secretos correspondiente; no deben guardarse en Git.
+
+### Expediente público del vehículo
+
+Desde `/orden/{token}`, **Ver expediente** abre `/orden/{token}/expediente`. El cliente consulta todas las órdenes de ese vehículo en el mismo taller, de más reciente a más antigua y de diez en diez, incluidas las canceladas, cerradas y las que todavía no tienen diagnóstico. Cada orden permite desplegar fecha, estado, kilometraje de ingreso, motivo, diagnóstico y productos o servicios con cantidad, precio, subtotal y total. Los importes usan la configuración monetaria de Galileo.
+
+`GET /api/publico/ordenes-servicio/{token}/expediente?pagina=1` resuelve en el servidor el `VehiculoId` y `EmpresaId` de la orden del enlace. No acepta esos identificadores desde el navegador, no consulta otros vehículos del propietario ni otros talleres y no devuelve tokens de otras órdenes. La consulta no modifica estados ni autoriza trabajos. El token debe seguir siendo válido y pertenecer a una orden con diagnóstico. La respuesta y la solicitud web no se almacenan en caché. El expediente no incluye datos personales de propietarios anteriores. No requiere migración ni cambios en SMART TPV NOVA; publicar API y frontal juntos.

@@ -88,11 +88,18 @@ public sealed class DiagnosticosOrdenesServicioController(
 [AllowAnonymous]
 [Route("api/publico/ordenes-servicio/{token}")]
 public sealed class OrdenesServicioPublicasController(
-    IDiagnosticoOrdenServicioServicio diagnosticoServicio) : ControllerBase
+    IDiagnosticoOrdenServicioServicio diagnosticoServicio,
+    IExpedienteVehiculoPublicoServicio expedienteServicio) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<OrdenServicioPublicaDto>> Obtener(string token, CancellationToken cancellationToken) =>
         Ok(await diagnosticoServicio.ObtenerPublicaAsync(token, cancellationToken));
+
+    [HttpGet("expediente")]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    public async Task<ActionResult<ExpedienteVehiculoPublicoDto>> ObtenerExpediente(
+        string token, [FromQuery] ConsultarExpedienteVehiculoPublicoSolicitud solicitud, CancellationToken cancellationToken) =>
+        Ok(await expedienteServicio.ObtenerAsync(token, solicitud, cancellationToken));
 
     [HttpPost("autorizar")]
     public async Task<ActionResult<OrdenServicioPublicaDto>> Autorizar(string token, CancellationToken cancellationToken) =>

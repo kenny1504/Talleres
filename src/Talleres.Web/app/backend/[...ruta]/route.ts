@@ -10,6 +10,8 @@ const nombresEncabezadosSolicitud = [
 ];
 
 const nombresEncabezadosRespuesta = [
+  "cache-control",
+  "pragma",
   "content-disposition",
   "content-type",
   "location",

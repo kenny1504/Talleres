@@ -42,6 +42,14 @@ Accept: application/json
 GET {{Talleres_Api_HostAddress}}/api/publico/ordenes-servicio/{{TokenPublicoOrden}}
 Accept: application/json
 
+### Expediente público del vehículo, sin sesión ni identificadores de empresa o vehículo.
+# Devuelve diez órdenes por página, de más reciente a más antigua, incluidas las que no tienen diagnóstico.
+# Incluye motivo, diagnóstico, kilometraje histórico, cargos y total con la configuración monetaria del taller.
+# El token limita todas las consultas al mismo VehiculoId y EmpresaId de la orden compartida.
+# No devuelve tokens de otras órdenes ni permite autorizar desde el historial. pagina >= 1; páginas fuera del total devuelven la última.
+GET {{Talleres_Api_HostAddress}}/api/publico/ordenes-servicio/{{TokenPublicoOrden}}/expediente?pagina=1
+Accept: application/json
+
 ### Confirmar la orden como cliente mediante el token público (sin sesión).
 # Registra fechaAutorizacionClienteUtc de forma idempotente y la web muestra Aprobada.
 # Conserva la etapa operativa hasta que el taller inicie la reparación.
